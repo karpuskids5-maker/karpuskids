@@ -1,274 +1,840 @@
 
-Quiero implementar en mi sistema una función profesional de **SUSPENSIÓN TEMPORAL DEL SERVICIO POR EMPRESA**, debido a falta de pago de la mensualidad.
+Q# 🎬 INFORME TÉCNICO
+
+## Sistema de Video y Experiencia Tipo Instagram para el Muro Escolar de Karpus Kids
 
-IMPORTANTE:
+**Proyecto:** Karpus Kids
+**Módulo:** Muro Escolar
+**Objetivo:** Implementar una experiencia moderna de publicación y reproducción de videos inspirada en los patrones de UX utilizados por Instagram Reels y publicaciones multimedia.
 
-* NO eliminar usuarios.
-* NO eliminar datos.
-* NO modificar ni romper funcionalidades existentes.
-* NO cambiar el diseño general del sistema.
-* La suspensión debe aplicarse a TODA la empresa/estancia, no usuario por usuario.
-* Mantener intacta toda la información existente.
-* Antes de modificar código, analiza la arquitectura actual, autenticación, tablas de Supabase, relaciones entre usuarios y empresa y políticas RLS.
+---
 
-### 1. ESTADO DE LA EMPRESA
+# 1. Resumen ejecutivo
 
-Utiliza la tabla `business` existente si ya existe.
+El Muro Escolar de **Karpus Kids** evoluciona de un simple visor de archivos multimedia hacia un sistema de publicación y reproducción de microvideos optimizado para dispositivos móviles.
 
-Agregar, únicamente si no existen, los campos necesarios para controlar el estado:
+La estrategia consiste en aplicar al entorno escolar los principales patrones de experiencia que hacen que plataformas como Instagram resulten rápidas, fluidas y fáciles de consumir:
 
-* `status`: `active` o `suspended`
-* `suspended_at`
-* `suspension_reason` (puede existir internamente, pero NO mostrarlo al cliente)
+* Videos verticales.
+* Reproducción automática al entrar en pantalla.
+* Reproducción silenciosa por defecto.
+* Pausa automática al salir del viewport.
+* Miniaturas antes de iniciar el video.
+* Precarga inteligente.
+* Compresión de contenido.
+* Diseño sin saltos visuales.
+* Interacciones mediante gestos.
+* Reproducción continua.
+* Optimización para conexiones móviles.
+* Control eficiente de memoria y recursos.
 
-El estado por defecto debe ser:
+El objetivo no es copiar Instagram literalmente, sino **adaptar sus mejores patrones de experiencia al contexto privado y educativo de Karpus Kids**.
 
-`active`
+---
 
-### 2. COMPORTAMIENTO CUANDO LA EMPRESA ESTÁ ACTIVA
+# 2. Objetivo principal
 
-Si:
+La finalidad del sistema es que un padre pueda abrir el Muro Escolar y consumir fotografías y videos de las actividades de sus hijos de manera:
 
-`business.status = active`
+**rápida + fluida + visual + sencilla + optimizada para móviles.**
 
-el sistema debe funcionar exactamente como funciona actualmente.
+La experiencia deseada es:
 
-NO modificar:
+```text
+Padre abre Karpus
+        ↓
+El muro aparece rápidamente
+        ↓
+Las miniaturas están disponibles
+        ↓
+El padre hace scroll
+        ↓
+El video entra en pantalla
+        ↓
+Reproducción automática sin sonido
+        ↓
+El video continúa mientras se descarga contenido
+        ↓
+El padre sigue haciendo scroll
+        ↓
+El video anterior se pausa
+        ↓
+El siguiente contenido toma el foco
+```
 
-* Dashboard
-* módulos
-* permisos
-* usuarios
-* navegación
-* datos
-* funcionalidades existentes
+---
 
-### 3. COMPORTAMIENTO CUANDO LA EMPRESA ESTÁ SUSPENDIDA
+# 3. Principio fundamental: “ver primero, descargar después”
 
-Si:
+Karpus no debe obligar al dispositivo a descargar todos los videos del Muro antes de mostrarlos.
 
-`business.status = suspended`
+La estrategia debe ser:
 
-NINGÚN usuario perteneciente a esa empresa debe poder utilizar el sistema.
+```text
+❌ Arquitectura tradicional
 
-Esto incluye:
+Abrir muro
+    ↓
+Descargar todos los videos
+    ↓
+Esperar
+    ↓
+Mostrar contenido
 
-* Director
-* Administradores
-* Maestros
-* Asistentes
-* Padres
-* Cualquier otro usuario asociado a esa empresa
 
-Después de iniciar sesión, el sistema debe comprobar el estado de la empresa.
+✅ Arquitectura optimizada
 
-Si está suspendida:
+Abrir muro
+    ↓
+Mostrar estructura + texto + thumbnails
+    ↓
+Detectar video visible
+    ↓
+Preparar reproducción
+    ↓
+Reproducir
+    ↓
+Cargar contenido progresivamente
+```
 
-1. No cargar el dashboard.
-2. No permitir acceso a los módulos.
-3. No permitir consultas normales de datos.
-4. Cerrar la sesión si corresponde.
-5. Mostrar una pantalla/modal de suspensión.
+Esto reduce el tiempo de espera inicial y evita descargar contenido que el usuario probablemente nunca llegará a visualizar.
 
-### 4. DISEÑO DE LA VENTANA DE SUSPENSIÓN
+---
 
-Crear una pantalla visualmente profesional, limpia y moderna.
+# 4. Formato de video
 
-NO mostrar el motivo de la suspensión.
+Para el contenido audiovisual del Muro Escolar se utilizarán formatos optimizados para dispositivos móviles.
 
-Mostrar únicamente:
+### Formato recomendado
 
-**Sistema temporalmente suspendido**
+* Relación vertical: **9:16**
+* Relación alternativa: **4:5**
+* Resolución principal: **1080 × 1920**
+* FPS recomendado: **30 fps**
+* Codec principal: **H.264**
+* Audio: **AAC**
+* Contenedor: **MP4**
+* Duración recomendada: **hasta 30 segundos**
 
-Texto:
+El formato de 30 segundos se utilizará principalmente para publicaciones dinámicas y actividades escolares.
 
-**En este momento el acceso al sistema se encuentra temporalmente suspendido.**
+No obstante, el límite debe considerarse una regla de producto y no una necesidad técnica absoluta.
 
-Debajo:
+---
 
-**Para obtener asistencia o solicitar la reactivación del servicio, comuníquese con nosotros.**
+# 5. Optimización de archivos
 
-Botón principal:
+El archivo original subido por una maestra no debe ser necesariamente el archivo que consume el padre.
 
-**Contactar soporte**
+El flujo recomendado es:
 
-El botón debe abrir WhatsApp directamente al número:
+```text
+Video original
+      ↓
+Validación
+      ↓
+Procesamiento
+      ↓
+Compresión
+      ↓
+Thumbnail
+      ↓
+Versión de reproducción
+      ↓
+Distribución
+      ↓
+Padres
+```
 
-**8497114807**
+Esto permite reducir el peso del contenido sin sacrificar innecesariamente la calidad visual.
 
-Utilizar el enlace de WhatsApp correspondiente:
+---
 
-`https://wa.me/18497114807`
+# 6. Sistema de thumbnails
 
-El botón debe abrir WhatsApp en una nueva pestaña/ventana cuando sea posible.
+Cada video debe disponer de una imagen de portada.
 
-### 5. DISEÑO VISUAL
+La thumbnail permitirá que Karpus muestre inmediatamente una representación visual del contenido mientras se prepara la reproducción.
 
-La ventana debe sentirse como una plataforma SaaS profesional.
+```text
+┌───────────────────────┐
+│                       │
+│     THUMBNAIL         │
+│                       │
+│          ▶            │
+│                       │
+└───────────────────────┘
+```
 
-Utilizar:
+La miniatura debe:
 
-* Fondo limpio.
-* Tarjeta central.
-* Icono de bloqueo/suspensión.
-* Título grande.
-* Texto corto.
-* Botón de WhatsApp claramente visible.
-* Diseño responsive para computadora, tablet y móvil.
-* Bordes redondeados.
-* Sombras suaves.
-* Buena separación entre elementos.
+* Mantener la misma relación de aspecto del video.
+* Evitar pantallas negras.
+* Utilizar formato WebP cuando sea conveniente.
+* Tener un tamaño reducido.
+* Mantener una apariencia visual atractiva.
+* Reservar previamente el espacio del video.
 
-NO utilizar un diseño agresivo, rojo intenso o que parezca un error del sistema.
+---
 
-La sensación debe ser:
+# 7. Eliminación del Layout Shift
 
-"El servicio está temporalmente inactivo y puedes comunicarte con soporte."
+El sistema debe conocer la relación de aspecto del contenido antes de cargar el video.
 
-### 6. SESIONES YA ABIERTAS
+Por ejemplo:
 
-MUY IMPORTANTE:
+```css
+aspect-ratio: 4 / 5;
+```
 
-Si una empresa está activa y un usuario ya tiene una sesión abierta, pero posteriormente el administrador cambia:
+o:
 
-`status = suspended`
+```css
+aspect-ratio: 9 / 16;
+```
 
-el usuario no debe poder continuar utilizando el sistema indefinidamente.
+De esta manera, el navegador reserva el espacio antes de que llegue el contenido multimedia.
 
-Implementar una comprobación periódica del estado de la empresa mientras el usuario está conectado.
+Resultado:
 
-Por ejemplo, verificar cada pocos minutos o utilizando el mecanismo más eficiente disponible en la arquitectura actual.
+```text
+❌ Antes
 
-Si detecta:
+Texto
+↓
+cargando video
+↓
+pantalla cambia de tamaño
+↓
+contenido salta
 
-`status = suspended`
 
-debe:
+✅ Karpus
 
-1. Detener las operaciones del sistema.
-2. Evitar nuevas consultas/modificaciones.
-3. Cerrar la sesión de forma segura.
-4. Mostrar la pantalla de suspensión.
+Texto
+↓
+espacio reservado
+↓
+thumbnail
+↓
+video
+```
 
-### 7. SEGURIDAD
+Esto mejora considerablemente la estabilidad visual del Muro.
 
-NO depender únicamente de JavaScript/frontend para realizar la suspensión.
+---
 
-Revisar las políticas RLS existentes de Supabase y determinar la mejor forma de impedir que una empresa suspendida continúe accediendo a sus datos mediante consultas directas.
+# 8. Reproducción automática inteligente
 
-No eliminar ni modificar políticas RLS existentes de forma destructiva.
+Karpus utilizará `IntersectionObserver` para determinar qué videos están actualmente visibles.
 
-Crear las nuevas políticas necesarias de forma compatible con la arquitectura actual.
+Cuando un video alcance un porcentaje suficiente de visibilidad, podrá comenzar la reproducción automáticamente.
 
-IMPORTANTE:
-La suspensión debe afectar solamente a la empresa suspendida.
+Configuración propuesta:
 
-Una empresa activa NO debe verse afectada.
+```text
+≥ 65 % visible
+       ↓
+     PLAY
 
-### 8. REACTIVACIÓN
+< 65 % visible
+       ↓
+     PAUSE
+```
 
-Desde el panel administrativo del propietario del sistema debe ser posible cambiar:
+El porcentaje podrá ajustarse posteriormente mediante pruebas reales de uso.
 
-`suspended → active`
+---
 
-Cuando la empresa vuelva a estar:
+# 9. Reproducción silenciosa
 
-`active`
+Los videos comenzarán:
 
-sus usuarios deben poder iniciar sesión y utilizar nuevamente el sistema con todos sus datos intactos.
+```javascript
+muted = true
+```
 
-No crear nuevamente los usuarios.
+Esto permite una experiencia de autoplay compatible con las políticas habituales de los navegadores móviles.
 
-No restaurar datos.
+El usuario podrá activar el sonido mediante un control visible.
 
-No duplicar registros.
+```text
+🔇 → 🔊
+```
 
-Simplemente permitir nuevamente el acceso.
+El sonido no deberá activarse automáticamente sin una interacción del usuario.
 
-### 9. PANEL ADMINISTRATIVO
+---
 
-Agregar al panel administrativo una opción para controlar el estado de cada empresa.
+# 10. Un solo video reproduciendo audio
 
-Mostrar:
+Karpus deberá garantizar que no existan múltiples videos reproduciendo sonido simultáneamente.
 
-**Estado: ACTIVO**
-o
-**Estado: SUSPENDIDO**
+Ejemplo:
 
-Agregar una acción:
+```text
+Video 1 → 🔊 reproduciendo
+Video 2 → pausado
+Video 3 → pausado
+```
 
-**Suspender servicio**
+Si el usuario activa el sonido en otro video:
 
-y cuando esté suspendida:
+```text
+Video 1 → mute
+Video 2 → 🔊
+Video 3 → pausado
+```
 
-**Reactivar servicio**
+Esto evita una experiencia incómoda dentro del Muro.
 
-Antes de suspender, mostrar una confirmación:
+---
 
-**¿Deseas suspender temporalmente el servicio de esta empresa?**
+# 11. Loop de microvideos
 
-Indicar que todos los usuarios asociados perderán temporalmente el acceso.
+Los videos cortos podrán utilizar:
 
-### 10. IMPLEMENTACIÓN SEGURA
+```html
+loop
+```
 
-ANTES de escribir código:
+para crear una experiencia continua.
 
-1. Analiza las tablas existentes.
-2. Identifica cómo se relaciona cada usuario con `business_id`.
-3. Identifica cómo funciona actualmente Supabase Auth.
-4. Revisa las políticas RLS.
-5. Identifica los archivos responsables del login.
-6. Identifica el sistema actual de rutas/protección de páginas.
-7. Identifica si existe algún sistema de permisos o roles.
+Esto resulta especialmente útil para:
 
-Después presenta un pequeño plan de implementación.
+* actividades de niños;
+* juegos;
+* experimentos;
+* presentaciones;
+* momentos especiales;
+* actividades de aula.
 
-Luego realiza los cambios.
+El loop debe realizarse sin introducir una pantalla negra innecesaria entre reproducciones.
 
-NO reemplaces archivos completos si solamente es necesario modificar una parte.
+---
 
-NO elimines funcionalidades existentes.
+# 12. Precarga inteligente
 
-NO cambies nombres de variables, tablas o funciones existentes innecesariamente.
+Karpus no deberá precargar todos los videos del Muro.
 
-### 11. CRITERIOS DE ACEPTACIÓN
+La estrategia recomendada es:
 
-La implementación estará correcta únicamente si:
+```text
+Video visible
+     ↓
+Prioridad máxima
 
-✓ Empresa activa → sistema funciona normalmente.
+Video siguiente
+     ↓
+Precarga limitada
 
-✓ Empresa suspendida → ningún usuario de esa empresa puede acceder al sistema.
+Videos lejanos
+     ↓
+Sin descarga
+```
 
-✓ Usuario con sesión abierta → pierde acceso cuando la empresa es suspendida.
+Esto reduce:
 
-✓ Pantalla de suspensión aparece correctamente.
+* consumo de datos;
+* uso de CPU;
+* uso de memoria;
+* tráfico;
+* consumo innecesario de almacenamiento/CDN.
 
-✓ No se muestra ningún motivo de suspensión.
+La precarga debe adaptarse también a la calidad de la conexión cuando el navegador proporcione esa información.
 
-✓ Aparece botón "Contactar soporte".
+---
 
-✓ El botón abre WhatsApp al número 8497114807.
+# 13. Adaptación a conexiones lentas
 
-✓ Empresa reactivada → vuelve a funcionar normalmente.
+Cuando sea posible detectar una conexión limitada, Karpus deberá reducir las operaciones de precarga.
 
-✓ Ningún dato se elimina.
+Ejemplo conceptual:
 
-✓ Ningún usuario se elimina.
+```text
+Wi-Fi / conexión rápida
+       ↓
+Precarga del siguiente contenido
 
-✓ Otras empresas activas continúan funcionando normalmente.
 
-✓ La implementación funciona correctamente en móvil, tablet y computadora.
+4G normal
+       ↓
+Carga progresiva
 
-✓ No se rompen las funcionalidades actuales.
 
-✓ Las políticas de seguridad de Supabase siguen protegiendo correctamente los datos.
+3G / Save Data
+       ↓
+Precarga mínima
+       ↓
+Reproducir bajo interacción
+```
 
-Al finalizar, explícame exactamente:
+El objetivo es que Karpus sea funcional tanto en dispositivos modernos como en teléfonos con recursos limitados.
 
-* qué archivos modificaste,
-* qué tablas modificaste,
-* qué políticas RLS modificaste o agregaste,
-* cómo funciona la suspensión,
-* cómo funciona la reactivación,
-* y cómo puedo probar todo sin afectar empresas reales.
-a
+---
+
+# 14. Streaming progresivo
+
+Para una primera implementación, Karpus podrá utilizar archivos MP4 optimizados y solicitudes parciales mediante HTTP Range cuando el almacenamiento/servidor lo soporte.
+
+Esto permite solicitar solamente partes del archivo en lugar de descargarlo necesariamente completo de una sola vez.
+
+Para una futura evolución del sistema, se recomienda implementar:
+
+**HLS + múltiples calidades + CDN.**
+
+Arquitectura futura:
+
+```text
+                    VIDEO ORIGINAL
+                          ↓
+                    PROCESAMIENTO
+                          ↓
+             ┌────────────┼────────────┐
+             ↓            ↓            ↓
+           1080p         720p         480p
+             │            │            │
+             └────────────┼────────────┘
+                          ↓
+                         HLS
+                          ↓
+                         CDN
+                          ↓
+                    KARPUS PLAYER
+                          ↓
+               CALIDAD ADAPTATIVA
+```
+
+Esto permitiría que el reproductor pueda utilizar una calidad diferente dependiendo de las condiciones de red.
+
+---
+
+# 15. Experiencia de subida para maestras
+
+La publicación debe ser sencilla.
+
+Flujo:
+
+```text
+Maestra
+   ↓
+Selecciona / graba video
+   ↓
+Validación
+   ↓
+Recorte si supera duración permitida
+   ↓
+Compresión
+   ↓
+Subida
+   ↓
+Procesamiento
+   ↓
+Thumbnail
+   ↓
+Publicación
+```
+
+La interfaz deberá mostrar el progreso de la operación.
+
+La publicación podrá continuar procesándose sin bloquear innecesariamente la navegación del panel.
+
+---
+
+# 16. Grabación desde la cámara
+
+Karpus podrá utilizar `MediaRecorder API` para permitir que las maestras graben directamente desde el dispositivo.
+
+Ejemplo:
+
+```text
+🎥 Grabar actividad
+
+00:30
+00:29
+00:28
+...
+00:01
+00:00
+```
+
+El límite recomendado será de **30 segundos** para mantener el Muro enfocado en microcontenido.
+
+---
+
+# 17. Recorte de videos
+
+Si una maestra selecciona un video que supera el límite establecido, Karpus podrá mostrar un editor sencillo:
+
+```text
+[──────────── VIDEO ────────────]
+
+      ▲                     ▲
+    Inicio                 Final
+
+         [ Recortar ]
+```
+
+La prioridad será ofrecer una herramienta simple, no un editor de video complejo.
+
+---
+
+# 18. Validación de archivos
+
+Antes de comenzar la subida, Karpus deberá validar:
+
+* duración;
+* tamaño;
+* formato;
+* MIME type;
+* resolución;
+* orientación.
+
+Como límite inicial:
+
+**25 MB por video.**
+
+Este límite puede revisarse posteriormente según el consumo real de almacenamiento y ancho de banda.
+
+---
+
+# 19. Doble tap para reaccionar
+
+El video podrá incorporar una interacción inspirada en las redes sociales:
+
+```text
+     DOUBLE TAP
+          ↓
+         ❤️
+```
+
+El corazón aparecerá mediante una animación breve.
+
+La reacción será registrada en Supabase.
+
+Esto permite convertir el Muro en una experiencia más interactiva sin introducir controles innecesarios.
+
+---
+
+# 20. Control de sonido
+
+El reproductor tendrá un botón flotante:
+
+```text
+┌──────────────────────┐
+│                      │
+│                      │
+│                      │
+│                 🔇   │
+└──────────────────────┘
+```
+
+El control deberá:
+
+* permitir mute/unmute;
+* no interferir con el contenido;
+* ser fácilmente accesible;
+* funcionar correctamente en dispositivos táctiles.
+
+---
+
+# 21. Visor inmersivo
+
+Al tocar una imagen o video, Karpus podrá mostrar un visor ampliado.
+
+Características:
+
+* pantalla completa;
+* fondo oscuro;
+* contenido centrado;
+* soporte táctil;
+* cierre sencillo;
+* reproducción de video;
+* compatibilidad con orientación móvil.
+
+Esto permite consumir el contenido sin abandonar el Muro.
+
+---
+
+# 22. Gestos móviles
+
+En dispositivos táctiles podrán incorporarse:
+
+* doble tap → reacción;
+* tap → interacción;
+* swipe → cerrar visor;
+* scroll → navegar;
+* tap → activar sonido.
+
+Los gestos deberán implementarse cuidadosamente para no interferir con el scroll normal de la aplicación.
+
+---
+
+# 23. Realtime
+
+Cuando una maestra publique una nueva actividad, el contenido podrá aparecer en el Muro mediante **Supabase Realtime**.
+
+Flujo:
+
+```text
+Maestra publica
+      ↓
+Supabase
+      ↓
+Realtime
+      ↓
+Muro de padres
+      ↓
+Nueva publicación
+```
+
+El usuario no tendrá que actualizar manualmente la página para recibir la publicación.
+
+---
+
+# 24. Contador de visualizaciones
+
+Para el personal autorizado:
+
+```text
+👁️ 24 visualizaciones
+```
+
+Karpus podrá registrar visualizaciones de forma controlada.
+
+Se recomienda evitar registrar múltiples vistas del mismo usuario de manera excesiva durante una misma sesión.
+
+---
+
+# 25. Marca Karpus Kids
+
+Los videos institucionales podrán incluir una marca de agua discreta:
+
+**🐾 Karpus Kids**
+
+La marca deberá ser pequeña y no interferir con la visualización del contenido.
+
+---
+
+# 26. Administración de memoria y recursos
+
+El sistema deberá controlar activamente los recursos utilizados por los reproductores.
+
+Cuando un video deje de estar visible:
+
+```text
+pause()
+```
+
+Cuando el componente deje de utilizarse:
+
+```text
+destroy()
+```
+
+También deberán liberarse:
+
+* `IntersectionObserver`;
+* listeners;
+* `MediaStream`;
+* reproductores;
+* referencias temporales;
+* recursos asociados al componente.
+
+En la cámara:
+
+```javascript
+stream.getTracks().forEach(track => track.stop());
+```
+
+El objetivo es evitar fugas de memoria y mantener estable la PWA en sesiones prolongadas.
+
+---
+
+# 27. Arquitectura propuesta
+
+## Fase actual
+
+```text
+Karpus Kids
+      ↓
+Supabase Storage
+      ↓
+Videos optimizados
+      ↓
+Thumbnail
+      ↓
+PWA
+      ↓
+IntersectionObserver
+      ↓
+Reproducción automática
+```
+
+## Fase avanzada
+
+```text
+                 KARPUS KIDS
+                      │
+                      ↓
+               Supabase Storage
+                      │
+                      ↓
+                Procesamiento
+                      │
+           ┌──────────┼──────────┐
+           ↓          ↓          ↓
+         1080p       720p       480p
+           └──────────┼──────────┘
+                      ↓
+                     HLS
+                      ↓
+                     CDN
+                      ↓
+                Karpus Player
+                      ↓
+              Reproducción adaptativa
+```
+
+---
+
+# 28. Comparación con la experiencia de Instagram
+
+Karpus adoptará **patrones de experiencia similares a Instagram**, principalmente:
+
+| Instagram        | Karpus Kids             |
+| ---------------- | ----------------------- |
+| Feed vertical    | Muro Escolar            |
+| Reels            | Microvideos escolares   |
+| Autoplay         | Autoplay visible        |
+| Muted autoplay   | Muted autoplay          |
+| Loop             | Loop                    |
+| Scroll           | Scroll                  |
+| Double tap ❤️    | Reacciones              |
+| Thumbnail        | Thumbnail               |
+| Fullscreen       | Visor inmersivo         |
+| Lazy loading     | Carga inteligente       |
+| Precarga         | Precarga controlada     |
+| Adaptación móvil | PWA móvil               |
+| CDN/streaming    | Evolución hacia CDN/HLS |
+
+**Importante:** la similitud está en la **experiencia y los patrones de interacción**, no significa que Karpus utilice la infraestructura privada de Instagram.
+
+---
+
+# 29. Objetivos de rendimiento
+
+El sistema debe optimizarse para conseguir:
+
+### Carga
+
+* Mostrar rápidamente la estructura del Muro.
+* Evitar descargar videos que el usuario no verá.
+* Evitar Layout Shift.
+* Mostrar thumbnail inmediatamente.
+
+### Reproducción
+
+* Inicio rápido.
+* Reproducción fluida.
+* Mínimo buffering.
+* Pausa automática fuera de pantalla.
+* Un único audio activo.
+
+### Dispositivo
+
+* Bajo consumo de memoria.
+* Bajo consumo de CPU.
+* Menor consumo de datos.
+* Compatibilidad con teléfonos de gama media/baja.
+
+### Experiencia
+
+* Sensación de aplicación nativa.
+* Interacciones táctiles.
+* Animaciones suaves.
+* Contenido visual.
+* Navegación rápida.
+
+---
+
+# 30. Criterio de éxito
+
+La implementación será considerada exitosa cuando un padre pueda realizar el siguiente recorrido:
+
+```text
+ABRIR KARPUS
+     ↓
+VER EL MURO
+     ↓
+HACER SCROLL
+     ↓
+VIDEO APARECE
+     ↓
+VIDEO COMIENZA
+     ↓
+CONTINUAR SCROLL
+     ↓
+VIDEO ANTERIOR SE PAUSA
+     ↓
+SIGUIENTE VIDEO SE PREPARA
+```
+
+Todo esto debe suceder **sin que el usuario tenga que esperar una descarga completa antes de consumir el contenido**.
+
+---
+
+# 31. Evolución recomendada
+
+### FASE 1 — Experiencia tipo Instagram
+
+* Autoplay.
+* Muted.
+* Loop.
+* IntersectionObserver.
+* Thumbnails.
+* Aspect ratio.
+* Double tap.
+* Mute/unmute.
+* Realtime.
+* Lazy loading.
+* Gestión de memoria.
+
+### FASE 2 — Optimización de distribución
+
+* Compresión automática.
+* MP4 H.264.
+* WebP thumbnails.
+* HTTP Range.
+* CDN.
+* Caché.
+* Precarga inteligente.
+
+### FASE 3 — Streaming avanzado
+
+* HLS.
+* 1080p.
+* 720p.
+* 480p.
+* Bitrate adaptativo.
+* Procesamiento automático.
+* Métricas de buffering.
+* Optimización avanzada para redes móviles.
+
+---
+
+# 32. Conclusión
+
+El objetivo de Karpus Kids no es simplemente **“subir videos al Muro Escolar”**.
+
+El objetivo es crear una experiencia en la que los padres puedan **ver y consumir las actividades de sus hijos de forma inmediata, fluida y natural**, utilizando patrones de interacción que ya han demostrado ser efectivos en plataformas modernas de contenido.
+
+La estrategia de Karpus se resume en:
+
+> **Publicar fácilmente → procesar automáticamente → mostrar rápidamente → reproducir inteligentemente → pausar cuando no se utiliza → optimizar según el dispositivo y la conexión.**
+
+De esta manera, el Muro Escolar puede convertirse en una experiencia audiovisual moderna, privada y diseñada específicamente para la comunicación entre la estancia y las familias.
+
+**Karpus Kids — Muro Escolar v4.0**
+**Experiencia de microvideo inspirada en Instagram, adaptada al entorno educativo.**
+APLICA MI 

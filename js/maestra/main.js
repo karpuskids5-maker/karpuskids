@@ -442,6 +442,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     toggleLike: (...a) => import('/js/shared/wall.js').then(m => m.WallModule.toggleLike(...a)),
     openNewPostModal: (...a) => import('/js/shared/wall.js').then(m => m.WallModule.openNewPostModal(...a)),
     deleteComment: (...a) => import('/js/shared/wall.js').then(m => m.WallModule.deleteComment(...a)),
+    playVideoCard: (...a) => import('/js/shared/wall.js').then(m => m.WallModule.playVideoCard(...a)),
+    _showVideoPreview: (...a) => import('/js/shared/wall.js').then(m => m.WallModule._showVideoPreview(...a)),
+    _hideVideoPreview: (...a) => import('/js/shared/wall.js').then(m => m.WallModule._hideVideoPreview(...a)),
+    _onVideoError: (...a) => import('/js/shared/wall.js').then(m => m.WallModule._onVideoError(...a)),
+    _replayVideo: (...a) => import('/js/shared/wall.js').then(m => m.WallModule._replayVideo(...a)),
   };
 
   // Inicializar QR de la maestra en sección perfil
@@ -1375,17 +1380,27 @@ async function submitNewPost() {
   try {
     let mediaUrl = null;
     let mediaType = null;
+    let thumbnailUrl = null;
+    let thumbnailUrls = [];
 
     if (file) {
-      const ext = file.type.startsWith('video') ? file.name.split('.').pop() : 'webp';
+      const isVideo = file.type.startsWith('video/');
+      const ext = isVideo ? file.name.split('.').pop() : 'webp';
       const path = `posts/${Date.now()}_${crypto.randomUUID()}.${ext}`;
-      
-      mediaUrl = await ImageLoader.uploadToStorage(file, 'karpus-uploads', path, {
-        maxWidth: 1200,
-        quality: 0.8,
-        onProgress: setProgress
-      });
-      mediaType = file.type.startsWith('video') ? 'video' : 'image';
+
+      if (isVideo) {
+        const result = await ImageLoader.uploadVideoWithThumbnails(file, { onProgress: setProgress });
+        mediaUrl = result.publicUrl;
+        thumbnailUrl = result.thumbnailUrl;
+        thumbnailUrls = result.thumbnailUrls;
+      } else {
+        mediaUrl = await ImageLoader.uploadToStorage(file, 'karpus-uploads', path, {
+          maxWidth: 1200,
+          quality: 0.8,
+          onProgress: setProgress
+        });
+      }
+      mediaType = isVideo ? 'video' : 'image';
     }
 
     const { data: { user } } = await supabase.auth.getUser();
@@ -1399,6 +1414,8 @@ async function submitNewPost() {
       content,
       media_url: mediaUrl,
       media_type: mediaType,
+      thumbnail_url: thumbnailUrl || null,
+      thumbnail_urls: (thumbnailUrls && thumbnailUrls.length ? thumbnailUrls : null),
       teacher_id: user.id,
       classroom_id: classroom.id,
       ...(taggedSids.length ? { tagged_students: taggedSids } : {})

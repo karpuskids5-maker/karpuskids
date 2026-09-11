@@ -542,7 +542,10 @@ export const PaymentsModule = {
     try {
       const monthPart = (monthPaid || '').split('-')[1];
       const mesN = monthPart ? MONTH_NAMES_ES[Number.parseInt(monthPart, 10) - 1] : null;
-      const { data: exList } = await supabase.from('payments').select('id, status').eq('student_id', studentId).or('month_paid.eq.' + monthPaid + ',month_paid.eq.' + (mesN || '')).limit(5);
+      const orFilter = mesN
+        ? `month_paid.eq."${monthPaid}",month_paid.eq.${mesN}`
+        : `month_paid.eq."${monthPaid}"`;
+      const { data: exList } = await supabase.from('payments').select('id, status').eq('student_id', studentId).or(orFilter).limit(5);
       const ex = exList?.[0] || null;
       if (ex) {
         if (ex.status === 'paid') { Helpers.toast('Pago ya aprobado para este mes', 'warning'); return; }

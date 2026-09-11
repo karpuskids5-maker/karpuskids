@@ -6,7 +6,7 @@ import { supabase } from './supabase.js';
 import { Helpers } from './helpers.js';
 import { ImageLoader } from './image-loader.js';
 import { QueryCache } from './query-cache.js';
-import { withTimeout } from './db-utils.js';
+import { withTimeout, runWithRetry } from './db-utils.js';
 
 // ─── Utilidades ───────────────────────────────────────────────────────────────
 const optimizeImageUrl = (url, opts = {}) => {
@@ -49,8 +49,8 @@ const _uuid = () => {
 // ─── Constantes ───────────────────────────────────────────────────────────────
 const REACTION_EMOJIS = ['❤️', '👏', '😊', '🎉', '👍', '😍'];
 const _SPAM_COOLDOWN_MS = 10_000;
-const MAX_VIDEO_DURATION = 30;       // segundos máximo
-const MAX_VIDEO_SIZE_MB = 25;        // MB
+const MAX_VIDEO_DURATION = 120;      // segundos máximo (2 minutos)
+const MAX_VIDEO_SIZE_MB = 50;        // MB
 const MAX_IMAGE_SIZE_MB = 5;         // MB
 const MAX_IMAGE_WIDTH = 1920;        // px
 const SIGNED_URL_EXPIRY_SEC = 3600;  // 1 hora
@@ -90,7 +90,7 @@ const generateVideoThumbnail = (file) => {
     let captured = false;
 
     const _targetTime = () => {
-      const duration = video.duration || 30;
+      const duration = video.duration || MAX_VIDEO_DURATION;
       // 20% del video o 10s, el que sea menor (nunca 0, nunca por encima de la duración).
       return Math.max(0.1, Math.min(10, duration * 0.2));
     };
@@ -124,6 +124,64 @@ const generateVideoThumbnail = (file) => {
       if (Math.abs(video.currentTime - _targetTime()) < 0.25) capture();
     };
     video.onerror = () => { if (!captured) { URL.revokeObjectURL(url); resolve(null); } };
+    video.src = url;
+  });
+};
+
+/**
+ * Genera N miniaturas equiespaciadas a lo largo del video (estilo YouTube).
+ * Devuelve [{ blob, time }, ...] o [] si falla.
+ */
+const generateVideoThumbnailsMulti = (file, count = 5) => {
+  return new Promise((resolve) => {
+    const video = document.createElement('video');
+    video.muted = true;
+    video.playsInline = true;
+    video.preload = 'auto';
+    const url = URL.createObjectURL(file);
+    const thumbs = [];
+    let done = false;
+
+    const finish = () => {
+      if (done) return;
+      done = true;
+      URL.revokeObjectURL(url);
+      resolve(thumbs);
+    };
+
+    const capture = () => {
+      try {
+        const w = video.videoWidth || 640;
+        const h = video.videoHeight || 360;
+        const canvas = document.createElement('canvas');
+        canvas.width  = Math.min(w, 640);
+        canvas.height = Math.round(canvas.width * h / w);
+        canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+        canvas.toBlob((blob) => {
+          if (!done && blob) thumbs.push({ blob, time: video.currentTime });
+          next();
+        }, 'image/webp', 0.7);
+      } catch (_) { next(); }
+    };
+
+    const seek = (t, onReady) => {
+      const fallback = setTimeout(onReady, 2500);
+      video.onseeked = () => { clearTimeout(fallback); onReady(); };
+      try { video.currentTime = t; } catch (_) { clearTimeout(fallback); onReady(); }
+    };
+
+    const next = () => {
+      const duration = video.duration || MAX_VIDEO_DURATION;
+      if (thumbs.length >= count || duration <= 0) { finish(); return; }
+      const target = ((thumbs.length + 1) * duration) / (count + 1);
+      seek(target, capture);
+    };
+
+    video.onloadedmetadata = () => {
+      if (!video.duration || video.duration <= 0) { finish(); return; }
+      next();
+    };
+    video.onerror = () => finish();
     video.src = url;
   });
 };
@@ -185,9 +243,11 @@ const WallModule = {
   _pageSize: 10,
   _isLoading: false,
   _hasMore: true,
+  _supportsThumbStrip: null,   // false si posts.thumbnail_urls aún no existe en la BD
   _pendingUploads: [],       // cola de subidas en segundo plano
   _schedulerTimer: null,
   _recordStream: null,       // MediaStream de grabación
+  _lastPrefetched: '',       // URL del último video precargado (siguiente del muro)
 
   _getLikeColors() {
     let color = this._options.likeColor;
@@ -267,11 +327,34 @@ const WallModule = {
       .wall-skeleton{border-radius:1rem;animation:wall-shimmer 1.5s infinite;background:linear-gradient(90deg,#f1f5f9 25%,#e2e8f0 50%,#f1f5f9 75%);background-size:800px 100%}
       .wall-blur-up{filter:blur(10px);transition:filter 0.4s ease}
       .wall-blur-up.wall-img-loaded{filter:blur(0)}
-      .wall-video-wrapper{position:relative;cursor:pointer;border-radius:1rem;overflow:hidden;background:#0f172a}
+      .wall-video-wrapper{position:relative;cursor:pointer;border-radius:1rem;overflow:hidden;background:#0f172a;display:flex;align-items:center;justify-content:center;max-width:100%;aspect-ratio:16/9;max-height:min(72vh,620px)}
+      @media (max-width:640px){.wall-video-wrapper{aspect-ratio:4/3;max-height:min(62vh,440px)}}
       .wall-play-btn{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:60px;height:60px;background:rgba(255,138,0,0.9);border-radius:50%;display:flex;align-items:center;justify-content:center;color:white;font-size:22px;transition:all 0.2s;backdrop-filter:blur(4px);pointer-events:none;box-shadow:0 4px 24px rgba(255,138,0,0.4)}
       .wall-video-wrapper:hover .wall-play-btn{transform:translate(-50%,-50%) scale(1.12);background:rgba(255,138,0,1)}
-      .wall-video-duration{position:absolute;bottom:8px;right:10px;background:rgba(0,0,0,0.65);color:white;font-size:9px;font-weight:900;padding:2px 7px;border-radius:8px;backdrop-filter:blur(4px)}
-      .wall-custom-video{width:100%;max-height:420px;background:#000;border-radius:0}
+      .wall-video-duration{position:absolute;bottom:8px;right:10px;background:rgba(0,0,0,0.65);color:white;font-size:9px;font-weight:900;padding:2px 7px;border-radius:8px;backdrop-filter:blur(4px);z-index:3}
+      .wall-video-poster{transition:transform 0.35s ease,filter 0.35s ease}
+      .wall-audio-toggle{position:absolute;top:10px;right:10px;z-index:4;width:34px;height:34px;border-radius:9999px;background:rgba(15,23,42,0.55);backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,0.3);color:#fff;display:flex;align-items:center;justify-content:center;font-size:15px;cursor:pointer;transition:all 0.2s;-webkit-tap-highlight-color:transparent;box-shadow:0 2px 10px rgba(0,0,0,0.3)}
+      .wall-audio-toggle:active{transform:scale(0.88)}
+      @keyframes wall-heart-burst{0%{transform:translate(-50%,-50%) scale(0.4);opacity:0}25%{transform:translate(-50%,-50%) scale(1.2);opacity:1}60%{transform:translate(-50%,-50%) scale(1);opacity:1}100%{transform:translate(-50%,-160%) scale(1.7);opacity:0}}
+      .wall-heart-burst{position:absolute;left:0;top:0;z-index:5;font-size:58px;line-height:1;pointer-events:none;animation:wall-heart-burst 0.95s ease forwards;filter:drop-shadow(0 4px 14px rgba(0,0,0,0.35))}
+      .wall-thumb-strip{position:absolute;left:0;right:0;bottom:0;display:flex;gap:4px;padding:8px 6px;background:linear-gradient(to top,rgba(0,0,0,0.85),rgba(0,0,0,0));opacity:1;transform:none;transition:opacity 0.2s ease;pointer-events:none;z-index:2}
+      .wall-thumb-strip-item{position:relative;flex:1;min-width:0;border-radius:6px;overflow:hidden;box-shadow:0 1px 6px rgba(0,0,0,0.4);transition:transform 0.18s ease}
+      .wall-video-wrapper:hover .wall-thumb-strip-item{transform:scale(1.06);box-shadow:0 2px 10px rgba(0,0,0,0.55)}
+      .wall-thumb-strip-item img{width:100%;height:100%;object-fit:cover;display:block;aspect-ratio:16/9}
+      .wall-thumb-strip-item::after{content:attr(data-time-label);position:absolute;bottom:2px;right:3px;background:rgba(0,0,0,0.7);color:white;font-size:8px;font-weight:900;padding:1px 4px;border-radius:4px;letter-spacing:0.03em}
+      .wall-custom-video{width:100%;max-width:100%;height:auto;max-height:min(70vh,560px);background:#000;border-radius:0;display:block}
+      .wall-img{width:100%;height:auto;max-height:min(70vh,560px);object-fit:contain;display:block;margin-inline:auto}
+      .wall-img.wall-img-compact{max-height:min(52vh,340px)}
+      @media (max-width:640px){.wall-img{max-height:min(56vh,420px)}.wall-img.wall-img-compact{max-height:min(46vh,280px)}}
+      /* Escritorio: contenedor de foto/video centrado (estilo panel directora) */
+      @media (min-width:768px){
+        .wall-video-wrapper{max-width:min(100%,820px);margin-inline:auto}
+        .wall-img{max-width:min(100%,820px);width:auto}
+        .wall-album-carousel{max-width:min(100%,820px);margin-inline:auto}
+      }
+      .wall-album-slide img.wall-album-img{width:100%;height:auto;max-height:min(70vh,520px);object-fit:contain;display:block;margin-inline:auto}
+      @media (max-width:640px){.wall-album-slide img.wall-album-img{max-height:min(56vh,420px)}}
+      .wall-lightbox-media{width:100%;height:auto;max-height:85vh;object-fit:contain;border-radius:0.75rem}
       .wall-progress-bar{height:3px;background:linear-gradient(90deg,#f97316,#22c55e);border-radius:2px;transition:width 0.1s linear}
       @keyframes wall-like-pop{0%{transform:scale(1)}30%{transform:scale(1.45)}60%{transform:scale(0.9)}100%{transform:scale(1)}}
       @keyframes wall-particle-fly{0%{opacity:1;transform:translate(0,0) scale(1)}100%{opacity:0;transform:translate(var(--tx),var(--ty)) scale(0.3)}}
@@ -405,15 +488,15 @@ const WallModule = {
       const buildEmbedSelect = () => `
         id, content, media_url, media_type, image_url, images, thumbnail_url, title, created_at, updated_at,
         teacher_name, teacher_avatar, is_pinned, comments_enabled, expire_days,
-        scheduled_at, views_count, tagged_students,
+        scheduled_at, views_count, duration, tagged_students${this._supportsThumbStrip === false ? '' : ', thumbnail_urls'},
         classroom:classrooms(name),
         teacher:profiles(name, avatar_url),
         likes(user_id${this._supportsReactionType === false ? '' : ', reaction_type'}),
         comments(count)`;
-      const FLAT_SELECT = `
+      const buildFlatSelect = () => `
         id, content, media_url, media_type, image_url, images, thumbnail_url, title, created_at, updated_at,
         teacher_name, teacher_avatar, is_pinned, comments_enabled, expire_days,
-        views_count, tagged_students, classroom_id, teacher_id`;
+        views_count, duration, tagged_students${this._supportsThumbStrip === false ? '' : ', thumbnail_urls'}, classroom_id, teacher_id`;
 
       const buildPostFilter = (q) => {
         if (this._options.searchTerm) q = q.ilike('content', `%${this._options.searchTerm}%`);
@@ -437,13 +520,18 @@ const WallModule = {
         return all.slice(0, pageSize);
       };
 
-      // Ejecuta una query; si falla 400 por likes.reaction_type inexistente,
-      // desactiva la columna y reintenta una vez manteniendo los joins.
-      const runWithReactionFallback = async (build) => {
+      // Ejecuta una query; si falla 400 por likes.reaction_type o posts.thumbnail_urls
+      // inexistentes en la BD, desactiva la columna y reintenta una vez.
+      const runWithEmbedFallback = async (build) => {
         let res = await withTimeout(() => build(buildEmbedSelect()), 10_000);
-        if (res?.error && this._supportsReactionType !== false && _isMissingColumnError(res.error, 'reaction_type')) {
-          this._supportsReactionType = false;
-          res = await withTimeout(() => build(buildEmbedSelect()), 10_000);
+        if (res?.error) {
+          if (this._supportsReactionType !== false && _isMissingColumnError(res.error, 'reaction_type')) {
+            this._supportsReactionType = false;
+            res = await withTimeout(() => build(buildEmbedSelect()), 10_000);
+          } else if (this._supportsThumbStrip !== false && _isMissingColumnError(res.error, 'thumbnail_urls')) {
+            this._supportsThumbStrip = false;
+            res = await withTimeout(() => build(buildEmbedSelect()), 10_000);
+          }
         }
         return res;
       };
@@ -453,16 +541,16 @@ const WallModule = {
       if (this._options.classroomId) {
         const orderOpts = { ascending: false };
         const [classResult, generalResult] = await Promise.all([
-          runWithReactionFallback((sel) => fetchClassroomPosts(sel, orderOpts).range(from, to)),
-          runWithReactionFallback((sel) => fetchGeneralPosts(sel, orderOpts).range(from, to))
+          runWithEmbedFallback((sel) => fetchClassroomPosts(sel, orderOpts).range(from, to)),
+          runWithEmbedFallback((sel) => fetchGeneralPosts(sel, orderOpts).range(from, to))
         ]);
 
         if (!classResult.error && !generalResult.error) {
           posts = mergeClassroomResults(classResult.data, generalResult.data, this._pageSize);
         } else {
           const [classFlat, generalFlat] = await Promise.all([
-            withTimeout(() => fetchClassroomPosts(FLAT_SELECT, orderOpts).range(from, to), 10_000),
-            withTimeout(() => fetchGeneralPosts(FLAT_SELECT, orderOpts).range(from, to), 10_000)
+            withTimeout(() => fetchClassroomPosts(buildFlatSelect(), orderOpts).range(from, to), 10_000),
+            withTimeout(() => fetchGeneralPosts(buildFlatSelect(), orderOpts).range(from, to), 10_000)
           ]);
           if (classFlat.error && generalFlat.error) throw classFlat.error;
           const merged = mergeClassroomResults(classFlat.data, generalFlat.data, this._pageSize);
@@ -471,16 +559,17 @@ const WallModule = {
             expire_days: p.expire_days || null, views_count: p.views_count || 0,
             tagged_students: p.tagged_students || [], likes: [], comments_count: 0,
             classroom: null, teacher: null, user_reaction: null, reaction_counts: {},
+            duration: p.duration ?? null,
           }));
         }
       } else {
-        const { data, error } = await runWithReactionFallback((sel) => {
+        const { data, error } = await runWithEmbedFallback((sel) => {
           let q = supabase.from('posts').select(sel)
             .order('created_at', { ascending: false }).range(from, to);
           return buildPostFilter(q);
         });
         if (error) {
-          let fallback = supabase.from('posts').select(FLAT_SELECT)
+          let fallback = supabase.from('posts').select(buildFlatSelect())
             .order('created_at', { ascending: false }).range(from, to);
           fallback = buildPostFilter(fallback);
           const retry = await withTimeout(() => fallback, 10_000);
@@ -490,6 +579,7 @@ const WallModule = {
             expire_days: p.expire_days || null, views_count: p.views_count || 0,
             tagged_students: p.tagged_students || [], likes: [], comments_count: 0,
             classroom: null, teacher: null, user_reaction: null, reaction_counts: {},
+            duration: p.duration ?? null,
           }));
         } else {
           posts = data;
@@ -527,6 +617,8 @@ const WallModule = {
 
       ImageLoader.observe(container);
       this._setupLongPressReactions(container);
+      this._setupVideoAutoplay();
+      this._setupDoubleTap(container);
 
       if ((posts || []).length < this._pageSize) {
         this._hasMore = false;
@@ -591,15 +683,90 @@ const WallModule = {
     }, { rootMargin: '200px' });
     const last = container.lastElementChild;
     if (last) this._observer.observe(last);
-    this._setupVideoAutoplay();
   },
 
+  /**
+   * Reproducción automática inteligente (§8 de la propuesta):
+   *  - Un wrapper con poster entra ≥65% al viewport  → monta y reproduce MUTED.
+   *  - Un video ya montado cae <65%                  → se pausa.
+   *  - Redes lentas / disableAutoplay                → solo reproducción por interacción.
+   */
   _setupVideoAutoplay() {
     if (this._videoObserver) this._videoObserver.disconnect();
+    const isSlow = this._detectSlowNetwork();
+    const autoplayEnabled = !this._options.disableAutoplay;
     this._videoObserver = new IntersectionObserver(entries => {
-      entries.forEach(e => { if (!e.isIntersecting) e.target.pause?.(); });
-    }, { threshold: 0.5 });
+      entries.forEach(e => {
+        const t = e.target;
+        const visible = e.intersectionRatio >= 0.65;
+
+        // Modo poster: montar el reproductor al entrar en pantalla
+        if (t.classList.contains('wall-video-wrapper')) {
+          if (t.dataset.mounted === '1' || t.dataset.userPaused === '1') return;
+          if (!visible || isSlow || !autoplayEnabled) return;
+          const postId = t.id.replace('video-wrapper-', '');
+          const url = t.dataset.videoUrl;
+          if (postId && url) {
+            const vid = this._mountVideo(postId, url, { muted: true, autoplay: true });
+            if (vid) {
+              this._videoObserver.unobserve(t);
+              this._videoObserver.observe(vid);
+            }
+          }
+          return;
+        }
+
+        // Elemento <video> real
+        if (!visible) {
+          t.dataset._observerPause = '1';
+          t.pause?.();
+          return;
+        }
+        if (t.dataset.userPaused === '1') return;
+        if (t.paused || t.readyState < 2) t.play().catch(() => {});
+      });
+    }, { threshold: [0.2, 0.65] });
+
+    document.querySelectorAll('.wall-video-wrapper[data-video-url]').forEach(w => this._videoObserver.observe(w));
     document.querySelectorAll('video.wall-custom-video').forEach(v => this._videoObserver.observe(v));
+  },
+
+  /** Doble tap / doble click sobre el video → ❤️ (§19 de la propuesta) */
+  _setupDoubleTap(container) {
+    container.querySelectorAll('.wall-video-wrapper[data-video-url]').forEach(w => {
+      if (w.dataset.dtReady) return;
+      w.dataset.dtReady = '1';
+      const postId = w.id.replace('video-wrapper-', '');
+      let lastTap = 0;
+      w.addEventListener('touchend', (e) => {
+        const now = Date.now();
+        if (now - lastTap < 300) {
+          e.preventDefault?.();
+          const ch = e.changedTouches[0];
+          this._burstHeart(postId, ch.clientX, ch.clientY);
+        }
+        lastTap = now;
+      }, { passive: false });
+      w.addEventListener('dblclick', (e) => this._burstHeart(postId, e.clientX, e.clientY));
+    });
+  },
+
+  /** Explosión de ❤️ en la posición del doble tap + like optimista */
+  _burstHeart(postId, clientX, clientY) {
+    const wrapper = document.getElementById(`video-wrapper-${postId}`);
+    if (!wrapper) return;
+    const rect = wrapper.getBoundingClientRect();
+    const heart = document.createElement('div');
+    heart.className = 'wall-heart-burst';
+    heart.textContent = '❤️';
+    heart.style.left = `${clientX - rect.left}px`;
+    heart.style.top = `${clientY - rect.top}px`;
+    wrapper.appendChild(heart);
+    setTimeout(() => heart.remove(), 1000);
+    if (navigator.vibrate) navigator.vibrate(15);
+    const postEl = document.getElementById(`post-${postId}`);
+    if (postEl && postEl.dataset.userReaction) return; // ya reaccionó: solo animación
+    this.toggleReaction(postId, 'like');
   },
 
   /** Long-press en el botón ❤️ abre el picker de reacciones (380ms) */
@@ -870,21 +1037,49 @@ const WallModule = {
   // ── Render Media Helpers ─────────────────────────────────────────────────────
   _renderVideoCard(p, isSlow) {
     const thumbUrl = p.thumbnail_url || null;
+    const thumbUrls = (p.thumbnail_urls || []).filter(Boolean);
+    const hasMultiThumbs = thumbUrls.length >= 3;
+
+    if (hasMultiThumbs) {
+      const stripItems = thumbUrls.slice(0, 5).map((url, i) => {
+        const timeSec = Math.round(((i + 1) / (thumbUrls.length + 1)) * (p.duration || MAX_VIDEO_DURATION));
+        const min = Math.floor(timeSec / 60);
+        const sec = String(timeSec % 60).padStart(2, '0');
+        return `<div class="wall-thumb-strip-item" data-time-label="${min}:${sec}" style="transition-delay:${i * 0.06}s">
+          <img src="${_sanitizeHTML(url)}" alt="Vista previa ${i + 1}" loading="lazy">
+        </div>`;
+      }).join('');
+
+      return `
+        <div class="wall-video-wrapper relative mb-4 shadow-inner" id="video-wrapper-${p.id}"
+             data-video-url="${_sanitizeHTML(p.display_media_url)}"
+             data-thumb-count="${thumbUrls.length}"
+             onmouseenter="WallModule._showVideoPreview('${p.id}')"
+             onmouseleave="WallModule._hideVideoPreview('${p.id}')"
+             onclick="WallModule.playVideoCard('${p.id}','${_sanitizeHTML(p.display_media_url)}')"
+             style="background:#0f172a;" role="button" aria-label="Reproducir video">
+          ${thumbUrl ? `<img src="${_sanitizeHTML(thumbUrl)}" class="w-full h-full object-cover absolute inset-0 wall-video-poster" alt="Vista previa del video" loading="lazy">` : '<div class="wall-shimmer absolute inset-0" style="background:linear-gradient(90deg,#1e293b 25%,#334155 50%,#1e293b 75%);background-size:800px 100%;"></div>'}
+          <div class="wall-thumb-strip" id="thumb-strip-${p.id}">${stripItems}</div>
+          <div class="wall-play-btn">▶</div>
+          <div class="wall-video-duration">${this._formatVideoDuration(p.duration || MAX_VIDEO_DURATION)}</div>
+          <div class="wall-watermark">🐾 Karpus Kids</div>
+        </div>`;
+    }
+
     const posterStyle = thumbUrl ? `background-image:url('${_sanitizeHTML(thumbUrl)}');background-size:cover;background-position:center;` : 'background:#0f172a;';
-    const maxH = isSlow ? 'max-h-[280px]' : 'max-h-[420px]';
     return `
-      <div class="wall-video-wrapper ${maxH} relative mb-4 shadow-inner" id="video-wrapper-${p.id}"
+      <div class="wall-video-wrapper relative mb-4 shadow-inner" id="video-wrapper-${p.id}"
+           data-video-url="${_sanitizeHTML(p.display_media_url)}"
            onclick="WallModule.playVideoCard('${p.id}','${_sanitizeHTML(p.display_media_url)}')"
-           style="${posterStyle}min-height:180px;" role="button" aria-label="Reproducir video">
+           style="${posterStyle}" role="button" aria-label="Reproducir video">
         ${!thumbUrl ? `<div class="wall-shimmer absolute inset-0" style="background:linear-gradient(90deg,#1e293b 25%,#334155 50%,#1e293b 75%);background-size:800px 100%;"></div>` : ''}
         <div class="wall-play-btn">▶</div>
-        <div class="wall-video-duration">0:30</div>
+        <div class="wall-video-duration">${this._formatVideoDuration(p.duration || MAX_VIDEO_DURATION)}</div>
         <div class="wall-watermark">🐾 Karpus Kids</div>
       </div>`;
   },
 
   _renderImageCard(p, isSlow) {
-    const maxH = isSlow ? 'max-h-[280px]' : 'max-h-[480px]';
     const original = p.original_media_url || p.display_media_url;
     const optimized = optimizeImageUrl(original, { width: isSlow ? 600 : 1200, quality: isSlow ? 60 : 80 });
     return `
@@ -893,7 +1088,7 @@ const WallModule = {
         <div class="wall-shimmer absolute inset-0 rounded-2xl" id="img-shimmer-${p.id}"></div>
         <img id="wall-img-${p.id}" src="${_sanitizeHTML(optimized)}" loading="lazy" decoding="async"
              data-fallback-src="${_sanitizeHTML(original)}"
-             class="w-full ${maxH} object-contain relative z-10 wall-img-loaded"
+             class="wall-img relative z-10 wall-img-loaded${isSlow ? ' wall-img-compact' : ''}"
              alt="Publicación escolar"
              onload="document.getElementById('img-shimmer-${p.id}')?.remove()"
              onerror="WallModule._imgRetry('${p.id}')">
@@ -936,7 +1131,7 @@ const WallModule = {
         <div class="wall-album-track" id="album-track-${p.id}">
           ${urls.map((url, i) => `
             <div class="wall-album-slide" onclick="WallModule.openLightbox('${_sanitizeHTML(url)}','image')" role="button" aria-label="Foto ${i+1} de ${urls.length}">
-              <img src="${_sanitizeHTML(url)}" loading="${i === 0 ? 'eager' : 'lazy'}" class="w-full max-h-[420px] object-cover" alt="Foto ${i+1}">
+              <img src="${_sanitizeHTML(url)}" loading="${i === 0 ? 'eager' : 'lazy'}" class="wall-album-img" alt="Foto ${i+1}">
             </div>`).join('')}
         </div>
         ${urls.length > 1 ? `
@@ -976,29 +1171,138 @@ const WallModule = {
   },
 
   // ── Reproductor de Video Custom ──────────────────────────────────────────────
-  playVideoCard(postId, url) {
+  _formatVideoDuration(sec) {
+    if (!sec || sec <= 0) return '0:00';
+    const m = Math.floor(sec / 60);
+    const s = Math.round(sec % 60);
+    return `${m}:${String(s).padStart(2, '0')}`;
+  },
+
+  _showVideoPreview(postId) {
     const wrapper = document.getElementById(`video-wrapper-${postId}`);
-    if (!wrapper || !url) return;
+    const strip = document.getElementById(`thumb-strip-${postId}`);
+    if (!wrapper || !strip) return;
+    strip.classList.add('active');
+    const poster = wrapper.querySelector('.wall-video-poster');
+    if (poster) { poster.style.transform = 'scale(1.06)'; poster.style.filter = 'brightness(0.75)'; }
+  },
+
+  _hideVideoPreview(postId) {
+    const wrapper = document.getElementById(`video-wrapper-${postId}`);
+    const strip = document.getElementById(`thumb-strip-${postId}`);
+    if (!wrapper || !strip) return;
+    strip.classList.remove('active');
+    const poster = wrapper.querySelector('.wall-video-poster');
+    if (poster) { poster.style.transform = ''; poster.style.filter = ''; }
+  },
+
+  /** Monta el reproductor dentro del wrapper. muted + loop por defecto. */
+  _mountVideo(postId, url, { muted = true, autoplay = false } = {}) {
+    const wrapper = document.getElementById(`video-wrapper-${postId}`);
+    if (!wrapper || !url) return null;
+    const existing = wrapper.querySelector('video.wall-custom-video');
+    if (existing) return existing;
+
     wrapper.onclick = null;
+    wrapper.dataset.mounted = '1';
     wrapper.style.backgroundImage = '';
     wrapper.style.background = '#000';
-    const isSlow = this._detectSlowNetwork();
+    const preload = autoplay ? 'auto' : 'metadata';
     wrapper.innerHTML = `
-      <video id="wall-vid-${postId}" class="wall-custom-video w-full" controls playsinline muted preload="metadata"
-             style="max-height:${isSlow ? '280px' : '420px'};display:block;"
+      <video id="wall-vid-${postId}" class="wall-custom-video w-full" controls playsinline loop ${muted ? 'muted' : ''} preload="${preload}"
+             style="display:block;"
              onended="document.getElementById('wall-replay-${postId}')?.classList.remove('hidden')"
              onerror="WallModule._onVideoError('${postId}')">
         <source src="${_sanitizeHTML(url)}" type="video/mp4">
       </video>
       <button id="wall-replay-${postId}" onclick="WallModule._replayVideo('${postId}')"
-        class="hidden absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-14 h-14 bg-orange-500/90 rounded-full text-white flex items-center justify-center text-2xl" aria-label="Repetir video">🔁</button>`;
+        class="hidden absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-14 h-14 bg-orange-500/90 rounded-full text-white flex items-center justify-center text-2xl" aria-label="Repetir video">🔁</button>
+      <button id="wall-audio-toggle-${postId}"
+        class="wall-audio-toggle absolute top-2.5 right-2.5" aria-label="Activar sonido">🔇</button>`;
 
     const vid = document.getElementById(`wall-vid-${postId}`);
-    if (vid) {
-      vid.play().catch(() => {});
-      this._attachVideoProgress(vid, postId);
-      if (this._videoObserver) this._videoObserver.observe(vid);
+    if (!vid) return null;
+    vid.dataset.postId = postId;
+    vid.dataset.userPaused = '0';
+
+    const audioBtn = document.getElementById(`wall-audio-toggle-${postId}`);
+    if (audioBtn) audioBtn.onclick = (e) => { e.stopPropagation(); this._toggleAudio(postId); };
+
+    vid.addEventListener('play', () => this._onVideoPlay(postId));
+    vid.addEventListener('volumechange', () => this._onVolumeChange(postId));
+    vid.addEventListener('pause', () => {
+      if (vid.dataset._observerPause === '1') { delete vid.dataset._observerPause; return; }
+      vid.dataset.userPaused = '1';
+    });
+    vid.addEventListener('play', () => { delete vid.dataset.userPaused; });
+
+    this._syncAudioBtn(postId, muted);
+    if (autoplay) vid.play().catch(() => {});
+    this._attachVideoProgress(vid, postId);
+    if (this._videoObserver) this._videoObserver.observe(vid);
+    return vid;
+  },
+
+  /** Click explícito del usuario → monta y reproduce (compatible con onclick inline) */
+  playVideoCard(postId, url) {
+    this._mountVideo(postId, url, { muted: true, autoplay: true });
+  },
+
+  /** Al iniciar reproducción: precarga el siguiente video del muro (§12) */
+  _onVideoPlay(postId) {
+    const vid = document.getElementById(`wall-vid-${postId}`);
+    if (vid && !vid.muted) this._onVolumeChange(postId);
+    this._prefetchNextVideo(postId);
+  },
+
+  /** Un solo video con audio a la vez (§10 de la propuesta) */
+  _onVolumeChange(postId) {
+    const vid = document.getElementById(`wall-vid-${postId}`);
+    if (!vid) return;
+    if (!vid.muted) {
+      document.querySelectorAll('video.wall-custom-video').forEach(v => {
+        if (v !== vid && !v.muted) { v.muted = true; this._syncAudioBtn(v.dataset.postId, true); }
+      });
     }
+    this._syncAudioBtn(postId, vid.muted);
+  },
+
+  _toggleAudio(postId) {
+    const vid = document.getElementById(`wall-vid-${postId}`);
+    if (!vid) return;
+    if (vid.muted) {
+      document.querySelectorAll('video.wall-custom-video').forEach(v => {
+        if (v !== vid && !v.muted) { v.muted = true; this._syncAudioBtn(v.dataset.postId, true); }
+      });
+      vid.muted = false;
+    } else {
+      vid.muted = true;
+    }
+    vid.play().catch(() => {});
+    this._syncAudioBtn(postId, vid.muted);
+    if (navigator.vibrate) navigator.vibrate(10);
+  },
+
+  _syncAudioBtn(postId, isMuted) {
+    const btn = document.getElementById(`wall-audio-toggle-${postId}`);
+    if (btn) {
+      btn.textContent = isMuted ? '🔇' : '🔊';
+      btn.setAttribute('aria-label', isMuted ? 'Activar sonido' : 'Silenciar');
+    }
+  },
+
+  /** Precarga limitada del siguiente video (HTTP Range, 1 MB) (§12) */
+  _prefetchNextVideo(postId) {
+    try {
+      const eff = navigator.connection?.effectiveType;
+      if (this._detectSlowNetwork() || (eff && ['slower-2g', '2g', '3g'].includes(eff))) return;
+      const wrappers = [...document.querySelectorAll('.wall-video-wrapper[data-video-url]')];
+      const idx = wrappers.findIndex(w => w.id === `video-wrapper-${postId}`);
+      const next = wrappers[idx + 1];
+      if (!next || !next.dataset.videoUrl || next.dataset.videoUrl === this._lastPrefetched) return;
+      this._lastPrefetched = next.dataset.videoUrl;
+      fetch(next.dataset.videoUrl, { headers: { Range: 'bytes=0-1048575' } }).catch(() => {});
+    } catch (_) { /* best-effort */ }
   },
 
   _attachVideoProgress(vid, postId) {
@@ -1029,8 +1333,8 @@ const WallModule = {
     if (!url) return;
     const isVideo = type === 'video' || /\.(mp4|webm|mov|m4v)$/i.test(url);
     const content = isVideo
-      ? `<video controls playsinline autoplay muted class="w-full max-h-[85vh] object-contain rounded-xl" preload="metadata" style="background:#000"><source src="${_sanitizeHTML(url)}" type="video/mp4"></video>`
-      : `<img src="${_sanitizeHTML(url)}" class="w-full max-h-[85vh] object-contain rounded-xl select-none" alt="Publicación" draggable="false" loading="eager">`;
+      ? `<video controls playsinline autoplay muted loop class="wall-lightbox-media" preload="metadata" style="background:#000"><source src="${_sanitizeHTML(url)}" type="video/mp4"></video>`
+      : `<img src="${_sanitizeHTML(url)}" class="wall-lightbox-media select-none" alt="Publicación" draggable="false" loading="eager">`;
 
     const lb = document.createElement('div');
     lb.id = 'wall-lightbox';
@@ -1734,6 +2038,8 @@ const WallModule = {
       container.insertAdjacentHTML('afterbegin', this.renderPost(processed));
       ImageLoader.observe(container);
       this._setupLongPressReactions(container);
+      this._setupVideoAutoplay();
+      this._setupDoubleTap(container);
       if (window.lucide) lucide.createIcons();
 
       // Si el post trae media, registrar vista (no bloqueante)
@@ -1764,37 +2070,56 @@ const WallModule = {
     if (this._recordStream) { this._recordStream.getTracks().forEach(t => t.stop()); this._recordStream = null; }
     // Limpiar lightbox si queda abierto
     document.getElementById('wall-lightbox')?.remove();
+    // Liberar observers de scroll y reproducción (§26: gestión de memoria)
+    if (this._observer) { this._observer.disconnect(); this._observer = null; }
+    if (this._videoObserver) { this._videoObserver.disconnect(); this._videoObserver = null; }
   },
 
   // ── Scheduler de publicaciones programadas ───────────────────────────────────
   _startSchedulerChecker() {
     if (this._schedulerTimer) return;
-    this._schedulerTimer = setInterval(async () => {
+    let delayMs = 60_000; // backoff progresivo si la red falla (máx 5 min)
+    const schedule = () => { this._schedulerTimer = setTimeout(run, delayMs); };
+    const run = async () => {
       try {
-        if (!navigator.onLine) return; // sin conexión: reintentar en el próximo ciclo
+        // Pestaña oculta o sin conexión: no consultar (evita ERR_CONNECTION_CLOSED en background)
+        if (document.hidden || !navigator.onLine) return;
         const profile = this._appState?.get('profile');
         if (!['directora','maestra','asistente'].includes(profile?.role)) return;
         const now = new Date().toISOString();
-        const { data: due, error: schedErr } = await supabase.from('posts')
+        const { data: due, error: schedErr } = await runWithRetry(async () => await supabase.from('posts')
           .select('id').not('scheduled_at', 'is', null)
-          .lte('scheduled_at', now).eq('status', 'scheduled').limit(5);
+          .lte('scheduled_at', now).eq('status', 'scheduled').limit(5), { retries: 2 });
         if (schedErr) {
-          // Red inestable: registrar solo el primer fallo para no llenar la consola
+          // Red inestable: registrar solo el primer fallo y espaciar las consultas
+          delayMs = Math.min(5 * 60_000, delayMs + 60_000);
           if (!this._schedFailLogged) {
-            console.warn('[Wall] Scheduler en pausa (red):', schedErr.message);
+            console.warn('[Wall] Scheduler en pausa (red):', schedErr.message || schedErr);
             this._schedFailLogged = true;
           }
+          schedule();
           return;
         }
         this._schedFailLogged = false;
-        if (!due?.length) return;
+        delayMs = 60_000;
+        if (!due?.length) { schedule(); return; }
         for (const p of due) {
-          await supabase.from('posts').update({ status: 'published', scheduled_at: null }).eq('id', p.id);
+          await runWithRetry(async () => {
+            const r = await supabase.from('posts').update({ status: 'published', scheduled_at: null }).eq('id', p.id);
+            if (r.error) throw r.error;
+          }, { retries: 2 }).catch(() => {});
         }
       } catch (e) {
-        console.warn('[Wall] Scheduler error:', e);
+        if (!this._schedFailLogged) {
+          console.warn('[Wall] Scheduler en pausa (red):', e?.message || e);
+          this._schedFailLogged = true;
+        }
+        delayMs = Math.min(5 * 60_000, delayMs + 60_000);
+      } finally {
+        schedule();
       }
-    }, 60_000); // cada minuto
+    };
+    schedule();
   },
 
   // ── Video Trimmer Modal ───────────────────────────────────────────────────────
@@ -1810,18 +2135,18 @@ const WallModule = {
           <div class="w-10 h-10 bg-orange-100 rounded-2xl flex items-center justify-center text-xl">✂️</div>
           <div>
             <h3 class="font-black text-slate-800">Recortar Video</h3>
-            <p class="text-xs text-slate-500">El video excede 30 segundos. Elige el segmento a publicar.</p>
+            <p class="text-xs text-slate-500">El video excede ${MAX_VIDEO_DURATION / 60} min. Elige el segmento a publicar.</p>
           </div>
         </div>
         <video id="trimmer-preview" src="${_sanitizeHTML(url)}" controls muted class="w-full rounded-2xl max-h-48 bg-black" preload="metadata"></video>
         <div class="space-y-2">
           <div class="flex justify-between text-xs font-bold text-slate-500">
             <span>Inicio: <span id="trim-start-val">0</span>s</span>
-            <span>Fin: <span id="trim-end-val">30</span>s (máx 30s)</span>
+            <span>Fin: <span id="trim-end-val">${MAX_VIDEO_DURATION}</span>s (máx ${MAX_VIDEO_DURATION}s)</span>
           </div>
           <input type="range" id="trim-start" min="0" max="0" step="0.5" value="0" class="w-full accent-orange-500"
                  oninput="WallModule._updateTrimmer()" aria-label="Punto de inicio">
-          <input type="range" id="trim-end" min="0" max="30" step="0.5" value="30" class="w-full accent-green-500"
+          <input type="range" id="trim-end" min="0" max="${MAX_VIDEO_DURATION}" step="0.5" value="${MAX_VIDEO_DURATION}" class="w-full accent-green-500"
                  oninput="WallModule._updateTrimmer()" aria-label="Punto de fin">
         </div>
         <div class="flex gap-3">
@@ -1836,8 +2161,8 @@ const WallModule = {
       const endInput = document.getElementById('trim-end');
       const startInput = document.getElementById('trim-start');
       if (endInput) { endInput.max = Math.min(vid.duration, vid.duration); }
-      if (startInput) { startInput.max = Math.max(0, vid.duration - 30); }
-      document.getElementById('trim-end-val').textContent = Math.min(30, vid.duration).toFixed(1);
+      if (startInput) { startInput.max = Math.max(0, vid.duration - MAX_VIDEO_DURATION); }
+      document.getElementById('trim-end-val').textContent = Math.min(MAX_VIDEO_DURATION, vid.duration).toFixed(1);
     };
     modal._onTrimmed = onTrimmed;
     modal._originalUrl = url;
@@ -1845,8 +2170,8 @@ const WallModule = {
 
   _updateTrimmer() {
     const start = Number.parseFloat(document.getElementById('trim-start')?.value || 0);
-    const end = Number.parseFloat(document.getElementById('trim-end')?.value || 30);
-    const clamped = Math.min(end, start + 30);
+    const end = Number.parseFloat(document.getElementById('trim-end')?.value || MAX_VIDEO_DURATION);
+    const clamped = Math.min(end, start + MAX_VIDEO_DURATION);
     document.getElementById('trim-start-val').textContent = start.toFixed(1);
     document.getElementById('trim-end-val').textContent = clamped.toFixed(1);
     const vid = document.getElementById('trimmer-preview');
@@ -1857,7 +2182,7 @@ const WallModule = {
     const btn = document.getElementById('btn-apply-trim');
     if (btn) { btn.disabled = true; btn.textContent = 'Procesando...'; }
     const start = Number.parseFloat(document.getElementById('trim-start')?.value || 0);
-    const end = Number.parseFloat(document.getElementById('trim-end')?.value || 30);
+    const end = Number.parseFloat(document.getElementById('trim-end')?.value || MAX_VIDEO_DURATION);
     const modal = document.getElementById('wall-trimmer');
 
     // Nota: recorte real requiere FFmpeg WASM. Aquí se usa el segmento con nota informativa.
@@ -1867,7 +2192,7 @@ const WallModule = {
     modal?.remove();
   },
 
-  // ── Grabador Directo de Video 30s ────────────────────────────────────────────
+  // ── Grabador Directo de Video 2min ────────────────────────────────────────────
   async openVideoRecorder(onRecorded) {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: true });
@@ -1890,7 +2215,7 @@ const WallModule = {
               <circle id="record-ring" cx="18" cy="18" r="16" fill="none" stroke="#ef4444" stroke-width="3"
                 stroke-dasharray="100.5" stroke-dashoffset="100.5" style="transition:stroke-dashoffset 0.5s linear"/>
             </svg>
-            <span id="record-timer" class="text-white font-black text-3xl tabular-nums">0:30</span>
+            <span id="record-timer" class="text-white font-black text-3xl tabular-nums">2:00</span>
           </div>
           <div class="flex gap-3">
             <button onclick="WallModule._stopRecording()" class="flex-1 py-3 bg-slate-700 text-white rounded-2xl font-black text-xs" aria-label="Cancelar grabación">Cancelar</button>
@@ -2085,4 +2410,4 @@ if (typeof window !== 'undefined') {
   window.openLightbox = (url, type) => WallModule.openLightbox(url, type);
 }
 
-export { WallModule, generateVideoThumbnail };
+export { WallModule, generateVideoThumbnail, generateVideoThumbnailsMulti };

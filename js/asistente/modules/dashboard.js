@@ -3,6 +3,7 @@ import { AppState } from '../state.js';
 import { Helpers } from '../../shared/helpers.js';
 import { QueryCache } from '../../shared/query-cache.js';
 import { getBirthdayInfo } from '../../shared/birthday-utils.js';
+import { autoMarkAbsentStudents } from '../../shared/absent-service.js';
 
 const STATUS_MAP = {
   paid:    { label: 'Aprobado',    cls: 'bg-emerald-100 text-emerald-700' },
@@ -49,7 +50,7 @@ export const DashboardModule = {
           'asis_dashboard_stats',
           async () => {
             // Auto-detección de ausentes (misma regla: check_in_end + 2h)
-            try { await supabase.rpc('mark_absent_students'); } catch (_) {}
+            try { await autoMarkAbsentStudents(); } catch (_) {}
 
             const [studentsRes, attendanceRes, absentRes, paymentsRes, incomeRes] = await Promise.allSettled([
               supabase.from('students').select('*', { count: 'exact', head: true })

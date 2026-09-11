@@ -265,6 +265,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     toggleLike: (...a) => import('/js/shared/wall.js').then(m => m.WallModule.toggleLike(...a)),
     openNewPostModal: (...a) => import('/js/shared/wall.js').then(m => m.WallModule.openNewPostModal(...a)),
     deleteComment: (...a) => import('/js/shared/wall.js').then(m => m.WallModule.deleteComment(...a)),
+    playVideoCard: (...a) => import('/js/shared/wall.js').then(m => m.WallModule.playVideoCard(...a)),
+    _showVideoPreview: (...a) => import('/js/shared/wall.js').then(m => m.WallModule._showVideoPreview(...a)),
+    _hideVideoPreview: (...a) => import('/js/shared/wall.js').then(m => m.WallModule._hideVideoPreview(...a)),
+    _onVideoError: (...a) => import('/js/shared/wall.js').then(m => m.WallModule._onVideoError(...a)),
+    _replayVideo: (...a) => import('/js/shared/wall.js').then(m => m.WallModule._replayVideo(...a)),
   };
   window.openTeacherModal = (id) => import('./teachers.js').then(m => m.TeachersModule.openModal(id));
   window.openNewPostModal = openNewPostModal;

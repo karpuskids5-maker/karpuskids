@@ -817,8 +817,15 @@ async function loadUnreadMessageBadge(userId) {
     const { data, error } = await supabase.rpc('get_unread_counts');
     if (!error && data) {
       total = Object.values(data).reduce((a, b) => a + Number(b), 0);
+    } else {
+      // Si el RPC no existe en la BD, contar directo los mensajes sin leer
+      const { count } = await supabase
+        .from('messages')
+        .select('id', { count: 'exact', head: true })
+        .eq('receiver_id', userId)
+        .or('is_read.eq.false,is_read.is.null');
+      total = count || 0;
     }
-    // Si el RPC falla, simplemente mostrar 0 � no hacer fallback a tablas que pueden no existir
 
     updateBadgeUI(total);
   } catch (_) {

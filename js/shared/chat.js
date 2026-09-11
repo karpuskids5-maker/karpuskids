@@ -286,21 +286,47 @@ export const ChatModule = {
       });
 
       // Si el RPC no existe aún, retornar vacío sin lanzar error
-      if (error) {
+      if (!error && data) {
+        const visible = (data || []).filter(m => !m.deleted_at);
+        const messages = visible.slice(-MSG_PAGE_SIZE);
+        const foundConvId = messages.length > 0 ? messages[0].conversation_id : null;
+
+        if (foundConvId) {
+          const state = this._getPagState(foundConvId);
+          state.page = 1;
+          state.hasMore = (data || []).length >= MSG_PAGE_SIZE;
+        }
+
+        return { messages, conversationId: foundConvId, hasMore: false };
+      }
+
+      // Fallback: si la RPC get_direct_messages no existe en la BD, leer directo
+      try {
+        const me = (await supabase.auth.getUser())?.data?.user;
+        if (!me) return { messages: [], conversationId: null, hasMore: false };
+        const sel = await this._msgSelect();
+        const mine = me.id, theirs = otherUserId;
+        let q = supabase
+          .from('messages')
+          .select(sel)
+          .or(`and(sender_id.eq.${mine},receiver_id.eq.${theirs}),and(sender_id.eq.${theirs},receiver_id.eq.${mine})`)
+          .order('created_at', { ascending: false })
+          .limit(MSG_PAGE_SIZE);
+        if (this._extendedCols) q = q.is('deleted_at', null);
+        const { data: fd, error: fErr } = await q;
+        if (fErr) return { messages: [], conversationId: null, hasMore: false };
+
+        const ordered = (fd || []).reverse();
+        const foundConvId = ordered.length > 0 ? ordered[0].conversation_id : null;
+        if (foundConvId) {
+          const state = this._getPagState(foundConvId);
+          state.page = 1;
+          state.hasMore = false;
+        }
+        return { messages: ordered, conversationId: foundConvId, hasMore: false };
+      } catch (_) {
         return { messages: [], conversationId: null, hasMore: false };
       }
-
-      const visible = (data || []).filter(m => !m.deleted_at);
-      const messages = visible.slice(-MSG_PAGE_SIZE);
-      const foundConvId = messages.length > 0 ? messages[0].conversation_id : null;
-
-      if (foundConvId) {
-        const state = this._getPagState(foundConvId);
-        state.page = 1;
-        state.hasMore = (data || []).length >= MSG_PAGE_SIZE;
-      }
-
-      return { messages, conversationId: foundConvId, hasMore: false };
     }
   },
 
@@ -531,14 +557,25 @@ export const ChatModule = {
 
   /**
    * Marca como leídos los mensajes de una conversación (con timestamp)
+   * RPC `mark_messages_read` con fallback directo si no existe en la BD.
    */
   async markAsRead(conversationId) {
     if (!conversationId) return;
     try {
-      // Use the new RPC that sets read_at timestamp
-      await supabase.rpc('mark_messages_read', {
-        p_conversation_id: conversationId
-      });
+      const rpc = await supabase.rpc('mark_messages_read', { p_conversation_id: conversationId });
+      if (!rpc.error) return;
+    } catch (_) {}
+
+    // Fallback: si la RPC no existe en la BD (prod desactualizada), marcar directamente
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      await supabase
+        .from('messages')
+        .update({ is_read: true, read_at: new Date().toISOString() })
+        .eq('conversation_id', conversationId)
+        .eq('receiver_id', user.id)
+        .or('is_read.eq.false,is_read.is.null');
     } catch (_) {}
   },
 

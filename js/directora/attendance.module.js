@@ -99,30 +99,56 @@ export const AttendanceModule = {
   async load() {
     this._setLoading(true);
     try {
+      const today = Helpers.getYYYYMMDD();
       let q = supabase
         .from('attendance')
         .select('id, date, status, check_in, check_out, student:student_id(id, name, avatar_url), classroom:classroom_id(id, name)')
         .order('date', { ascending: false });
 
       if (this._mode === 'day') {
-        const date = document.getElementById('attDateSingle')?.value || Helpers.getYYYYMMDD();
+        const date = document.getElementById('attDateSingle')?.value || today;
         q = q.eq('date', date);
+
+        const [attRes, studentsRes] = await Promise.all([
+          q,
+          supabase.from('students')
+            .select('id, name, avatar_url, classroom:classroom_id(id, name)')
+            .eq('is_active', true)
+            .not('classroom_id', 'is', null)
+            .order('name')
+        ]);
+        if (attRes.error) throw attRes.error;
+
+        const attData = attRes.data || [];
+        const allStudents = (studentsRes.data || []);
+        this._activeStudentCount = allStudents.length || 0;
+
+        const recordedIds = new Set(attData.map(r => r.student?.id).filter(Boolean));
+
+        const syntheticAbsents = allStudents
+          .filter(s => !recordedIds.has(s.id))
+          .map(s => ({
+            id: null,
+            date,
+            status: 'absent',
+            check_in: null,
+            check_out: null,
+            student: { id: s.id, name: s.name, avatar_url: s.avatar_url },
+            classroom: s.classroom
+          }));
+
+        this._data = [...attData, ...syntheticAbsents];
       } else {
         const from = document.getElementById('attDateFrom')?.value || this._firstOfMonth();
-        const to   = document.getElementById('attDateTo')?.value   || Helpers.getYYYYMMDD();
+        const to   = document.getElementById('attDateTo')?.value   || today;
         q = q.gte('date', from).lte('date', to);
+
+        const attRes = await q;
+        if (attRes.error) throw attRes.error;
+
+        this._data = attRes.data || [];
+        this._activeStudentCount = 0;
       }
-
-      const [attRes, studentsRes] = await Promise.all([
-        q,
-        this._mode === 'day'
-          ? supabase.from('students').select('id', { count: 'exact', head: true }).eq('is_active', true).not('classroom_id', 'is', null)
-          : Promise.resolve({ count: 0 })
-      ]);
-      if (attRes.error) throw attRes.error;
-
-      this._data = attRes.data || [];
-      this._activeStudentCount = studentsRes.count || 0;
       this._populateRoomFilter();
       this._renderKPIs();
       this._renderTable();

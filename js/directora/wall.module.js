@@ -1,13 +1,13 @@
 /**
  * 📰 WALL MODULE — Directora / Maestra
  * Extiende SharedWallModule con modal de publicación mejorado:
- * compresión WebP, validación 30s, álbum multi-foto, grabación directa,
+ * compresión WebP, validación 2min, álbum multi-foto, grabación directa,
  * programación, borradores, preview, etiquetado de alumnos.
  */
 import { supabase, sendPush, emitEvent } from '../shared/supabase.js';
 import { Helpers } from '../shared/helpers.js';
 import { showNotifyFeedback } from '../shared/notify-feedback.js';
-import { WallModule as SharedWallModule, generateVideoThumbnail } from '../shared/wall.js';
+import { WallModule as SharedWallModule, generateVideoThumbnail, generateVideoThumbnailsMulti } from '../shared/wall.js';
 
 export const WallModule = {
   ...SharedWallModule,
@@ -71,12 +71,12 @@ export const WallModule = {
             </label>
           </div>
           <input type="file" id="postMediaFile" class="hidden" accept="image/*,video/*" multiple>
-          <p class="text-[10px] text-slate-400">Imágenes (máx 5 para álbum) o 1 video de hasta 30s / 25MB.</p>
+          <p class="text-[10px] text-slate-400">Imágenes (máx 5 para álbum) o 1 video de hasta 2min / 50MB.</p>
 
           <!-- Botón grabadora -->
           <button onclick="WallModule._openRecorderFromModal()" type="button"
             class="flex items-center gap-2 text-xs font-black text-red-500 hover:text-red-600 bg-red-50 hover:bg-red-100 px-4 py-2 rounded-2xl transition-all">
-            <i data-lucide="video" class="w-4 h-4"></i> Grabar video (30s)
+            <i data-lucide="video" class="w-4 h-4"></i> Grabar video (2min)
           </button>
         </div>
 
@@ -165,15 +165,15 @@ export const WallModule = {
     if (isVideo) {
       if (files.length > 1) { Helpers.toast('Solo 1 video por publicación', 'warning'); return; }
       const file = files[0];
-      const maxBytes = 25 * 1024 * 1024;
-      if (file.size > maxBytes) { Helpers.toast('Video demasiado grande (máx 25MB)', 'error'); return; }
+      const maxBytes = 50 * 1024 * 1024;
+      if (file.size > maxBytes) { Helpers.toast('Video demasiado grande (máx 50MB)', 'error'); return; }
 
       const { ok, duration } = await SharedWallModule.validateVideoDuration
         ? SharedWallModule.validateVideoDuration(file)
         : this._validateDuration(file);
 
       if (!ok) {
-        Helpers.toast(`El video excede 30s (${duration.toFixed(0)}s). Recórtalo.`, 'warning');
+        Helpers.toast(`El video excede 2min (${duration.toFixed(1)}s). Recórtalo.`, 'warning');
         this.openVideoTrimmer(file, () => {
           this._recordedBlob = null;
           this._albumFiles = [file];
@@ -244,7 +244,7 @@ export const WallModule = {
     return new Promise(resolve => {
       const v = document.createElement('video');
       const url = URL.createObjectURL(file);
-      v.onloadedmetadata = () => { URL.revokeObjectURL(url); resolve({ ok: v.duration <= 30, duration: v.duration }); };
+      v.onloadedmetadata = () => { URL.revokeObjectURL(url); resolve({ ok: v.duration <= 120, duration: v.duration }); };
       v.onerror = () => { URL.revokeObjectURL(url); resolve({ ok: false, duration: -1 }); };
       v.src = url;
     });
@@ -403,7 +403,7 @@ export const WallModule = {
       return this._uploadSingleBlob(this._recordedBlob, 'video/webm', 'video');
     }
     if (filesToUpload.length === 0) {
-      return { mediaUrl: null, mediaType: null, imagesArr: [] };
+      return { mediaUrl: null, mediaType: null, thumbnailUrl: null, thumbnailUrls: [], imagesArr: [] };
     }
     if (filesToUpload[0].type.startsWith('video/')) {
       return this._uploadVideoFile(filesToUpload[0]);
@@ -418,8 +418,9 @@ export const WallModule = {
     const path = `posts/${Date.now()}_rec.webm`;
     await this._uploadFile('posts', path, blob, mimeType);
     const { data: u } = supabase.storage.from('posts').getPublicUrl(path);
-    const thumbnailUrl = await this._uploadVideoThumb(blob);
-    return { mediaUrl: u.publicUrl, mediaType, thumbnailUrl, imagesArr: [] };
+    const { thumbnailUrl, thumbnailUrls } = await this._uploadVideoThumbs(blob);
+    const duration = await this._probeVideoDuration(blob);
+    return { mediaUrl: u.publicUrl, mediaType, thumbnailUrl, thumbnailUrls, imagesArr: [], duration };
   },
 
   async _uploadVideoFile(file) {
@@ -427,26 +428,60 @@ export const WallModule = {
     const path = `posts/${Date.now()}.${ext}`;
     await this._uploadFile('posts', path, file, file.type);
     const { data: u } = supabase.storage.from('posts').getPublicUrl(path);
-    const thumbnailUrl = await this._uploadVideoThumb(file);
-    return { mediaUrl: u.publicUrl, mediaType: 'video', thumbnailUrl, imagesArr: [] };
+    const { thumbnailUrl, thumbnailUrls } = await this._uploadVideoThumbs(file);
+    const duration = await this._probeVideoDuration(file);
+    return { mediaUrl: u.publicUrl, mediaType: 'video', thumbnailUrl, thumbnailUrls, imagesArr: [], duration };
+  },
+
+  /** Lee la duración real de un blob/file de video (segundos) */
+  async _probeVideoDuration(src) {
+    try {
+      return await new Promise(resolve => {
+        const v = document.createElement('video');
+        const url = URL.createObjectURL(src);
+        v.onloadedmetadata = () => { URL.revokeObjectURL(url); resolve(v.duration && v.duration > 0 ? Math.round(v.duration * 10) / 10 : null); };
+        v.onerror = () => { URL.revokeObjectURL(url); resolve(null); };
+        v.src = url;
+      });
+    } catch (_) { return null; }
   },
 
   /**
-   * 🎬 Genera la PORTADA del video en canvas (fragmento: 20% del video o 10s,
-   * el menor) y la sube al storage. Devuelve la URL pública o null si falla.
+   * 🎬 Genera la portada y los thumbnails múltiples del video (vista previa
+   * estilo YouTube) y los sube al storage.
+   * Devuelve { thumbnailUrl, thumbnailUrls }.
    */
-  async _uploadVideoThumb(videoFile) {
+  async _uploadVideoThumbs(videoFile) {
+    let thumbnailUrl = null;
+    let thumbnailUrls = [];
+
     try {
-      const thumb = await generateVideoThumbnail(videoFile);
-      if (!thumb) return null;
-      const thumbPath = `wall/thumbs/${Date.now()}_${crypto.randomUUID?.().slice(0, 6) || ''}.webp`;
-      await this._uploadFile('posts', thumbPath, thumb, 'image/webp');
-      const { data: t } = supabase.storage.from('posts').getPublicUrl(thumbPath);
-      return t?.publicUrl || null;
+      const [thumb, multiThumbs] = await Promise.all([
+        generateVideoThumbnail(videoFile),
+        generateVideoThumbnailsMulti(videoFile, 5)
+      ]);
+
+      if (thumb) {
+        const thumbPath = `wall/thumbs/${Date.now()}_${crypto.randomUUID?.().slice(0, 6) || ''}.webp`;
+        await this._uploadFile('posts', thumbPath, thumb, 'image/webp');
+        const { data: t } = supabase.storage.from('posts').getPublicUrl(thumbPath);
+        thumbnailUrl = t?.publicUrl || null;
+      }
+
+      if (multiThumbs.length > 0) {
+        const uploads = await Promise.allSettled(multiThumbs.map(async (th, i) => {
+          const path = `wall/thumbs/${Date.now()}_${crypto.randomUUID?.().slice(0, 6) || ''}_${i}.webp`;
+          await this._uploadFile('posts', path, th.blob, 'image/webp');
+          const { data: t } = supabase.storage.from('posts').getPublicUrl(path);
+          return t?.publicUrl || null;
+        }));
+        thumbnailUrls = uploads.map(r => r.status === 'fulfilled' ? r.value : null).filter(Boolean);
+      }
     } catch (e) {
-      console.warn('[Wall] Portada de video no generada:', e);
-      return null;
+      console.warn('[Wall] Thumbnails de video no generados:', e);
     }
+
+    return { thumbnailUrl, thumbnailUrls };
   },
 
   async _uploadSingleImage(file) {
@@ -454,7 +489,7 @@ export const WallModule = {
     const path = `posts/${Date.now()}.webp`;
     await this._uploadFile('posts', path, compressed, 'image/webp');
     const { data: u } = supabase.storage.from('posts').getPublicUrl(path);
-    return { mediaUrl: u.publicUrl, mediaType: 'image', imagesArr: [] };
+    return { mediaUrl: u.publicUrl, mediaType: 'image', thumbnailUrl: null, thumbnailUrls: [], imagesArr: [] };
   },
 
   async _uploadAlbum(files) {
@@ -469,14 +504,14 @@ export const WallModule = {
     }
     const mediaUrl = imagesArr.length > 0 ? imagesArr[0] : null;
     const mediaType = imagesArr.length > 0 ? 'album' : null;
-    return { mediaUrl, mediaType, imagesArr };
+    return { mediaUrl, mediaType, thumbnailUrl: null, thumbnailUrls: [], imagesArr };
   },
 
   _isScheduledPost(scheduledAt) {
     return !!scheduledAt && new Date(scheduledAt) > new Date();
   },
 
-  _buildPostPayload({ content, classroomId, scheduledAt, expireDays, mediaUrl, mediaType, thumbnailUrl, imagesArr, user }) {
+  _buildPostPayload({ content, classroomId, scheduledAt, expireDays, mediaUrl, mediaType, thumbnailUrl, thumbnailUrls = [], imagesArr, duration, user }) {
     const isScheduled    = this._isScheduledPost(scheduledAt);
     return {
       content:         content || null,
@@ -484,7 +519,9 @@ export const WallModule = {
       media_url:       mediaUrl,
       media_type:      mediaType,
       thumbnail_url:   thumbnailUrl || null,
+      thumbnail_urls:  thumbnailUrls.length ? thumbnailUrls : null,
       images:          imagesArr.length > 1 ? imagesArr : null,
+      duration:        duration ?? null,
       teacher_id:      user.id,
       scheduled_at:    isScheduled ? new Date(scheduledAt).toISOString() : null,
       status:          isScheduled ? 'scheduled' : 'published',
@@ -504,8 +541,8 @@ export const WallModule = {
     if (!user) throw new Error('Sin sesión');
 
     const filesToUpload = this._resolveFilesToUpload(mediaFileInput);
-    const { mediaUrl, mediaType, thumbnailUrl, imagesArr } = await this._resolveMediaUpload(filesToUpload);
-    const payload = this._buildPostPayload({ content, classroomId, scheduledAt, expireDays, mediaUrl, mediaType, thumbnailUrl, imagesArr, user });
+    const { mediaUrl, mediaType, thumbnailUrl, thumbnailUrls = [], imagesArr, duration } = await this._resolveMediaUpload(filesToUpload);
+    const payload = this._buildPostPayload({ content, classroomId, scheduledAt, expireDays, mediaUrl, mediaType, thumbnailUrl, thumbnailUrls, imagesArr, duration, user });
 
     const { error } = await supabase.from('posts').insert(payload);
     if (error) throw error;

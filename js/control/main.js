@@ -715,11 +715,12 @@ window.renderWallGallery = function() {
   grid.innerHTML = allWallPosts.filter(p => _getWallMediaUrl(p)).slice(0, 100).map(p => {
     const url = _getWallMediaUrl(p);
     const isVid = _isVideoUrl(url);
+    const posterUrl = p.thumbnail_url || null;
     const dt = p.created_at ? new Date(p.created_at).toLocaleDateString('es-DO') : '';
     const author = p.teacher_name || '';
     const content = [p.title, p.content].filter(Boolean).join(' — ');
     return `<div class="gallery-item" onclick="openLightbox('${escH(url)}','${escH(author + ' — ' + dt)}')">
-      ${isVid ? `<video src="${escH(url)}" style="width:100%;height:100%;object-fit:cover;" muted preload="metadata"></video>` : `<img src="${escH(url)}" alt="" loading="lazy">`}
+      ${isVid ? `<video src="${escH(url)}" ${posterUrl ? `poster="${escH(posterUrl)}"` : ''} style="width:100%;height:100%;object-fit:cover;" muted preload="metadata"></video>` : `<img src="${escH(url)}" alt="" loading="lazy">`}
       <div class="overlay"><div class="overlay-text">📷 ${escH(author)} · ${dt}</div></div>
     </div>`;
   }).join('') || '<div style="text-align:center;padding:40px;color:var(--muted);">Sin fotos ni videos</div>';
@@ -733,10 +734,10 @@ window.renderWallMedia = function() {
   const allMedia = [];
   allWallPosts.forEach(p => {
     const url = _getWallMediaUrl(p);
-    if (url) allMedia.push({ url, author: p.teacher_name || '—', date: p.created_at, likes: p.likes_count || 0, comments: p.comments_count || 0 });
+    if (url) allMedia.push({ url, author: p.teacher_name || '—', date: p.created_at, likes: p.likes_count || 0, comments: p.comments_count || 0, poster: p.thumbnail_url || null });
     if (p.images && Array.isArray(p.images)) {
       p.images.slice(1).forEach(u => {
-        if (u && u !== url) allMedia.push({ url: u, author: p.teacher_name || '—', date: p.created_at, likes: p.likes_count || 0, comments: p.comments_count || 0 });
+        if (u && u !== url) allMedia.push({ url: u, author: p.teacher_name || '—', date: p.created_at, likes: p.likes_count || 0, comments: p.comments_count || 0, poster: null });
       });
     }
   });
@@ -744,7 +745,7 @@ window.renderWallMedia = function() {
     const dt = m.date ? new Date(m.date).toLocaleDateString('es-DO') : '';
     const isVid = _isVideoUrl(m.url);
     return `<div class="gallery-item" onclick="openLightbox('${escH(m.url)}','${escH(m.author + ' · ' + dt + ' · ❤' + m.likes)}')">
-      ${isVid ? `<video src="${escH(m.url)}" style="width:100%;height:100%;object-fit:cover;" muted preload="metadata"></video>` : `<img src="${escH(m.url)}" alt="" loading="lazy">`}
+      ${isVid ? `<video src="${escH(m.url)}" ${m.poster ? `poster="${escH(m.poster)}"` : ''} style="width:100%;height:100%;object-fit:cover;" muted preload="metadata"></video>` : `<img src="${escH(m.url)}" alt="" loading="lazy">`}
       <div class="overlay"><div class="overlay-text">📷 ${escH(m.author)} · ${dt}</div></div>
     </div>`;
   }).join('') || '<div style="text-align:center;padding:40px;color:var(--muted);">Sin fotos ni videos en publicaciones</div>';
@@ -3829,8 +3830,9 @@ function _feedCardHTML(p) {
   const color = p.author_role === 'directora' ? '#f97316' : p.author_role === 'asistente' ? '#8b5cf6' : '#22c55e';
   const txt = [p.title, p.content].filter(Boolean).join(' — ');
   const media = _getWallMediaUrl(p);
+  const poster = p.thumbnail_url ? `poster="${escH(p.thumbnail_url)}"` : '';
   const mediaHTML = media ? (_isVideoUrl(media)
-    ? `<video src="${escH(media)}" controls style="width:100%;max-height:300px;object-fit:cover;border-radius:12px;margin-top:10px;"></video>`
+    ? `<video src="${escH(media)}" ${poster} controls preload="metadata" style="width:100%;max-height:300px;object-fit:cover;border-radius:12px;margin-top:10px;"></video>`
     : `<img src="${escH(media)}" loading="lazy" onclick="openLightbox('${escH(media)}','${escH(author + ' · ' + dt)}')" style="width:100%;max-height:300px;object-fit:cover;border-radius:12px;margin-top:10px;cursor:zoom-in;">`) : '';
   return `<div class="feed-card" style="background:var(--surface2);border:1px solid var(--border);border-radius:16px;padding:14px;margin-bottom:12px;box-shadow:0 4px 18px rgba(0,0,0,.18);">
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">

@@ -1,4 +1,4 @@
-import { logError } from './db-utils.js';
+import { logError, runWithRetry } from './db-utils.js';
 import { Helpers } from './helpers.js';
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js';
 
@@ -26,6 +26,35 @@ const options = {
 };
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, options);
+
+// ── Circuit breaker de RPC ────────────────────────────────────────────────────
+// Si un RPC no existe en la BD (p. ej. mark_absent_students no aplicado en prod),
+// PostgREST responde 400/404 en CADA llamada y el panel lo dispara una y otra vez
+// (carga + intervalos de 5 min). Detectamos el fallo UNA vez y cortocircuitamos
+// las siguientes llamadas del RPC en la sesión, devolviendo el mismo error cacheado.
+const _brokenRpcCache = new Map();
+const _originalRpc = supabase.rpc.bind(supabase);
+supabase.rpc = (fn, args, opts) => {
+  const cached = _brokenRpcCache.get(fn);
+  if (cached) return Promise.resolve({ data: null, error: cached });
+  const result = _originalRpc(fn, args, opts);
+  if (result && typeof result.then === 'function') {
+    return result.then((res) => {
+      if (res.error) {
+        const code = String(res.error.code || '');
+        const msg = String(res.error.message || '').toLowerCase();
+        const notFound = code === 'PGRST202' || /does not exist|not found|not find|could not find|no function matches|function .*not exist|no matching row|missing/i.test(msg);
+        const badArgs = /invalid.*arg|wrong.*arg|no argument|takes no argument|invalid input|22p02/i.test(msg);
+        const badStatus = /^4\d\d$/.test(code) && code !== '429';
+        if (notFound || badArgs || badStatus) {
+          _brokenRpcCache.set(fn, res.error);
+        }
+      }
+      return res;
+    });
+  }
+  return result;
+};
 
 // ── Auto-refresh: detectar JWT expirado y refrescar sesión ───────────────────
 supabase.auth.onAuthStateChange((event, session) => {
@@ -100,7 +129,20 @@ window.fetch = async function(...args) {
     args[1] = options;
   }
 
-  let res = await _originalFetch.apply(this, args);
+  // Reintento ante fallos transitorios de red (ERR_CONNECTION_CLOSED / "Failed to fetch")
+  // Solo para peticiones idempotentes (GET/HEAD) — nunca reintentar mutaciones.
+  let res;
+  try {
+    res = await _originalFetch.apply(this, args);
+  } catch (err) {
+    const method = ((args[1]?.method) || 'GET').toUpperCase();
+    if (isSupabase && ['GET', 'HEAD'].includes(method)) {
+      await new Promise(r => setTimeout(r, 700));
+      res = await _originalFetch.apply(this, args);
+    } else {
+      throw err;
+    }
+  }
 
   // Interceptar 401 para intentar refrescar sesión
   if (res.status === 401 && isSupabase && !url.includes('/auth/v1/')) {
@@ -304,22 +346,34 @@ export function startAccountWatchdog(userId, isAdmin = false) {
   } catch (_) {}
 
   // Fallback: polling periódico por si el realtime no está disponible.
-  setInterval(async () => {
+  // - Pestaña oculta / sin conexión: no consulta (evita ERR_CONNECTION_CLOSED).
+  // - Backoff progresivo ante fallos de red (máx 5 min).
+  let delayMs = 30_000;
+  const schedule = () => { setTimeout(run, delayMs); };
+  const run = async () => {
     try {
+      if (document.hidden || !navigator.onLine) return;
       const path = window.location.pathname || '';
       if (path.includes('login.html')) return;
-      const { data } = await supabase
+      const { data } = await runWithRetry(async () => await supabase
         .from('profiles')
         .select('is_active')
         .eq('id', userId)
-        .maybeSingle();
+        .maybeSingle(), { retries: 2 });
       if (data && data.is_active === false) {
         window._karpusInactiveRedirect = true;
         await supabase.auth.signOut().catch(() => {});
         window.location.href = 'login.html?reason=inactive';
+        return;
       }
-    } catch (_) {}
-  }, 30000);
+      delayMs = 30_000;
+    } catch (_) {
+      delayMs = Math.min(5 * 60_000, delayMs + 30_000);
+    } finally {
+      if (!window._karpusInactiveRedirect) schedule();
+    }
+  };
+  schedule();
 }
 
 // ── Suspensión temporal del servicio ─────────────────────────────────────────

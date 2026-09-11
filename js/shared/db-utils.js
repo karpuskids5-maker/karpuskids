@@ -82,6 +82,48 @@ export function withTimeout(queryFn, ms = 8000) {
   return Promise.race([queryFn(), timeout]);
 }
 
+// ── Reintentos ante fallos de red transitorios ────────────────────────────────
+
+function _sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+/**
+ * Detecta un error de red (no de negocio). Cubre el patrón clásico del stack:
+ * "net::ERR_CONNECTION_CLOSED" / TypeError: Failed to fetch / load failed,
+ * que Supabase expone como TypeError o como error con .code/.message de red.
+ */
+function _isNetworkError(err) {
+  if (!err) return false;
+  if (err instanceof TypeError) return true;
+  const msg = String(err.message || err.code || '').toLowerCase();
+  return /network|fetch|conn|connection|timeout|abort|closed|load failed|econnres|socket|net::/i.test(msg);
+}
+
+/**
+ * 🛡️ runWithRetry — Ejecuta una operación de red reintentando SOLO fallos
+ * transitorios (ERR_CONNECTION_CLOSED, "Failed to fetch", timeouts).
+ * - Backoff exponencial con jitter para no golpear al servidor en ráfaga.
+ * - Respeta navigator.onLine (espera reconexión antes de cada intento).
+ * - No reintenta errores de negocios/4xx (RLS, columnas, validaciones…).
+ *
+ * @param {Function} fn   async () => resultado  (recibe el nº de intento)
+ * @param {object}   opts { retries = 3, baseDelay = 800, maxDelay = 8000 }
+ */
+export async function runWithRetry(fn, { retries = 3, baseDelay = 800, maxDelay = 8000 } = {}) {
+  let lastErr;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    if (navigator.onLine === false) await _sleep(1200);
+    try {
+      return await fn(attempt);
+    } catch (err) {
+      lastErr = err;
+      if (!_isNetworkError(err) || attempt === retries) break;
+      const delay = Math.min(maxDelay, baseDelay * 2 ** attempt) + Math.floor(Math.random() * 300);
+      await _sleep(delay);
+    }
+  }
+  throw lastErr;
+}
+
 /**
  * 🔒 maskSensitive — Enmascara datos sensibles para logs de auditoría
  * Nunca guardar emails, teléfonos o nombres completos en logs.

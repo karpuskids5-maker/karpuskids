@@ -74,7 +74,7 @@ export const Prefetch = {
     try {
       const { data: posts } = await supabase
         .from('posts')
-        .select('media_url, image_url, teacher:teacher_id(avatar_url)')
+        .select('media_url, image_url, thumbnail_url, thumbnail_urls, teacher:teacher_id(avatar_url)')
         .eq('classroom_id', classroomId)
         .order('created_at', { ascending: false })
         .limit(10);
@@ -83,6 +83,8 @@ export const Prefetch = {
       for (const p of posts || []) {
         const media = p.media_url || p.image_url;
         if (media) urls.push(media);
+        if (p.thumbnail_url) urls.push(p.thumbnail_url);
+        for (const t of (p.thumbnail_urls || [])) if (t) urls.push(t);
         if (p.teacher?.avatar_url) urls.push(p.teacher.avatar_url);
       }
 
@@ -192,12 +194,24 @@ export const Prefetch = {
       const isVideo = /\.(mp4|mov|webm|ogg)(\?|$)/i.test(url);
 
       if (isVideo) {
-        // Para videos: solo pre-cargar el primer chunk con fetch range
-        return fetch(url, {
-          method: 'GET',
-          headers: { Range: 'bytes=0-65535' }, // primeros 64KB
-          cache: 'force-cache'
-        }).catch(() => {});
+        // Videos: preload link (el browser cachea metadata y primeros chunks) +
+        // fetch range más grande para poblar el caché HTTP.
+        return new Promise(resolve => {
+          const timeout = setTimeout(() => resolve(), 12000);
+          const link = document.createElement('link');
+          link.rel = 'preload';
+          link.as = 'video';
+          link.href = url;
+          link.addEventListener('load', () => resolve());
+          link.addEventListener('error', () => resolve());
+          document.head.appendChild(link);
+          fetch(url, {
+            method: 'GET',
+            headers: { Range: 'bytes=0-262143' }, // primeros 256KB
+            cache: 'force-cache'
+          }).then(() => { clearTimeout(timeout); resolve(); }).catch(() => { clearTimeout(timeout); resolve(); });
+          setTimeout(() => { try { link.remove(); } catch (_) {} }, 12000);
+        });
       } else {
         // Para imágenes: crear un Image() que el browser cachea automáticamente
         return new Promise(resolve => {

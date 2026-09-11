@@ -100,18 +100,29 @@ export const BadgeSystem = {
 
       // Mensajes no leidos
       try {
-        const { data: unreadData } = await supabase.rpc('get_unread_counts');
-        if (unreadData) {
-          const total = Object.values(unreadData).reduce(function(a, b) { return a + Number(b); }, 0);
-          if (total > 0) {
-            // Panel padre
-            this._renderBadge('notifications', total);
-            this._renderCardBadge('notifications', total);
-            // Panel staff
-            this._renderBadge('chat', total);
-            this._renderBadge('comunicacion', total);
-            this._renderCardBadge('comunicacion', total);
-          }
+        let total = 0;
+        const { data: unreadData, error: unreadErr } = await supabase.rpc('get_unread_counts');
+        if (!unreadErr && unreadData) {
+          total = Object.values(unreadData).reduce(function(a, b) { return a + Number(b); }, 0);
+        } else {
+          // Fallback: si la RPC no existe en la BD, contar directo
+          try {
+            const { count } = await supabase
+              .from('messages')
+              .select('id', { count: 'exact', head: true })
+              .eq('receiver_id', this._userId)
+              .or('is_read.eq.false,is_read.is.null');
+            total = count || 0;
+          } catch (_) {}
+        }
+        if (total > 0) {
+          // Panel padre
+          this._renderBadge('notifications', total);
+          this._renderCardBadge('notifications', total);
+          // Panel staff
+          this._renderBadge('chat', total);
+          this._renderBadge('comunicacion', total);
+          this._renderCardBadge('comunicacion', total);
         }
       } catch (_) {}
 

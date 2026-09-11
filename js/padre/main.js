@@ -1387,10 +1387,17 @@ async function loadUnreadBadge() {
     if (!user) return;
 
     let total = 0;
-    // Mensajes no leídos
-    const { data } = await supabase.rpc('get_unread_counts');
-    if (data) {
+    // Mensajes no leídos (RPC con fallback directo si no existe en la BD)
+    const { data, error } = await supabase.rpc('get_unread_counts');
+    if (!error && data) {
       total = Object.values(data).reduce((a, b) => a + Number(b), 0);
+    } else {
+      const { count: msgCount } = await supabase
+        .from('messages')
+        .select('id', { count: 'exact', head: true })
+        .eq('receiver_id', user.id)
+        .or('is_read.eq.false,is_read.is.null');
+      total = msgCount || 0;
     }
     // Notificaciones no leídas
     const { count: notifCount } = await supabase

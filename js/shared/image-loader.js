@@ -83,9 +83,15 @@ export const ImageLoader = {
   _loadVideo(el) {
     const src = el.dataset.src;
     if (!src) return;
+    // Precargar la fuente iluminada — solo metadata primero (rápido, no bloquea)
     if (el.dataset.poster) el.poster = el.dataset.poster;
+    el.preload = el.dataset.preload || 'metadata';
     el.src = src; el.load();
     el.dataset.loaded = '1'; el.classList.add('karpus-img-loaded');
+    // Cuando la metadata esté lista, subir a preload auto para arranque instantáneo
+    el.addEventListener('loadedmetadata', () => {
+      if (el.dataset.preload !== 'none') el.preload = 'auto';
+    }, { once: true });
   },
 
   img(src, opts = {}) {
@@ -109,8 +115,8 @@ export const ImageLoader = {
   },
 
   video(src, poster = '', opts = {}) {
-    const { cls = 'w-full max-h-[500px] mx-auto', controls = true } = opts;
-    return `<video data-src="${src}" ${poster ? `data-poster="${poster}"` : ''} class="karpus-img karpus-img-loading ${cls}" ${controls ? 'controls' : ''} playsinline preload="none"></video>`;
+    const { cls = 'w-full max-h-[500px] mx-auto', controls = true, preload = 'metadata' } = opts;
+    return `<video data-src="${src}" ${poster ? `data-poster="${poster}"` : ''} data-preload="${preload}" class="karpus-img karpus-img-loading ${cls}" ${controls ? 'controls' : ''} playsinline preload="${preload}"></video>`;
   },
 
   skeleton(cls = 'w-full h-48') {
@@ -302,6 +308,122 @@ export const ImageLoader = {
       reader.onerror = reject;
       reader.readAsDataURL(file);
     });
+  },
+
+  /**
+   * Genera thumbnails de un archivo de video usando canvas.
+   * @param {File|Blob} videoFile — archivo de video
+   * @param {number} count — cuántos thumbnails generar
+   * @returns {Promise<Blob|null>} — thumbnails [blobPrincipal, ...multiples] o []
+   */
+  async _generateVideoThumbnails(videoFile, count = 5) {
+    const list = [];
+    const video = document.createElement('video');
+    video.muted = true;
+    video.playsInline = true;
+    video.preload = 'auto';
+    const url = URL.createObjectURL(videoFile);
+
+    try {
+      await new Promise((resolve, reject) => {
+        video.onloadedmetadata = resolve;
+        video.onerror = reject;
+        video.src = url;
+      });
+      const duration = video.duration || 30;
+      // Principal: 20% del video o 10s (reutiliza el criterio actual)
+      const times = [];
+      times.push(Math.max(0.1, Math.min(10, duration * 0.2)));
+      for (let i = 0; i < count; i++) {
+        times.push(Math.max(0.5, (duration / (count + 1)) * (i + 1)));
+      }
+
+      for (const t of times) {
+        const blob = await new Promise((resolve) => {
+          video.onseeked = () => {
+            try {
+              const w = video.videoWidth || 640;
+              const h = video.videoHeight || 360;
+              const canvas = document.createElement('canvas');
+              canvas.width = 160;
+              canvas.height = Math.round(160 * h / w);
+              canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+              canvas.toBlob(b => resolve(b), 'image/webp', 0.6);
+            } catch (_) { resolve(null); }
+          };
+          try { video.currentTime = t; } catch (_) { resolve(null); }
+        });
+        if (blob) list.push(blob);
+      }
+    } catch (_) {
+      // Silencioso
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+    return list;
+  },
+
+  /**
+   * Sube un video a Supabase Storage y genera su portada y thumbnails
+   * múltiples (vista previa estilo YouTube). Devuelve las URLs públicas.
+   *
+   * @param {File} file — video a subir
+   * @param {object} opts — { onProgress }
+   * @returns {Promise<{publicUrl, thumbnailUrl, thumbnailUrls}>}
+   */
+  async uploadVideoWithThumbnails(file, opts = {}) {
+    const { supabase } = await import('./supabase.js');
+    const { onProgress } = opts;
+
+    const isVideo = file.type.startsWith('video/') ||
+      /\.(mp4|webm|mov|ogv|m4v|mkv|3gp|avi|wmv|flv)$/i.test(file.name || '');
+    if (!isVideo) {
+      const publicUrl = await this.uploadToStorage(file, 'karpus-uploads',
+        `posts/${Date.now()}.webp`, { maxWidth: 1200, quality: 0.8 });
+      return { publicUrl, thumbnailUrl: null, thumbnailUrls: [] };
+    }
+
+    const ext = (file.name || 'video.mp4').split('.').pop();
+    const path = `posts/${Date.now()}_${crypto.randomUUID?.().slice(0, 8) || Math.random().toString(36).slice(2, 8)}.${ext}`;
+
+    const videoBucket = 'classroom_media';
+    const { error } = await supabase.storage.from(videoBucket).upload(path, file, {
+      cacheControl: '31536000',
+      contentType: file.type || 'video/mp4',
+      upsert: true
+    });
+    if (error) throw error;
+    const { data } = supabase.storage.from(videoBucket).getPublicUrl(path);
+    const publicUrl = data.publicUrl;
+
+    // Generar portada + thumbnails múltiples
+    let thumbnailUrl = null;
+    let thumbnailUrls = [];
+    try {
+      const thumbs = await this._generateVideoThumbnails(file, 5);
+      if (thumbs.length > 1) thumbnailUrl = await this._uploadThumb(thumbs[0], 'poster');
+      const multi = thumbs.slice(1);
+      thumbnailUrls = (await Promise.allSettled(
+        multi.map((t, i) => this._uploadThumb(t, `t${i}`))
+      )).map(r => r.status === 'fulfilled' ? r.value : null).filter(Boolean);
+    } catch (e) {
+      console.warn('[ImageLoader] Thumbnail generation failed:', e);
+    }
+
+    return { publicUrl, thumbnailUrl, thumbnailUrls };
+  },
+
+  async _uploadThumb(blob, label) {
+    const { supabase } = await import('./supabase.js');
+    const path = `wall/thumbs/${Date.now()}_${label}_${crypto.randomUUID?.().slice(0, 6) || Math.random().toString(36).slice(2, 8)}.webp`;
+    const { error } = await supabase.storage.from('posts').upload(path, blob, {
+      cacheControl: '31536000',
+      contentType: 'image/webp',
+      upsert: true
+    });
+    if (error) throw error;
+    const { data } = supabase.storage.from('posts').getPublicUrl(path);
+    return data.publicUrl;
   }
 };
 

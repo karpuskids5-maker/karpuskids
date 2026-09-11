@@ -2,6 +2,7 @@ import { supabase } from '/js/shared/supabase.js';
 import { TABLES } from '/js/shared/constants.js';
 import { AppState } from './state.js';
 import { QueryCache } from '/js/shared/query-cache.js';
+import { autoMarkAbsentStudents } from '/js/shared/absent-service.js';
 
 /**
  * Helper interno para manejar errores
@@ -98,18 +99,10 @@ export const MaestraApi = {
    */
   async markAbsentStudents() {
     try {
-      const { data, error } = await supabase.rpc('mark_absent_students');
-      if (error) {
-        QueryCache.invalidatePrefix('maestra_attendance');
-        return { marked: 0, parents: [], students: [] };
-      }
-      const res = (typeof data === 'object' && data) ? data : {};
-      return {
-        marked: Number.isFinite(res.marked) ? res.marked : 0,
-        parents: Array.isArray(res.parents) ? res.parents : [],
-        students: Array.isArray(res.students) ? res.students : []
-      };
+      // RPC mark_absent_students() con fallback client-side si no existe en la BD
+      return await autoMarkAbsentStudents();
     } catch (e) {
+      QueryCache.invalidatePrefix('maestra_attendance');
       return { marked: 0, parents: [], students: [] };
     }
   },

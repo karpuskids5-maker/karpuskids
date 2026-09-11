@@ -1,6 +1,7 @@
 import { supabase } from '../shared/supabase.js';
 import { QueryCache } from '../shared/query-cache.js';
 import { safeHandle } from '../shared/db-utils.js';
+import { autoMarkAbsentStudents } from '../shared/absent-service.js';
 
 const TABLES = {
   PROFILES: 'profiles',
@@ -59,7 +60,7 @@ export const DirectorApi = {
       }
 
       // Auto-detección de ausentes antes de medir (check_in_end + 2h)
-      try { await supabase.rpc('mark_absent_students'); } catch (_) {}
+      try { await autoMarkAbsentStudents(); } catch (_) {}
 
       const { data: rpcData, error: rpcError } = await supabase.rpc('get_dashboard_kpis', { p_month: monthText || maxVisibleMonthKey });
       
