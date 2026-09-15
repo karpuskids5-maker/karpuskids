@@ -7,6 +7,8 @@
   <meta name="description" content="Karpus Kids — Guardería y estancia infantil en San Cristóbal, República Dominicana. Cuidado seguro, educación integral y app exclusiva para padres. ¡Inscribe a tu hijo hoy!">
   <meta name="keywords" content="guardería San Cristóbal, estancia infantil San Cristóbal, preescolar San Cristóbal, cuidado niños San Cristóbal, educación infantil San Cristóbal, Karpus Kids">
   <meta name="robots" content="index, follow">
+  <meta name="theme-color" content="#FF9800">
+  <link rel="manifest" href="manifest.json">
   <link rel="canonical" href="https://karpuskids.com/">
   <meta property="og:title" content="Karpus Kids — Guardería y Estancia Infantil en San Cristóbal">
   <meta property="og:description" content="Guardería y estancia infantil en San Cristóbal, República Dominicana. Cuidado experto, educación integral y app exclusiva para padres.">
@@ -45,6 +47,7 @@
   </script>
   <link rel="icon" href="logo/favicon.ico" sizes="any">
   <link rel="apple-touch-icon" href="logo/apple-touch-icon.png">
+  <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Poppins:wght@700;800;900&display=swap" rel="stylesheet">
@@ -299,8 +302,8 @@
 ════════════════════════════════════════════════════════════ -->
 <section class="hero" id="inicio">
   <!-- Video background (muted, autoplay) -->
-  <video class="hero-video" autoplay muted loop playsinline poster="img/karpus.jpg" aria-label="Video de fondo Karpus Kids">
-    <source src="img/video%20karpus%20kids.mp4" type="video/mp4">
+  <video class="hero-video video-bg" autoplay muted loop playsinline poster="img/karpus.jpg" aria-label="Video de fondo Karpus Kids">
+    <source src="img/14.mp4" type="video/mp4">
     <track kind="captions" srclang="es" label="Español" default>
   </video>
   <div class="hero-overlay"></div>
@@ -1813,6 +1816,28 @@
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', loadCampaigns);
     else loadCampaigns();
   })();
+</script>
+
+<!-- Service Worker Registration & OneSignal Setup -->
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/OneSignalSDKWorker.js', { scope: '/' })
+        .then(reg => console.log('Service Worker PWA registrado con exito:', reg.scope))
+        .catch(err => console.error('Error registrando Service Worker:', err));
+    });
+  }
+
+  window.OneSignalDeferred = window.OneSignalDeferred || [];
+  OneSignalDeferred.push(function(OneSignal) {
+    OneSignal.init({
+      appId: "63402434-7a0e-473d-9d21-f095166311e9",
+      safari_web_id: "web.onesignal.auto.63402434-7a0e-473d-9d21-f095166311e9",
+      notifyButton: {
+        enable: false,
+      },
+    });
+  });
 </script>
 </body>
 </html>
