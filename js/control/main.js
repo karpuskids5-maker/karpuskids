@@ -1720,8 +1720,8 @@ function renderAttendance() {
   const activeStudents = allStudents.filter(s => s.is_active);
   const presentIds = new Set(todayData.filter(a => ['present','presente'].includes((a.status||'').toLowerCase())).map(a => a.student_id));
   const lateIds = new Set(todayData.filter(a => ['late','tarde'].includes((a.status||'').toLowerCase())).map(a => a.student_id));
-  const checkedInIds = new Set(todayData.map(a => a.student_id));
-  const absentToday = activeStudents.filter(s => !checkedInIds.has(s.id));
+  const checkedInIds = new Set(todayData.map(a => String(a.student_id)));
+  const absentToday = activeStudents.filter(s => !checkedInIds.has(String(s.id)));
   const pendingCheck = activeStudents.filter(s => !checkedInIds.has(s.id));
 
   const setKpi = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
@@ -1799,7 +1799,7 @@ function renderAbsentList(absentToday) {
       <div style="width:36px;height:36px;border-radius:50%;background:${color};display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:900;color:white;flex-shrink:0;">${(s.name||'?')[0].toUpperCase()}</div>
       <div style="flex:1;min-width:0;">
         <div style="font-size:13px;font-weight:800;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escH(s.name||'Sin nombre')}</div>
-        <div style="font-size:10px;color:var(--muted);">${room ? escH(room.name) : 'Sin aula'} · ID: ${escH(s.matricula||s.id?.slice(0,8)||'—')}</div>
+        <div style="font-size:10px;color:var(--muted);">${room ? escH(room.name) : 'Sin aula'} · ID: ${escH(s.matricula || String(s.id || '—').slice(0,8))}</div>
       </div>
       <span class="badge badge-red" style="font-size:9px;">Ausente</span>
     </div>`;

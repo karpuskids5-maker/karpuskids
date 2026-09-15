@@ -1,6 +1,8 @@
 const ALLOWED_ORIGINS = [
   'https://karpus.app',
   'https://www.karpus.app',
+  'https://karpuskids.com',
+  'https://www.karpuskids.com',
   'https://karpuskids.netlify.app',
   'http://localhost:5600',
   'http://localhost:3000',

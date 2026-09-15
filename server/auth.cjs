@@ -8,6 +8,8 @@ const ALLOWED_ORIGINS = [
   'http://127.0.0.1:5600',
   'https://karpus.app',
   'https://www.karpus.app',
+  'https://karpuskids.com',
+  'https://www.karpuskids.com',
   'https://karpuskids.netlify.app',
 ];
 

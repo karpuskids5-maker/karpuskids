@@ -5,7 +5,10 @@ import { ImageLoader } from '../shared/image-loader.js';
 import { WallModule } from '../shared/wall.js';
 
 // Exponer WallModule globalmente: los onclick inline del muro (likes,
-// comentarios, etc.) referencian la variable GLOBAL, no el binding del módulo.
+// comentarios, reproducción de video, etc.) referencian la variable GLOBAL,
+// no el binding del módulo. IMPORTANTE: se incluyen TODOS los métodos usados
+// por los onclick inline (incluida la reproducción de video) para que tocar
+// un video funcione en todos los paneles.
 if (!window.WallModule) {
   window.WallModule = {
     init: (...a) => WallModule.init(...a),
@@ -14,7 +17,17 @@ if (!window.WallModule) {
     toggleCommentSection: (...a) => WallModule.toggleCommentSection(...a),
     sendComment: (...a) => WallModule.sendComment(...a),
     deletePost: (...a) => WallModule.deletePost(...a),
-    toggleLike: (...a) => WallModule.toggleLike(...a)
+    toggleLike: (...a) => WallModule.toggleLike(...a),
+    // Video — muro mostrará el fotograma (poster) antes de reproducir
+    playVideoCard: (...a) => WallModule.playVideoCard(...a),
+    _mountVideo: (...a) => WallModule._mountVideo(...a),
+    playVideo: (...a) => WallModule.playVideo(...a),
+    _mountVideoPreview: (...a) => WallModule._mountVideoPreview(...a),
+    _showVideoPreview: (...a) => WallModule._showVideoPreview(...a),
+    _hideVideoPreview: (...a) => WallModule._hideVideoPreview(...a),
+    _onVideoError: (...a) => WallModule._onVideoError(...a),
+    _replayVideo: (...a) => WallModule._replayVideo(...a),
+    _toggleAudio: (...a) => WallModule._toggleAudio(...a)
   };
 }
 

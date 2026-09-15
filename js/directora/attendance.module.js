@@ -102,7 +102,7 @@ export const AttendanceModule = {
       const today = Helpers.getYYYYMMDD();
       let q = supabase
         .from('attendance')
-        .select('id, date, status, check_in, check_out, student:student_id(id, name, avatar_url), classroom:classroom_id(id, name)')
+        .select('id, date, status, check_in, check_out, student_id, student:student_id(id, name, avatar_url), classroom:classroom_id(id, name)')
         .order('date', { ascending: false });
 
       if (this._mode === 'day') {
@@ -123,10 +123,28 @@ export const AttendanceModule = {
         const allStudents = (studentsRes.data || []);
         this._activeStudentCount = allStudents.length || 0;
 
-        const recordedIds = new Set(attData.map(r => r.student?.id).filter(Boolean));
+        // Índice rápido de estudiantes por ID para fallback si el join RLS falla
+        const studentIndex = new Map(allStudents.map(s => [String(s.id), s]));
+
+        // Normalizar registros reales — completar student/classroom si el join retornó null
+        const normalizedAtt = attData.map(r => {
+          if (r.student?.id) return r;
+          // Intentar recuperar datos del estudiante por student_id embebido en el registro
+          // (Supabase incluye student_id aunque el join RLS falle)
+          const sid = String(r.student_id || '');
+          const fallback = sid ? studentIndex.get(sid) : null;
+          if (!fallback) return r;
+          return {
+            ...r,
+            student:   { id: fallback.id, name: fallback.name, avatar_url: fallback.avatar_url },
+            classroom: fallback.classroom || r.classroom
+          };
+        });
+
+        const recordedIds = new Set(normalizedAtt.map(r => String(r.student?.id || r.student_id || '')).filter(Boolean));
 
         const syntheticAbsents = allStudents
-          .filter(s => !recordedIds.has(s.id))
+          .filter(s => !recordedIds.has(String(s.id)))
           .map(s => ({
             id: null,
             date,
@@ -137,7 +155,7 @@ export const AttendanceModule = {
             classroom: s.classroom
           }));
 
-        this._data = [...attData, ...syntheticAbsents];
+        this._data = [...normalizedAtt, ...syntheticAbsents];
       } else {
         const from = document.getElementById('attDateFrom')?.value || this._firstOfMonth();
         const to   = document.getElementById('attDateTo')?.value   || today;

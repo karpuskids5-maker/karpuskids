@@ -23,15 +23,16 @@
 //   - Las peticiones a Supabase, OneSignal y auth NUNCA se cachean.
 // ═══════════════════════════════════════════════════════════════
 
-importScripts('https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.sw.js');
-
 // ⚠️ Handler message requerido (Chrome 120+)
 // Atiende SKIP_WAITING: la página lo envía solo cuando el usuario acepta la
 // actualización. Sin mensaje, el worker espera y NUNCA interrumpe al usuario.
+// IMPORTANTE: debe estar ANTES de importScripts para evaluarse en el scope global inicial.
 self.addEventListener('message', event => {
   const data = event.data;
   if (data && data.type === 'SKIP_WAITING') self.skipWaiting();
 });
+
+importScripts('https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.sw.js');
 
 // ── VERSIÓN DE CACHÉ ────────────────────────────────────────────────────────
 // ⚠️ INCREMENTAR en cada deploy: karpus-v1.0.38 → karpus-v1.0.39 ...
