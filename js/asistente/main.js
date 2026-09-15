@@ -255,22 +255,24 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   // Exponer WallModule globalmente
-  window.WallModule = {
-    init: (...a) => import('/js/shared/wall.js').then(m => m.WallModule.init(...a)),
-    loadPosts: (...a) => import('/js/shared/wall.js').then(m => m.WallModule.loadPosts(...a)),
-    destroy: (...a) => import('/js/shared/wall.js').then(m => m.WallModule.destroy(...a)),
-    toggleCommentSection: (...a) => import('/js/shared/wall.js').then(m => m.WallModule.toggleCommentSection(...a)),
-    sendComment: (...a) => import('/js/shared/wall.js').then(m => m.WallModule.sendComment(...a)),
-    deletePost: (...a) => import('/js/shared/wall.js').then(m => m.WallModule.deletePost(...a)),
-    toggleLike: (...a) => import('/js/shared/wall.js').then(m => m.WallModule.toggleLike(...a)),
-    openNewPostModal: (...a) => import('/js/shared/wall.js').then(m => m.WallModule.openNewPostModal(...a)),
-    deleteComment: (...a) => import('/js/shared/wall.js').then(m => m.WallModule.deleteComment(...a)),
-    playVideoCard: (...a) => import('/js/shared/wall.js').then(m => m.WallModule.playVideoCard(...a)),
-    _showVideoPreview: (...a) => import('/js/shared/wall.js').then(m => m.WallModule._showVideoPreview(...a)),
-    _hideVideoPreview: (...a) => import('/js/shared/wall.js').then(m => m.WallModule._hideVideoPreview(...a)),
-    _onVideoError: (...a) => import('/js/shared/wall.js').then(m => m.WallModule._onVideoError(...a)),
-    _replayVideo: (...a) => import('/js/shared/wall.js').then(m => m.WallModule._replayVideo(...a)),
-  };
+  // Wrapper WallModule: Proxy universal que reenvía CUALQUIER método al módulo
+  // real (mismo patrón que directora/main.js). Los onclick inline del muro
+  // (likes, comentarios, reproducción de video…) referencian el GLOBAL; con
+  // este Proxy ya no se cae si falta enumerar un método en la lista explícita.
+  const _wallModuleCache = {};
+  const _forwardWall = (prop) => (...args) =>
+    import('/js/shared/wall.js').then(m => {
+      const fn = m.WallModule[prop];
+      if (typeof fn !== 'function') throw new Error(`WallModule.${prop} no es una función`);
+      return fn.apply(m.WallModule, args);
+    });
+  window.WallModule = new Proxy({}, {
+    get(_t, prop) {
+      if (typeof prop !== 'string') return undefined;
+      if (!(prop in _wallModuleCache)) _wallModuleCache[prop] = _forwardWall(prop);
+      return _wallModuleCache[prop];
+    },
+  });
   window.openTeacherModal = (id) => import('./teachers.js').then(m => m.TeachersModule.openModal(id));
   window.openNewPostModal = openNewPostModal;
   window.submitNewPost = submitNewPost;

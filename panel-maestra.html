@@ -520,6 +520,93 @@
     /* Cola visual de la burbuja para lectura inmediata del lado */
     .kk-msg-row.is-out .kk-msg-bubble { border-top-right-radius: 4px; margin-left: auto; }
     .kk-msg-row.is-in  .kk-msg-bubble { border-top-left-radius: 4px; }
+    /* ═══════════════════════════════════════════════
+       📊 KPI CARDS — Panel Maestra (tema naranja)
+    ═══════════════════════════════════════════════ */
+    .kpi-card {
+      position: relative;
+      background: #fff;
+      border: 1px solid rgba(0,0,0,0.06);
+      border-radius: 20px;
+      padding: 18px 18px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.04);
+      overflow: hidden;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+      animation: kpiIn 0.4s cubic-bezier(.22,1,.36,1) both;
+      animation-delay: var(--kpi-delay, 0ms);
+    }
+    .kpi-card:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+    }
+    @keyframes kpiIn {
+      from { opacity: 0; transform: translateY(12px) scale(0.97); }
+      to   { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    .kpi-glow {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+    }
+    .kpi-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      position: relative;
+    }
+    .kpi-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      transition: transform 0.2s ease;
+    }
+    .kpi-card:hover .kpi-icon { transform: scale(1.12) rotate(-4deg); }
+    .kpi-badge {
+      font-size: 9px;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      padding: 3px 8px;
+      border-radius: 20px;
+    }
+    .kpi-body { position: relative; }
+    .kpi-value {
+      font-size: 2.25rem;
+      font-weight: 900;
+      line-height: 1;
+      letter-spacing: -0.02em;
+      transition: transform 0.15s ease;
+    }
+    .kpi-card:hover .kpi-value { transform: scale(1.04); }
+    .kpi-label {
+      font-size: 10px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-top: 4px;
+    }
+    .kpi-bar {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      border-radius: 0 0 20px 20px;
+      opacity: 0.7;
+    }
+    @media (max-width: 639px) {
+      .kpi-value { font-size: 1.875rem; }
+      .kpi-card  { padding: 14px 14px 12px; }
+    }
+
   </style>
 </head>
 <body class="bg-slate-50 text-slate-800 font-nunito panel-maestra-body" style="overflow-y:auto;overflow-x:hidden;">
@@ -624,91 +711,88 @@
         </header>
 
         <!-- 📊 MÉTRICAS DEL DÍA -->
-        <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 items-stretch gap-3 mb-4">
+        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 mb-4" id="kpiGrid">
+
           <!-- Alumnos -->
-          <div class="relative overflow-hidden rounded-2xl p-5 shadow-lg flex flex-col justify-between h-full group transition-all hover:-translate-y-0.5 hover:shadow-xl"
-               style="background:linear-gradient(135deg,#7c3aed 0%,#4f46e5 60%,#3730a3 100%)">
-            <div class="absolute -right-5 -top-5 w-20 h-20 bg-white/10 rounded-full"></div>
-            <div class="absolute right-8 -bottom-8 w-16 h-16 bg-black/10 rounded-full"></div>
-            <div class="relative flex items-center justify-between mb-3">
-              <div class="w-10 h-10 rounded-xl bg-white/15 backdrop-blur flex items-center justify-center shadow-inner group-hover:scale-110 transition-transform">
-                <i data-lucide="users" class="w-5 h-5 text-white"></i>
+          <div class="kpi-card group" style="--kpi-delay:0ms">
+            <div class="kpi-glow" style="background:radial-gradient(circle at 70% 30%, rgba(251,146,60,0.35), transparent 65%)"></div>
+            <div class="kpi-top">
+              <div class="kpi-icon" style="background:rgba(251,146,60,0.18)">
+                <i data-lucide="users" class="w-5 h-5" style="color:#fb923c"></i>
               </div>
-              <span class="text-[9px] font-black uppercase tracking-widest text-white/80 bg-white/10 px-2 py-1 rounded-full">Activos</span>
+              <span class="kpi-badge" style="background:rgba(251,146,60,0.12);color:#ea580c">Activos</span>
             </div>
-            <div class="relative">
-              <p class="text-3xl font-black leading-none drop-shadow" id="statStudents">0</p>
-              <p class="text-[11px] font-black uppercase tracking-widest text-white/80 mt-1.5">Alumnos</p>
+            <div class="kpi-body">
+              <p class="kpi-value text-slate-800" id="statStudents">0</p>
+              <p class="kpi-label" style="color:#9a3412">Alumnos</p>
             </div>
+            <div class="kpi-bar" style="background:linear-gradient(90deg,#fb923c,#f97316)"></div>
           </div>
 
           <!-- Aulas -->
-          <div class="relative overflow-hidden rounded-2xl p-5 shadow-lg flex flex-col justify-between h-full group transition-all hover:-translate-y-0.5 hover:shadow-xl"
-               style="background:linear-gradient(135deg,#4f46e5 0%,#3b82f6 60%,#1e3a8a 100%)">
-            <div class="absolute -right-5 -top-5 w-20 h-20 bg-white/10 rounded-full"></div>
-            <div class="absolute right-8 -bottom-8 w-16 h-16 bg-black/10 rounded-full"></div>
-            <div class="relative flex items-center justify-between mb-3">
-              <div class="w-10 h-10 rounded-xl bg-white/15 backdrop-blur flex items-center justify-center shadow-inner group-hover:scale-110 transition-transform">
-                <i data-lucide="home" class="w-5 h-5 text-white"></i>
+          <div class="kpi-card group" style="--kpi-delay:60ms">
+            <div class="kpi-glow" style="background:radial-gradient(circle at 70% 30%, rgba(168,85,247,0.25), transparent 65%)"></div>
+            <div class="kpi-top">
+              <div class="kpi-icon" style="background:rgba(168,85,247,0.12)">
+                <i data-lucide="door-open" class="w-5 h-5" style="color:#a855f7"></i>
               </div>
-              <span class="text-[9px] font-black uppercase tracking-widest text-white/80 bg-white/10 px-2 py-1 rounded-full">Asignadas</span>
+              <span class="kpi-badge" style="background:rgba(168,85,247,0.1);color:#7c3aed">Asignadas</span>
             </div>
-            <div class="relative">
-              <p class="text-3xl font-black leading-none drop-shadow" id="statClasses">0</p>
-              <p class="text-[11px] font-black uppercase tracking-widest text-white/80 mt-1.5">Aulas</p>
+            <div class="kpi-body">
+              <p class="kpi-value text-slate-800" id="statClasses">0</p>
+              <p class="kpi-label" style="color:#581c87">Aulas</p>
             </div>
+            <div class="kpi-bar" style="background:linear-gradient(90deg,#a855f7,#7c3aed)"></div>
           </div>
 
           <!-- Incidentes -->
-          <div class="relative overflow-hidden rounded-2xl p-5 shadow-lg flex flex-col justify-between h-full group transition-all hover:-translate-y-0.5 hover:shadow-xl"
-               style="background:linear-gradient(135deg,#f43f5e 0%,#e11d48 60%,#9f1239 100%)">
-            <div class="absolute -right-5 -top-5 w-20 h-20 bg-white/10 rounded-full"></div>
-            <div class="absolute right-8 -bottom-8 w-16 h-16 bg-black/10 rounded-full"></div>
-            <div class="relative flex items-center justify-between mb-3">
-              <div class="w-10 h-10 rounded-xl bg-white/15 backdrop-blur flex items-center justify-center shadow-inner group-hover:scale-110 transition-transform">
-                <i data-lucide="alert-octagon" class="w-5 h-5 text-white"></i>
+          <div class="kpi-card group" style="--kpi-delay:120ms">
+            <div class="kpi-glow" style="background:radial-gradient(circle at 70% 30%, rgba(239,68,68,0.22), transparent 65%)"></div>
+            <div class="kpi-top">
+              <div class="kpi-icon" style="background:rgba(239,68,68,0.1)">
+                <i data-lucide="alert-triangle" class="w-5 h-5" style="color:#ef4444"></i>
               </div>
-              <span class="text-[9px] font-black uppercase tracking-widest text-white/80 bg-white/10 px-2 py-1 rounded-full">Hoy</span>
+              <span class="kpi-badge" style="background:rgba(239,68,68,0.08);color:#dc2626">Hoy</span>
             </div>
-            <div class="relative">
-              <p class="text-3xl font-black leading-none drop-shadow" id="statIncidents">0</p>
-              <p class="text-[11px] font-black uppercase tracking-widest text-white/80 mt-1.5">Incidentes</p>
+            <div class="kpi-body">
+              <p class="kpi-value text-slate-800" id="statIncidents">0</p>
+              <p class="kpi-label" style="color:#7f1d1d">Incidentes</p>
             </div>
+            <div class="kpi-bar" style="background:linear-gradient(90deg,#f87171,#ef4444)"></div>
           </div>
 
           <!-- Presentes -->
-          <div class="relative overflow-hidden rounded-2xl p-5 shadow-lg flex flex-col justify-between h-full group transition-all hover:-translate-y-0.5 hover:shadow-xl"
-               style="background:linear-gradient(135deg,#10b981 0%,#059669 60%,#065f46 100%)">
-            <div class="absolute -right-5 -top-5 w-20 h-20 bg-white/10 rounded-full"></div>
-            <div class="absolute right-8 -bottom-8 w-16 h-16 bg-black/10 rounded-full"></div>
-            <div class="relative flex items-center justify-between mb-3">
-              <div class="w-10 h-10 rounded-xl bg-white/15 backdrop-blur flex items-center justify-center shadow-inner group-hover:scale-110 transition-transform">
-                <i data-lucide="user-check" class="w-5 h-5 text-white"></i>
+          <div class="kpi-card group" style="--kpi-delay:180ms">
+            <div class="kpi-glow" style="background:radial-gradient(circle at 70% 30%, rgba(16,185,129,0.25), transparent 65%)"></div>
+            <div class="kpi-top">
+              <div class="kpi-icon" style="background:rgba(16,185,129,0.12)">
+                <i data-lucide="user-check" class="w-5 h-5" style="color:#10b981"></i>
               </div>
-              <span class="text-[9px] font-black uppercase tracking-widest text-white/80 bg-white/10 px-2 py-1 rounded-full">Hoy</span>
+              <span class="kpi-badge" style="background:rgba(16,185,129,0.1);color:#059669">Hoy</span>
             </div>
-            <div class="relative">
-              <p class="text-3xl font-black leading-none drop-shadow" id="statPresent">0</p>
-              <p class="text-[11px] font-black uppercase tracking-widest text-white/80 mt-1.5">Presentes</p>
+            <div class="kpi-body">
+              <p class="kpi-value text-slate-800" id="statPresent">0</p>
+              <p class="kpi-label" style="color:#064e3b">Presentes</p>
             </div>
+            <div class="kpi-bar" style="background:linear-gradient(90deg,#34d399,#10b981)"></div>
           </div>
 
           <!-- Ausentes -->
-          <div class="relative overflow-hidden rounded-2xl p-5 shadow-lg flex flex-col justify-between h-full group transition-all hover:-translate-y-0.5 hover:shadow-xl"
-               style="background:linear-gradient(135deg,#f43f5e 0%,#e11d48 60%,#9f1239 100%)">
-            <div class="absolute -right-5 -top-5 w-20 h-20 bg-white/10 rounded-full"></div>
-            <div class="absolute right-8 -bottom-8 w-16 h-16 bg-black/10 rounded-full"></div>
-            <div class="relative flex items-center justify-between mb-3">
-              <div class="w-10 h-10 rounded-xl bg-white/15 backdrop-blur flex items-center justify-center shadow-inner group-hover:scale-110 transition-transform">
-                <i data-lucide="user-minus" class="w-5 h-5 text-white"></i>
+          <div class="kpi-card group col-span-2 md:col-span-1" style="--kpi-delay:240ms">
+            <div class="kpi-glow" style="background:radial-gradient(circle at 70% 30%, rgba(248,113,113,0.22), transparent 65%)"></div>
+            <div class="kpi-top">
+              <div class="kpi-icon" style="background:rgba(248,113,113,0.12)">
+                <i data-lucide="user-x" class="w-5 h-5" style="color:#f87171"></i>
               </div>
-              <span class="text-[9px] font-black uppercase tracking-widest text-white/80 bg-white/10 px-2 py-1 rounded-full">Hoy</span>
+              <span class="kpi-badge" style="background:rgba(248,113,113,0.1);color:#dc2626">Hoy</span>
             </div>
-            <div class="relative">
-              <p class="text-3xl font-black leading-none drop-shadow" id="statAbsent">0</p>
-              <p class="text-[11px] font-black uppercase tracking-widest text-white/80 mt-1.5">Ausentes</p>
+            <div class="kpi-body">
+              <p class="kpi-value text-slate-800" id="statAbsent">0</p>
+              <p class="kpi-label" style="color:#7f1d1d">Ausentes</p>
             </div>
+            <div class="kpi-bar" style="background:linear-gradient(90deg,#fca5a5,#f87171)"></div>
           </div>
+
         </div>
 
         <!-- 🚀 WIDGETS DE AUTOMATIZACIÓN -->
