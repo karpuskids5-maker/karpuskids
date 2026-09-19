@@ -1,13 +1,15 @@
 import { supabase } from './supabase.js';
 import { ensureJspdf } from './load-pdf.js';
 
-const CARD_W = 85.6;
-const CARD_H = 54;
+// FORMATO 3.5" x 2.2" (88.9 x 55.88 mm)
+const CARD_W = 88.90;
+const CARD_H = 55.88;
 const PAGE_W = 210;
 const PAGE_H = 297;
-const MARGIN_TB = 8;
-const MARGIN_LR = 8;
-const GAP = 5;
+const MARGIN_LR = 12.10;
+const MARGIN_TB = 26.74;
+const GAP_X = 8.00;
+const GAP_Y = 6.66;
 const COLS = 2;
 const ROWS = 4;
 const CARDS_PER_PAGE = COLS * ROWS;
@@ -23,6 +25,9 @@ const GREEN = {
   darkText: [15, 23, 42],
   lightText: [148, 163, 184],
 };
+
+// Año escolar vigente mostrado en el carnet
+const SCHOOL_YEAR = '2026-2027';
 
 const INSTITUTIONAL = {
   phone: '(829) 803-8424',
@@ -48,7 +53,7 @@ class CarnetsManager {
   async _loadData() {
     const [{ data: students, error: se }, { data: classrooms, error: ce }] = await Promise.all([
       supabase.from('students')
-        .select('id, name, matricula, avatar_url, age, age_type, is_active, classroom_id, parent_id, p1_name, p1_phone, p2_name, p2_phone, classrooms(name, level)')
+        .select('id, name, last_name, matricula, avatar_url, age, age_type, is_active, classroom_id, parent_id, p1_name, p1_phone, p2_name, p2_phone, classrooms(name, level)')
         .order('name'),
       supabase.from('classrooms').select('id, name, level').order('name'),
     ]);
@@ -205,7 +210,7 @@ class CarnetsManager {
       </div>
 
       <div style="padding:1.5rem;border-top:1px solid #f1f5f9;background:#f8fafc;border-radius:0 0 1.5rem 1.5rem;display:flex;justify-content:space-between;align-items:center">
-        <span style="font-size:10px;color:#94a3b8;font-weight:700">Carnet PVC: 85.6×54mm · 8 por hoja · A4 vertical</span>
+        <span style="font-size:10px;color:#94a3b8;font-weight:700">Carnet PVC: 88.9×55.88mm · 8 por hoja · A4 vertical</span>
         <div style="display:flex;gap:0.5rem">
           <button onclick="window._carnetsClose()" style="padding:0.625rem 1.25rem;border:2px solid #e2e8f0;color:#475569;font-weight:700;font-size:12px;border-radius:0.75rem;cursor:pointer;background:#fff;transition:all 0.2s">Cancelar</button>
           <button id="btnCarnetGenerate" onclick="window._carnetsGenerate()" style="padding:0.625rem 1.25rem;background:linear-gradient(135deg,#198754,#146C43);color:#fff;font-weight:700;font-size:12px;border-radius:0.75rem;border:none;cursor:pointer;box-shadow:0 10px 15px -3px rgba(90,198,122,0.3);display:flex;align-items:center;gap:0.375rem;transition:all 0.2s">
@@ -352,8 +357,8 @@ class CarnetsManager {
         if (idx >= students.length) break;
         const col = i % COLS;
         const row = Math.floor(i / COLS);
-        const cx = MARGIN_LR + col * (CARD_W + GAP);
-        const cy = MARGIN_TB + row * (CARD_H + GAP);
+        const cx = MARGIN_LR + col * (CARD_W + GAP_X);
+        const cy = MARGIN_TB + row * (CARD_H + GAP_Y);
         this._drawFrontCard(doc, students[idx], cx, cy, this._qrCache[students[idx].id]);
         this._drawCutMarks(doc, cx, cy);
       }
@@ -372,8 +377,8 @@ class CarnetsManager {
         if (idx >= students.length) break;
         const col = i % COLS;
         const row = Math.floor(i / COLS);
-        const cx = MARGIN_LR + col * (CARD_W + GAP);
-        const cy = MARGIN_TB + row * (CARD_H + GAP);
+        const cx = MARGIN_LR + col * (CARD_W + GAP_X);
+        const cy = MARGIN_TB + row * (CARD_H + GAP_Y);
         this._drawBackCard(doc, students[idx], cx, cy);
         this._drawCutMarks(doc, cx, cy);
       }
@@ -405,7 +410,7 @@ class CarnetsManager {
     doc.setDrawColor(200, 210, 205);
     doc.setLineWidth(0.1);
     for (let col = 0; col <= COLS; col++) {
-      const cx = MARGIN_LR + col * (CARD_W + GAP) - (col === 0 ? 0 : GAP / 2);
+      const cx = MARGIN_LR + col * (CARD_W + GAP_X) - (col === 0 ? 0 : GAP_X / 2);
       if (col > 0 && col < COLS) {
         for (let y = MARGIN_TB; y < PAGE_H - MARGIN_TB; y += 4) {
           doc.line(cx, y, cx, Math.min(y + 2, PAGE_H - MARGIN_TB));
@@ -413,7 +418,7 @@ class CarnetsManager {
       }
     }
     for (let row = 0; row <= ROWS; row++) {
-      const ry = MARGIN_TB + row * (CARD_H + GAP) - (row === 0 ? 0 : GAP / 2);
+      const ry = MARGIN_TB + row * (CARD_H + GAP_Y) - (row === 0 ? 0 : GAP_Y / 2);
       if (row > 0 && row < ROWS) {
         for (let x = MARGIN_LR; x < PAGE_W - MARGIN_LR; x += 4) {
           doc.line(x, ry, Math.min(x + 2, PAGE_W - MARGIN_LR), ry);
@@ -456,7 +461,6 @@ class CarnetsManager {
     const h = CARD_H;
     const classroom = this._classrooms.find(c => c.id == student.classroom_id);
     const classroomName = student.classrooms?.name || classroom?.name || 'Sin aula';
-    const level = student.classrooms?.level || classroom?.level || '';
 
     doc.setFillColor(255, 255, 255);
     doc.roundedRect(x, y, w, h, 2, 2, 'F');
@@ -467,20 +471,20 @@ class CarnetsManager {
     this._drawCardBackground(doc, x, y, w, h);
 
     doc.setFillColor(...GREEN.primary);
-    doc.roundedRect(x, y, w, 8, 1, 1, 'F');
+    doc.roundedRect(x, y, w, 8.5, 1, 1, 'F');
 
     this._drawLogoCorner(doc, x, y);
 
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(7.5);
+    doc.setFontSize(8);
     doc.setTextColor(255, 255, 255);
-    doc.text('KARPUS KIDS', x + w / 2 + 3, y + 5.2, { align: 'center' });
+    doc.text('KARPUS KIDS', x + w / 2 + 3, y + 5.4, { align: 'center' });
     doc.setFontSize(3);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(210, 240, 220);
-    doc.text('Centro de Desarrollo Infantil', x + w / 2 + 3, y + 7.5, { align: 'center' });
+    doc.text('Centro de Desarrollo Infantil', x + w / 2 + 3, y + 7.8, { align: 'center' });
 
-    const qrZoneW = 32;
+    const qrZoneW = 34;
     const qrZoneY = y + 10;
     const qrZoneH = h - 15;
     doc.setFillColor(250, 252, 251);
@@ -489,7 +493,7 @@ class CarnetsManager {
     doc.setLineWidth(0.15);
     doc.roundedRect(x + 0.8, qrZoneY, qrZoneW, qrZoneH, 2, 2, 'S');
 
-    const qrSize = 24;
+    const qrSize = 26;
     const qrX = x + (qrZoneW - qrSize) / 2 + 0.8;
     const qrY = qrZoneY + 2;
 
@@ -548,8 +552,8 @@ class CarnetsManager {
     doc.setTextColor(...GREEN.slate);
     doc.text('KK-' + shortCode, qrTextX, qrZoneY + qrZoneH - 2.5, { align: 'center' });
 
-    const infoX = x + qrZoneW + 3;
-    const infoW = w - qrZoneW - 6;
+    const infoX = x + 36;
+    const infoW = w - 39;
     let infoY = y + 11;
 
     if (this._logoDataUrl) {
@@ -590,9 +594,9 @@ class CarnetsManager {
     doc.line(infoX, infoY, infoX + infoW, infoY);
     infoY += 3.5;
 
-    const fullName = student.name || 'Estudiante';
+    const fullName = [student.name, student.last_name].filter(Boolean).join(' ') || 'Estudiante';
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(7.5);
+    doc.setFontSize(8);
     doc.setTextColor(...GREEN.darkText);
     const nameLines = doc.splitTextToSize(fullName.toUpperCase(), infoW);
     doc.text(nameLines[0], infoX, infoY);
@@ -606,8 +610,8 @@ class CarnetsManager {
     const fields = [
       { label: 'AULA', value: classroomName },
       { label: 'MATRÍCULA', value: student.matricula || 'S/M' },
+      { label: 'AÑO ESCOLAR', value: SCHOOL_YEAR },
     ];
-    if (level) fields.push({ label: 'AÑO ESCOLAR', value: level });
     if (p1Name) fields.push({ label: 'TUTOR 1', value: p1Name });
     if (p2Name) fields.push({ label: 'TUTOR 2', value: p2Name });
     if (p1Phone) fields.push({ label: 'TEL. TUTOR', value: p1Phone });
@@ -615,11 +619,11 @@ class CarnetsManager {
     const maxFields = 7;
     fields.slice(0, maxFields).forEach(f => {
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(3.5);
+      doc.setFontSize(4);
       doc.setTextColor(...GREEN.primary);
       doc.text(f.label + ':', infoX, infoY);
       doc.setFont('helvetica', 'normal');
-      doc.setFontSize(3.5);
+      doc.setFontSize(4.2);
       doc.setTextColor(51, 65, 85);
       const valLines = doc.splitTextToSize(f.value, infoW - 20);
       doc.text(valLines[0], infoX + 20, infoY);
@@ -660,24 +664,24 @@ class CarnetsManager {
     this._drawCardBackground(doc, x, y, w, h);
 
     doc.setFillColor(...GREEN.primary);
-    doc.roundedRect(x, y, w, 8, 1, 1, 'F');
+    doc.roundedRect(x, y, w, 8.5, 1, 1, 'F');
 
     this._drawLogoCorner(doc, x, y);
 
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(7.5);
+    doc.setFontSize(8);
     doc.setTextColor(255, 255, 255);
-    doc.text('KARPUS KIDS', x + w / 2 + 3, y + 5.2, { align: 'center' });
+    doc.text('KARPUS KIDS', x + w / 2 + 3, y + 5.4, { align: 'center' });
     doc.setFontSize(3);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(210, 240, 220);
-    doc.text('Centro de Desarrollo Infantil', x + w / 2 + 3, y + 7.5, { align: 'center' });
+    doc.text('Centro de Desarrollo Infantil', x + w / 2 + 3, y + 7.8, { align: 'center' });
 
     const cx = x + w / 2;
-    const logoSize = 14;
+    const logoSize = 16;
 
     const logoX = cx - logoSize / 2;
-    const logoY = y + 11;
+    const logoY = y + 10;
 
     if (this._logoDataUrl) {
       try {
@@ -688,35 +692,37 @@ class CarnetsManager {
       } catch (_) {}
     }
 
-    const line1Y = logoY + logoSize + 3;
+    const line1Y = logoY + logoSize + 2;
     doc.setDrawColor(...GREEN.primary);
     doc.setLineWidth(0.3);
     doc.line(cx - 28, line1Y, cx + 28, line1Y);
 
-    let textY = line1Y + 3;
+    let textY = line1Y + 2.5;
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(3);
     doc.setTextColor(...GREEN.darkText);
     doc.text('🔒 Este carnet es propiedad de la Estancia Karpus Kids.', cx, textY, { align: 'center' });
-    textY += 3.5;
+    textY += 2.8;
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(2.8);
     doc.setTextColor(...GREEN.slate);
     doc.text('En caso de pérdida favor devolver a la institución.', cx, textY, { align: 'center' });
 
-    const line2Y = textY + 3;
+    const line2Y = textY + 2;
     doc.setDrawColor(...GREEN.primary);
     doc.setLineWidth(0.3);
     doc.line(cx - 28, line2Y, cx + 28, line2Y);
 
-    let contactY = line2Y + 3.5;
+    let contactY = line2Y + 3;
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(2.8);
     doc.setTextColor(...GREEN.dark);
     doc.text('📞 ' + INSTITUTIONAL.phone, cx, contactY, { align: 'center' });
-    contactY += 3;
+    contactY += 3.8;
     doc.text('✉️ ' + INSTITUTIONAL.email, cx, contactY, { align: 'center' });
-    contactY += 3;
+    contactY += 3.8;
+    doc.text('🌐 ' + INSTITUTIONAL.facebook + ' · ' + INSTITUTIONAL.instagram + ' · ' + INSTITUTIONAL.tiktok, cx, contactY, { align: 'center' });
+    contactY += 3.8;
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(2.5);
     doc.setTextColor(...GREEN.slate);

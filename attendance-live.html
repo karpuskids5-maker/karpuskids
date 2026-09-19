@@ -255,6 +255,7 @@
 <script type="module">
 import { supabase } from './js/shared/supabase.js';
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from './js/shared/config.js';
+import { autoMarkAbsentStudents } from './js/shared/absent-service.js';
 
 // ── PWA Logic ─────────────────────────────────────────────────────────────────
 let deferredPrompt;
@@ -328,6 +329,21 @@ async function updateStats() {
   } catch (_) {}
 }
 updateStats();
+
+// ── Auto-detección de ausentes (24/7 desde el terminal) ─────────────────────
+// Usa el mismo horario configurado (límite de entrada + 2h): marca como ausente
+// a quien no ha llegado, incluso si nadie tiene el panel de la maestra abierto.
+async function runAbsentCheck() {
+  try {
+    if (!navigator.onLine) return;
+    const res = await autoMarkAbsentStudents();
+    if (res?.marked > 0) {
+      await updateStats();
+    }
+  } catch (_) {}
+}
+runAbsentCheck();
+setInterval(runAbsentCheck, 5 * 60 * 1000);
 
 // ── Fullscreen toggle ─────────────────────────────────────────────────────────
 const scannerWrap = document.getElementById('scannerWrap');

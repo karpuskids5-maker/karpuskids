@@ -1814,7 +1814,7 @@ export const StudentRecordModal = {
     if (!qrImg) { Helpers.toast('Genera el QR primero', 'warning'); return; }
     const room = this._classrooms.find(c => String(c.id) === String(this._form.classroom_id));
     const win = window.open('', '_blank');
-    win.document.write(Helpers.getQRPrintTemplate(qrImg, this._form.name || '', matricula, {
+    win.document.write(Helpers.getQRPrintTemplate(qrImg, [this._form.name, this._form.last_name].filter(Boolean).join(' '), matricula, {
       classroom: room?.name || '',
       level: room?.level || '',
       p1Name: this._form.p1_name || '',

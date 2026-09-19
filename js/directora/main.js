@@ -356,14 +356,14 @@ async function loadProfile() {
       let settings = null;
       const { data: s1, error: e1 } = await supabase
         .from('school_settings')
-        .select('id, generation_day, due_day, phone, business_hours, open_time, close_time, work_days')
+        .select('id, generation_day, due_day, phone, business_hours, open_time, close_time, work_days, check_in_end')
         .eq('id', 1).single();
 
       if (e1 && e1.code === '42703') {
         // Columnas nuevas no existen � usar solo las base
         const { data: s2 } = await supabase
           .from('school_settings')
-          .select('id, generation_day, due_day, phone, business_hours')
+          .select('id, generation_day, due_day, phone, business_hours, open_time, close_time, work_days, check_in_end')
           .eq('id', 1).single();
         settings = s2;
       } else {
@@ -373,6 +373,14 @@ async function loadProfile() {
       if (settings) {
         if (settings.open_time)  { const el = document.getElementById('confOpenTime');  if (el) el.value = settings.open_time; }
         if (settings.close_time) { const el = document.getElementById('confCloseTime'); if (el) el.value = settings.close_time; }
+        if (settings.check_in_end) {
+          const el = document.getElementById('confCheckInEnd');
+          if (el) el.value = settings.check_in_end;
+        } else {
+          // Si aún no hay límite configurado, derivarlo de la apertura (asistencia/ausentes lo usan)
+          const el = document.getElementById('confCheckInEnd');
+          if (el && settings.open_time) el.value = settings.open_time;
+        }
         if (settings.work_days) {
           try {
             const days = typeof settings.work_days === 'string' ? JSON.parse(settings.work_days) : settings.work_days;
@@ -403,6 +411,7 @@ async function loadProfile() {
 
     document.getElementById('confOpenTime')?.addEventListener('change', _updateSchedulePreview);
     document.getElementById('confCloseTime')?.addEventListener('change', _updateSchedulePreview);
+    document.getElementById('confCheckInEnd')?.addEventListener('change', _updateSchedulePreview);
     
     const nameEl = document.getElementById('sidebarName'); 
     if(nameEl) nameEl.textContent = profile.name || 'Directora';
@@ -682,12 +691,18 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Guardar horario en school_settings
         const openTime  = document.getElementById('confOpenTime')?.value;
         const closeTime = document.getElementById('confCloseTime')?.value;
+        const checkInEnd = document.getElementById('confCheckInEnd')?.value;
         const workDays  = [...document.querySelectorAll('.work-day-btn.bg-violet-600')].map(b => b.dataset.day);
         const scheduleUpdates = {};
         if (openTime)  scheduleUpdates.open_time  = openTime;
         if (closeTime) scheduleUpdates.close_time = closeTime;
+        // Asistencia y ausencias automáticas usan check_in_end. Si no se define,
+        // se deriva de la apertura para que todo trabaje con el mismo horario.
+        scheduleUpdates.check_in_end = checkInEnd || openTime || undefined;
         if (workDays.length) scheduleUpdates.work_days = JSON.stringify(workDays);
         if (Object.keys(scheduleUpdates).length) {
+          // Eliminar propiedades indefinidas para no romper el update
+          Object.keys(scheduleUpdates).forEach(k => scheduleUpdates[k] === undefined && delete scheduleUpdates[k]);
           const { error: schedErr } = await supabase.from('school_settings').update(scheduleUpdates).eq('id', 1);
           if (schedErr) { Helpers.toast('Error al guardar horario: ' + schedErr.message, 'error'); return; }
         }
@@ -898,14 +913,16 @@ function _updateSchedulePreview() {
   const days = [...document.querySelectorAll('.work-day-btn.bg-violet-600')].map(b => b.dataset.day);
   const open  = document.getElementById('confOpenTime')?.value  || '';
   const close = document.getElementById('confCloseTime')?.value || '';
+  const limit = document.getElementById('confCheckInEnd')?.value || '';
 
   if (!days.length && !open) { preview.classList.add('hidden'); return; }
 
-  const daysText = days.length ? days.join(' � ') : 'Sin d�as seleccionados';
-  const timeText = open && close ? `${open} � ${close}` : '';
+  const daysText = days.length ? days.join(' - ') : 'Sin d�as seleccionados';
+  const timeText = open && close ? `${open} a ${close}` : '';
+  const limitText = limit ? `Limite de entrada: ${limit}` : '';
 
   preview.classList.remove('hidden');
-  preview.innerHTML = `<span class="text-violet-600">📅 ${daysText}</span>${timeText ? `<span class="mx-2 text-violet-300">|</span><span class="text-violet-800">🕐 ${timeText}</span>` : ''}`;
+  preview.innerHTML = `<span class="text-violet-600">📅 ${daysText}</span>${timeText ? `<span class="mx-2 text-violet-300">|</span><span class="text-violet-800">🕐 ${timeText}</span>` : ''}${limitText ? `<span class="mx-2 text-violet-300">|</span><span class="text-violet-800">⏱ ${limitText}</span>` : ''}`;
 }
 
 

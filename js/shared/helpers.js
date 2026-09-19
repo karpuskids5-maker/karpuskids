@@ -2,6 +2,8 @@
  * 🧰 Helpers PRO - Nivel Empresa
  */
 
+const SCHOOL_YEAR = '2026-2027';
+
 export const Helpers = {
 
   /**
@@ -257,11 +259,10 @@ export const Helpers = {
   },
 
   /**
-   * 🖨️ Carnet Estudiante — Frente + Reverso (PVC 85.6×54mm)
+   * 🖨️ Carnet Estudiante — Frente + Reverso (PVC 3.5"×2.2" / 88.9×55.88mm)
    */
   getQRPrintTemplate(qrImg, name, matricula, extra = {}) {
     const classroom = extra.classroom || '';
-    const level = extra.level || '';
     const p1Name = extra.p1Name || '';
     const p2Name = extra.p2Name || '';
     const p1Phone = extra.p1Phone || '';
@@ -288,13 +289,14 @@ export const Helpers = {
             min-height: 100vh; margin: 0; background: #f1f5f9; padding: 10mm 0; gap: 8mm;
             -webkit-print-color-adjust: exact; print-color-adjust: exact;
           }
-          @page { size: 85.6mm 54mm; margin: 0; }
-          .carnet {
-            width: 85.6mm; height: 54mm; background: #fff;
-            border-radius: 0; overflow: hidden;
-            position: relative; box-shadow: 0 2px 16px rgba(0,0,0,0.1);
-            page-break-after: always;
-          }
+          @page { size: 3.5in 2.2in; margin: 0; }
+.carnet {
+    width: 3.5in; height: 2.2in; background: #fff;
+    border-radius: 0; overflow: hidden;
+    position: relative; box-shadow: 0 2px 16px rgba(0,0,0,0.1);
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+    page-break-after: always;
+  }
           .carnet-back { page-break-after: auto; }
           .top-bar {
             height: 8mm; background: linear-gradient(135deg, #198754, #146C43);
@@ -465,7 +467,7 @@ export const Helpers = {
               <div class="student-name-card">${name || 'Estudiante'}</div>
               <div class="field-row"><span class="field-label">AULA:</span><span class="field-value bold">${classroom || '—'}</span></div>
               <div class="field-row"><span class="field-label">MATRÍCULA:</span><span class="field-value bold">${matricula || '—'}</span></div>
-              <div class="field-row"><span class="field-label">AÑO ESCOLAR:</span><span class="field-value bold">${level || '—'}</span></div>
+              <div class="field-row"><span class="field-label">AÑO ESCOLAR:</span><span class="field-value bold">${SCHOOL_YEAR}</span></div>
               <div class="field-row"><span class="field-label">TUTOR 1:</span><span class="field-value">${p1Name || '—'}</span></div>
               <div class="field-row"><span class="field-label">TUTOR 2:</span><span class="field-value">${p2Name || '—'}</span></div>
               <div class="field-row"><span class="field-label">TEL. TUTOR:</span><span class="field-value">${p1Phone || '—'}</span></div>
@@ -518,7 +520,7 @@ export const Helpers = {
   },
 
   /**
-   * 🪪 Carnet Personal Administrativo — Horizontal (PVC 85.6×54mm)
+   * 🪪 Carnet Personal Administrativo — Horizontal (PVC 3.5"×2.2" / 88.9×55.88mm)
    */
   getStaffCarnetTemplate(name, role, phone, extra = {}) {
     const logoUrl = 'img/karpus.jpg';
@@ -539,12 +541,14 @@ export const Helpers = {
             min-height: 100vh; background: #f1f5f9;
             -webkit-print-color-adjust: exact; print-color-adjust: exact;
           }
-          @page { size: 85.6mm 54mm; margin: 0; }
-          .carnet {
-            width: 85.6mm; height: 54mm; background: #fff;
-            position: relative; overflow: hidden;
-            box-shadow: 0 2px 16px rgba(0,0,0,0.1);
-          }
+          @page { size: 3.5in 2.2in; margin: 0; }
+.carnet {
+    width: 3.5in; height: 2.2in; background: #fff;
+    position: relative; overflow: hidden;
+    box-shadow: 0 2px 16px rgba(0,0,0,0.1);
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
           .top-bar {
             height: 8mm; background: linear-gradient(135deg, #1e40af, #1d4ed8);
             display: flex; align-items: center; padding: 0 3mm; gap: 2mm;

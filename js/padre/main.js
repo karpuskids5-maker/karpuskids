@@ -63,7 +63,7 @@ window.App = {
     const imgData = img.src;
     const classroom = student.classrooms?.name || '';
     const level = student.classrooms?.level || '';
-    _openPrintWindow(Helpers.getQRPrintTemplate(imgData, student.name, student.matricula, {
+    _openPrintWindow(Helpers.getQRPrintTemplate(imgData, [student.name, student.last_name].filter(Boolean).join(' '), student.matricula, {
       classroom, level,
       p1Name: student.p1_name || '',
       p2Name: student.p2_name || '',
@@ -1852,7 +1852,7 @@ async function _initPadreQR(student) {
     if (!img) return;
     const classroom = student.classrooms?.name || '';
     const level = student.classrooms?.level || '';
-    _openPrintWindow(Helpers.getQRPrintTemplate(img, name, matricula, {
+    _openPrintWindow(Helpers.getQRPrintTemplate(img, [student.name, student.last_name].filter(Boolean).join(' '), matricula, {
       classroom, level,
       p1Name: student.p1_name || '',
       p2Name: student.p2_name || '',

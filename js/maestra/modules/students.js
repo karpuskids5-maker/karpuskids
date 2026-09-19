@@ -115,7 +115,7 @@ export function openStudentProfile(studentId) {
     const classroom = s.classrooms?.name || '';
     const level = s.classrooms?.level || '';
     const win = window.open('', '_blank');
-    win.document.write(Helpers.getQRPrintTemplate(imgData, s.name, s.matricula, {
+    win.document.write(Helpers.getQRPrintTemplate(imgData, [s.name, s.last_name].filter(Boolean).join(' '), s.matricula, {
       classroom, level,
       p1Name: s.p1_name || '',
       p2Name: s.p2_name || '',

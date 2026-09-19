@@ -73,14 +73,17 @@ function parseResult(d) {
 async function jsMarkAbsentFallback() {
   const { data: settings } = await supabase
     .from('school_settings')
-    .select('check_in_end, work_days')
+    .select('check_in_end, open_time, work_days')
     .eq('id', 1)
     .maybeSingle();
 
-  if (!settings?.check_in_end) return null;
+  // El límite de entrada se resuelve de check_in_end; si no existe, cae a open_time
+  // para que la detección automática trabaje siempre con el horario configurado.
+  const limitEnd = settings?.check_in_end || settings?.open_time;
+  if (!limitEnd) return null;
 
   const { date, time, dow } = nowDRInfo();
-  const threshold = toMin(settings.check_in_end) + 120; // check_in_end + 2h
+  const threshold = toMin(limitEnd) + 120; // límite de entrada + 2h
   if (toMin(time) < threshold) return null;
   if (!isWorkday(settings.work_days, dow)) return null;
 
