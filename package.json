@@ -10,7 +10,7 @@
     "seed": "node scripts/seed-demo.cjs",
     "build:css": "postcss ./css/tailwind.css -o ./css/karpus-tailwind.css",
     "watch:css": "postcss ./css/tailwind.css -o ./css/karpus-tailwind.css --watch",
-    "predeploy": "node scripts/pre-deploy-check.js",
+    "predeploy": "node scripts/pre-deploy-check.cjs",
     "web": "node server/web.cjs",
     "security:audit": "npm audit"
   },
