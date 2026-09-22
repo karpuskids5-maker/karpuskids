@@ -544,7 +544,12 @@ export const WallModule = {
     const { mediaUrl, mediaType, thumbnailUrl, thumbnailUrls = [], imagesArr, duration } = await this._resolveMediaUpload(filesToUpload);
     const payload = this._buildPostPayload({ content, classroomId, scheduledAt, expireDays, mediaUrl, mediaType, thumbnailUrl, thumbnailUrls, imagesArr, duration, user });
 
-    const { error } = await supabase.from('posts').insert(payload);
+    let { error } = await supabase.from('posts').insert(payload);
+    // Fallback: si la columna thumbnail_urls no existe aún en la BD, reintentar sin ella
+    if (error?.code === 'PGRST204' && error.message?.includes('thumbnail_urls')) {
+      const { thumbnail_urls: _dropped, ...payloadWithout } = payload;
+      ({ error } = await supabase.from('posts').insert(payloadWithout));
+    }
     if (error) throw error;
 
     // 🔔 Notificar a padres: push + email — SOLO publicaciones inmediatas

@@ -52,7 +52,8 @@ BEGIN
   END IF;
 
   -- 2) Umbral = límite de entrada + 2 horas. Si no hay límite explícito, se usa la apertura.
-  v_threshold := COALESCE(v_settings.check_in_end, v_settings.open_time) + interval '2 hours';
+  -- open_time es text ("07:00") y check_in_end es time → cast a time para que COALESCE no falle (42804).
+  v_threshold := COALESCE(v_settings.check_in_end, (v_settings.open_time)::time) + interval '2 hours';
 
   IF v_threshold IS NULL THEN
     RETURN jsonb_build_object('marked', 0, 'parents', '[]'::jsonb, 'students', '[]'::jsonb);
@@ -87,7 +88,7 @@ BEGIN
     FROM public.attendance_requests
     WHERE student_id = v_student.id AND date = v_today
       AND coalesce(status, '') IN ('pending', 'approved')
-    ORDER BY updated_at DESC, id DESC
+    ORDER BY created_at DESC, id DESC
     LIMIT 1;
 
     SELECT * INTO v_att
@@ -167,7 +168,8 @@ BEGIN
     v_name := v_student.name; v_role := 'Estudiante'; v_parent := v_student.parent_id;
     SELECT * INTO v_settings FROM public.school_settings WHERE id = 1;
     -- Límite de entrada desde el horario configurado
-    v_limit := COALESCE(v_settings.check_in_end, v_settings.open_time);
+    -- open_time es text ("07:00") y check_in_end es time → cast a time para que COALESCE no falle (42804).
+    v_limit := COALESCE(v_settings.check_in_end, (v_settings.open_time)::time);
     SELECT * INTO v_existing FROM public.door_punches WHERE student_id = v_student.id AND date = v_today AND punch_type = 'check_in';
     IF NOT FOUND THEN
       v_type := 'check_in';

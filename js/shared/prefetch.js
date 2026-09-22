@@ -74,7 +74,7 @@ export const Prefetch = {
     try {
       const { data: posts } = await supabase
         .from('posts')
-        .select('media_url, image_url, thumbnail_url, thumbnail_urls, teacher:teacher_id(avatar_url)')
+        .select('media_url, image_url, thumbnail_url, teacher:teacher_id(avatar_url)')
         .eq('classroom_id', classroomId)
         .order('created_at', { ascending: false })
         .limit(10);

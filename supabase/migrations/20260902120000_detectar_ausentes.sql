@@ -88,7 +88,7 @@ BEGIN
     FROM public.attendance_requests
     WHERE student_id = v_student.id AND date = v_today
       AND coalesce(status, '') IN ('pending', 'approved')
-    ORDER BY updated_at DESC, id DESC
+    ORDER BY created_at DESC, id DESC
     LIMIT 1;
 
     SELECT * INTO v_att

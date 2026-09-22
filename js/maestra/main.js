@@ -26,6 +26,13 @@ const { safeToast, safeEscapeHTML, Modal } = UI;
 // Cache de marcas de tiempo para evitar recargas constantes
 const _lastLoad = {};
 
+// La columna posts.thumbnail_urls puede no existir aún en la BD
+// (migraciones/operativos/25_wall_video_thumbnails_strip.sql). Si PostgREST
+// responde 400 por ella, se desactiva y el insert se reintenta sin la columna.
+let _supportsThumbUrls = null; // null: desconocido / true | false
+const _isMissingColumnError = (err, col) =>
+  !!err && (err.code === '42703' || new RegExp(String.raw`\b${col}\b`, 'i').test(err.message || ''));
+
 // Exponer Modal globalmente ANTES de cualquier interacción del usuario
 // Los onclick inline en HTML dinámico necesitan window.Modal disponible de inmediato
 window.Modal = Modal;
@@ -1415,7 +1422,7 @@ async function submitNewPost() {
     const taggedSids = [...document.querySelectorAll('#postTagChips button[data-sid].bg-orange-100')]
       .map(b => Number(b.dataset.sid));
 
-    const { error } = await supabase.from('posts').insert({
+    const postPayload = {
       content,
       media_url: mediaUrl,
       media_type: mediaType,
@@ -1424,7 +1431,14 @@ async function submitNewPost() {
       teacher_id: user.id,
       classroom_id: classroom.id,
       ...(taggedSids.length ? { tagged_students: taggedSids } : {})
-    });
+    };
+
+    let { error } = await supabase.from('posts').insert(postPayload);
+    // Fallback: si la columna thumbnail_urls no existe aún en la BD, reintentar sin ella
+    if (error?.code === 'PGRST204' && error.message?.includes('thumbnail_urls')) {
+      const { thumbnail_urls: _dropped, ...payloadWithout } = postPayload;
+      ({ error } = await supabase.from('posts').insert(payloadWithout));
+    }
 
     if (error) throw error;
 

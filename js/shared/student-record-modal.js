@@ -2178,15 +2178,22 @@ export const StudentRecordModal = {
     const months = 10;
     const hasAmounts = payload.monthly_fee > 0 || payload.inscription_fee > 0 || payload.prolongado_fee > 0;
     if (!hasAmounts) return;
+
+    // Derivar el mes de inicio desde start_date del estudiante (YYYY-MM)
+    const startMonth = payload.start_date
+      ? payload.start_date.slice(0, 7)  // "2026-09-12" → "2026-09"
+      : null;
+
     const rpc = await supabase.rpc('generate_student_charges', {
-      p_student_id: studentId,
-      p_plan: payload.payment_plan,
+      p_student_id:        studentId,
+      p_plan:              payload.payment_plan,
       p_inscription_amount: payload.inscription_fee,
-      p_monthly_amount: payload.monthly_fee,
-      p_prolongado_fee: payload.prolongado_fee,
-      p_discount_pct: payload.discount_pct,
-      p_due_day: payload.due_day,
-      p_months: months,
+      p_monthly_amount:    payload.monthly_fee,
+      p_prolongado_fee:    payload.prolongado_fee,
+      p_discount_pct:      payload.discount_pct,
+      p_due_day:           payload.due_day,
+      p_months:            months,
+      p_start_month:       startMonth,
     });
     if (rpc.error) throw rpc.error;
   },
