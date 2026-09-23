@@ -912,6 +912,14 @@ function _renderConversationCards(pairs) {
     const c1 = _getUserAvatarColor(p.user1);
     const c2 = _getUserAvatarColor(p.user2);
     const hasUnread = p.unread > 0;
+    // 🟡 "Visto y sin respuesta": sin mensajes sin leer y el último fue leído → en espera
+    const last = p.msgs[0] || null;
+    const waiting = !hasUnread && !!last && last.is_read === true;
+    const cardStyle = hasUnread
+      ? 'border-color:rgba(99,102,241,.35);background:rgba(99,102,241,.06);'
+      : waiting
+        ? 'border-color:rgba(245,158,11,.35);background:rgba(245,158,11,.06);'
+        : '';
     const roleBadgeColors = { padre: 'badge-blue', maestra: 'badge-green', directora: 'badge-orange', asistente: 'badge-purple', admin: 'badge-yellow' };
     const rb1 = roleBadgeColors[r1] || 'badge-gray';
     const rb2 = roleBadgeColors[r2] || 'badge-gray';
@@ -930,7 +938,7 @@ function _renderConversationCards(pairs) {
         </div>`;
     }).join('');
 
-    return `<div class="convo-card" onclick="viewThread('${p.user1}','${p.user2}')" style="cursor:pointer;align-items:flex-start;${hasUnread ? 'border-color:rgba(99,102,241,.35);background:rgba(99,102,241,.06);' : ''}">
+    return `<div class="convo-card" onclick="viewThread('${p.user1}','${p.user2}')" style="cursor:pointer;align-items:flex-start;${cardStyle}">
       <!-- Avatars -->
       <div style="position:relative;flex-shrink:0;">
         <div class="convo-avatar" style="background:${c1};width:46px;height:46px;font-size:17px;">${(n1[0]||'?').toUpperCase()}</div>
@@ -952,6 +960,7 @@ function _renderConversationCards(pairs) {
         <div class="convo-preview-wrap" style="padding:3px 0 0;">${history}</div>
         <div style="display:flex;gap:4px;margin-top:6px;flex-wrap:wrap;">
           ${hasUnread ? `<span class="badge badge-red" style="font-size:8px;padding:2px 7px;"><i class="bi bi-envelope-fill" style="font-size:7px;"></i> ${p.unread} sin leer</span>` : ''}
+          ${waiting ? '<span class="badge badge-yellow" style="font-size:8px;padding:2px 7px;"><i class="bi bi-check2-all" style="font-size:7px;"></i> Visto · espera respuesta</span>' : ''}
           ${p.msgs.some(m => findSensitiveHits(m.content).length > 0) ? '<span class="badge badge-yellow" style="font-size:8px;padding:2px 7px;"><i class="bi bi-exclamation-triangle-fill" style="font-size:7px;"></i> Sensible</span>' : ''}
           ${p.hasMedia ? '<span class="badge badge-purple" style="font-size:8px;padding:2px 7px;"><i class="bi bi-image" style="font-size:7px;"></i> Archivos</span>' : ''}
           <button class="btn btn-ghost" style="margin-left:auto;padding:3px 10px;font-size:10px;" onclick="event.stopPropagation();viewThread('${p.user1}','${p.user2}')"><i class="bi bi-eye-fill"></i> Ver hilo (${p.msgs.length})</button>

@@ -174,6 +174,7 @@ export function chatListItemHTML({ c, unread = 0, lastMsg = null, online = false
   const name = c.name || 'Usuario';
   const initial = name.trim().charAt(0).toUpperCase() || '?';
   const time = lastMsg?.created_at ? formatListTime(lastMsg.created_at) : '';
+  const waiting = isChatAwaiting(lastMsg, unread, disabled);
 
   let preview;
   if (lastMsg) {
@@ -185,7 +186,7 @@ export function chatListItemHTML({ c, unread = 0, lastMsg = null, online = false
 
   return `
   <div data-contact-id="${_esc(String(c.id || ''))}" ${extraAttr}
-       class="kk-chat-item ${disabled ? 'is-disabled' : ''} ${unread > 0 ? 'has-unread' : ''}">
+       class="kk-chat-item ${disabled ? 'is-disabled' : ''} ${unread > 0 ? 'has-unread' : ''} ${waiting ? 'is-waiting' : ''}">
     <div class="kk-chat-item-avatar-wrap">
       <div class="kk-chat-item-avatar ${avatarBg}">
         ${c.avatar ? `<img src="${_esc(c.avatar)}" alt="" loading="lazy">` : `<span>${initial}</span>`}
@@ -200,10 +201,39 @@ export function chatListItemHTML({ c, unread = 0, lastMsg = null, online = false
       </div>
       <div class="kk-chat-item-bottom">
         <span class="kk-chat-item-preview">${preview}</span>
-        ${unread > 0 ? `<span class="kk-unread-badge is-static">${unread > 99 ? '99+' : unread}</span>` : ''}
+        ${unread > 0 ? `<span class="kk-unread-badge is-static">${unread > 99 ? '99+' : unread}</span>` : (waiting ? '<span class="kk-waiting-tag">En espera</span>' : '')}
       </div>
     </div>
   </div>`;
+}
+
+/**
+ * 🟡 Estado "vista y sin respuesta" (dejado en visto por mí):
+ * el último mensaje es del OTRO contacto y ya lo leí (unread = 0) → en espera de mi respuesta.
+ */
+export function isChatAwaiting(lastMsg, unread = 0, disabled = false) {
+  return !disabled && !!lastMsg && lastMsg.mine === false && unread === 0;
+}
+
+/**
+ * Marca/desmarca la fila de una conversación como "En espera" (amarilla)
+ * sin re-renderizar la lista completa. Funciona con rows data-contact-id / data-user-id.
+ */
+export function markChatRowWaiting(contactId, waiting) {
+  if (!contactId) return;
+  const id = String(contactId).replace(/["\\]/g, '');
+  const el = document.querySelector(
+    `#chatContactsList [data-contact-id="${id}"], #chatContactsList [data-user-id="${id}"]`
+  );
+  if (!el) return;
+  el.classList.toggle('is-waiting', !!waiting);
+  if (waiting) el.classList.remove('has-unread');
+  el.querySelectorAll('.kk-unread-badge').forEach(b => b.remove());
+  el.querySelector('.kk-waiting-tag')?.remove();
+  if (waiting) {
+    const bottom = el.querySelector('.kk-chat-item-bottom');
+    if (bottom) bottom.insertAdjacentHTML('beforeend', '<span class="kk-waiting-tag">En espera</span>');
+  }
 }
 
 /**

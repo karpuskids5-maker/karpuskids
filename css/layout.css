@@ -486,6 +486,21 @@ video.karpus-img-loading { background: #1e293b; }
 }
 .kk-chat-item.has-unread .kk-chat-item-name { color: #0f172a; font-weight: 900; }
 .kk-chat-item.has-unread .kk-chat-item-preview { color: #334155; font-weight: 700; }
+
+/* 🟡 Visto y sin respuesta — conversación en espera de mi respuesta */
+.kk-chat-item.is-waiting {
+  background: rgba(245, 158, 11, 0.10);
+  border-left: 3px solid #f59e0b;
+  padding-left: calc(0.6rem - 3px);
+}
+.kk-chat-item.is-waiting:hover { background: rgba(245, 158, 11, 0.16); }
+.kk-chat-item.is-waiting .kk-chat-item-name { color: #92400e; }
+.kk-chat-item.is-waiting .kk-chat-item-preview { color: #b45309; font-weight: 700; }
+.kk-waiting-tag {
+  flex-shrink: 0; font-size: 9px; font-weight: 800; text-transform: uppercase;
+  letter-spacing: 0.03em; color: #b45309; background: rgba(251, 191, 36, 0.22);
+  padding: 2px 8px; border-radius: 999px; white-space: nowrap;
+}
 .kk-chat-item-bottom {
   display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;
   margin-top: 1px;

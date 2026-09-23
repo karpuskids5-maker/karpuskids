@@ -67,7 +67,14 @@ export const ChatModule = {
 
       if (sentRes.error && receivedRes.error) return {};
 
+      // ⚠️ Mezclar y ordenar DESCENDENTE por fecha: la vista previa debe ser el
+      //    ÚLTIMO mensaje real (mío O del contacto), no el último mío.
       const all = [...(sentRes.data || []), ...(receivedRes.data || [])];
+      all.sort((a, b) => {
+        const ta = a.created_at ? new Date(a.created_at).getTime() : 0;
+        const tb = b.created_at ? new Date(b.created_at).getTime() : 0;
+        return tb - ta;
+      });
 
       const previews = {};
       all.forEach(m => {
@@ -78,7 +85,8 @@ export const ChatModule = {
           created_at: m.created_at,
           sender_id: m.sender_id,
           mine: m.sender_id === user.id,
-          deleted: !!m.deleted_at
+          deleted: !!m.deleted_at,
+          is_read: !!m.is_read
         };
       });
       return previews;

@@ -4,7 +4,7 @@ import { ChatView, ChatListState } from '/js/shared/chat-view.js';
 import {
   buildThreadHTML, prependThreadHTML, appendLiveMessage,
   waBubbleHTML, unreadBadgeHTML, chatListItemHTML,
-  reactionChipsHTML
+  reactionChipsHTML, isChatAwaiting, markChatRowWaiting
 } from '/js/shared/chat-render.js';
 import {
   bindMessageActions, closeMessageActions,
@@ -592,6 +592,9 @@ export async function selectChatContact(userId, name, meta) {
   }
 
   await loadChatMessages(userId, false);
+
+  // 🟡 "Lo dejé en visto": el último mensaje es del contacto y ya lo leí → fila en espera
+  markChatRowWaiting(userId, isChatAwaiting(_lastPreviews[userId], 0));
 }
 
 /**
@@ -725,6 +728,8 @@ async function sendChatMessage() {
       subscribeToChat(activeConversationId);
     }
     _notifyUnreadChanged();
+    // Ya respondí: quitar la marca amarilla "En espera"
+    markChatRowWaiting(activeChatUserId, false);
   } catch (err) {
     safeToast('Error al enviar mensaje', 'error');
     // Revertir optimistic

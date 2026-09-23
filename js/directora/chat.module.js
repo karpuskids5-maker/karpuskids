@@ -6,7 +6,7 @@ import { ScrollModule } from '../shared/scroll.module.js';
 import { ChatView, ChatListState } from '../shared/chat-view.js';
 import {
   buildThreadHTML, prependThreadHTML, appendLiveMessage, waBubbleHTML,
-  chatListItemHTML, reactionChipsHTML
+  chatListItemHTML, reactionChipsHTML, isChatAwaiting, markChatRowWaiting
 } from '../shared/chat-render.js';
 import {
   bindMessageActions, closeMessageActions,
@@ -338,6 +338,10 @@ export const ChatModule = {
       // Marcar como leídos al abrir
       if (conversationId) SharedChat.markAsRead(conversationId);
 
+      // 🟡 "Lo dejé en visto": el último mensaje es del contacto y ya lo leí → fila en espera
+      const lastMsg = messages[messages.length - 1];
+      markChatRowWaiting(this._activeContactId, !!(lastMsg && lastMsg.sender_id !== this._currentUserId));
+
       container.classList.add('wa-wallpaper');
 
       // ✅ Acciones de mensaje: mantener presionado / clic derecho (siempre, idempotente)
@@ -461,6 +465,8 @@ export const ChatModule = {
 
       // Push notification (silent fail)
       sendPush({ user_id: this._activeContactId, title: 'Nuevo mensaje de Dirección', message: text, type: 'chat' }).catch(() => {});
+      // Ya respondí: quitar la marca amarilla "En espera"
+      markChatRowWaiting(this._activeContactId, false);
     } catch (e) {
       Helpers.toast('Error al enviar mensaje', 'error');
       // Remove optimistic message

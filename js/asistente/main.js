@@ -13,7 +13,8 @@ import { ScrollModule } from '/js/shared/scroll.module.js';
 import { ChatView, ChatListState } from '/js/shared/chat-view.js';
 import {
   buildThreadHTML, prependThreadHTML, appendLiveMessage, waBubbleHTML,
-  formatDayLabel, chatListItemHTML, reactionChipsHTML
+  formatDayLabel, chatListItemHTML, reactionChipsHTML,
+  isChatAwaiting, markChatRowWaiting
 } from '/js/shared/chat-render.js';
 import {
   bindMessageActions, closeMessageActions,
@@ -1079,6 +1080,10 @@ window.selectAssistantChat = async (userId, name, role, avatarUrl = null) => {
     // Marcar como leídos al abrir
     if (conversationId) (await getChatModule()).markAsRead(conversationId);
 
+    // 🟡 "Lo dejé en visto": el último mensaje es del contacto y ya lo leí → fila en espera
+    const lastMsg = messages[messages.length - 1];
+    markChatRowWaiting(userId, !!(lastMsg && lastMsg.sender_id !== user.id));
+
     if (container) {
       container.classList.add('wa-wallpaper');
       _resolveReplyPreviews(messages);
@@ -1331,6 +1336,8 @@ async function initAssistantChat() {
           if (!convId && res.conversationId) {
             AppState.set('activeConversationId', res.conversationId);
           }
+          // Ya respondí: quitar la marca amarilla "En espera"
+          markChatRowWaiting(destId, false);
         } catch (_) {
           const tempMsg = document.getElementById(`msg-${tempId}`);
           if (tempMsg) tempMsg.style.opacity = '0.5';

@@ -1027,10 +1027,28 @@
             AND c.teacher_id IS NOT NULL
         )
       )
+      -- 5. Maestras ven perfiles del staff directivo (directora/asistente) para el chat
+      OR (
+        get_my_role() = 'maestra'
+        AND role IN ('directora', 'asistente')
+      )
+      -- 6. Maestras ven los perfiles de los padres de sus estudiantes (para el chat)
+      OR (
+        get_my_role() = 'maestra'
+        AND id IN (
+          SELECT s.parent_id
+          FROM public.students s
+          WHERE s.parent_id IS NOT NULL
+            AND s.deleted_at IS NULL
+            AND s.classroom_id IN (
+              SELECT c.id FROM public.classrooms c WHERE c.teacher_id = auth.uid()
+            )
+        )
+      )
     )
   );
 
-  SELECT '✅ profiles_select actualizado — padres ven staff en chat' AS status;
+  SELECT '✅ profiles_select actualizado — maestras ven staff directivo y padres en chat' AS status;
 
   -- ═══════════════════════════════════════════════════════════════════════════
   -- 10.8 · subjects — relajar CHECK education_level

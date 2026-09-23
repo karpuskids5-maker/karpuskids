@@ -7,7 +7,8 @@ import { ScrollModule } from '../shared/scroll.module.js';
 import { ChatView, ChatListState } from '../shared/chat-view.js';
 import {
   buildThreadHTML, prependThreadHTML, appendLiveMessage, waBubbleHTML,
-  chatListItemHTML, reactionChipsHTML
+  chatListItemHTML, reactionChipsHTML,
+  isChatAwaiting, markChatRowWaiting
 } from '../shared/chat-render.js';
 import {
   bindMessageActions, closeMessageActions,
@@ -264,6 +265,9 @@ export const ChatModule = {
 
     await this.loadMessages();
     this.initRealtime();
+
+    // 🟡 "Lo dejé en visto": el último mensaje es del contacto y ya lo leí → fila en espera
+    markChatRowWaiting(contactId, isChatAwaiting(this._previews[contactId], 0));
   },
 
   async loadMessages(loadMore = false) {
@@ -413,6 +417,8 @@ export const ChatModule = {
         this._conversationId = conversationId;
         this.initRealtime();
       }
+      // Ya respondí: quitar la marca amarilla "En espera" del contacto
+      markChatRowWaiting(this._activeContact.id, false);
     } catch (err) {
       Helpers.toast('Error al enviar mensaje', 'error');
       container?.lastElementChild?.remove();
