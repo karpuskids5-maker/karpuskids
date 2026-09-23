@@ -7,12 +7,6 @@ const CARD_H = 55.88;
 const PAGE_W = 210;
 const PAGE_H = 297;
 const MARGIN_LR = 12.10;
-const MARGIN_TB = 26.74;
-const GAP_X = 8.00;
-const GAP_Y = 6.66;
-const COLS = 2;
-const ROWS = 4;
-const CARDS_PER_PAGE = COLS * ROWS;
 
 const GREEN = {
   primary: [25, 135, 84],
@@ -175,7 +169,7 @@ class CarnetsManager {
 
           <div style="display:flex;align-items:center;gap:0.5rem;font-size:12px;color:#64748b;font-weight:500">
             <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color:#198754"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-            Se generarán <strong id="carnetEstimate" style="color:#198754">${active.length}</strong> carnets · 8 por hoja (frente + reverso)
+            Se generarán <strong id="carnetEstimate" style="color:#198754">${active.length}</strong> carnets · 1 por hoja (frente + reverso)
           </div>
         </div>
 
@@ -210,7 +204,7 @@ class CarnetsManager {
       </div>
 
       <div style="padding:1.5rem;border-top:1px solid #f1f5f9;background:#f8fafc;border-radius:0 0 1.5rem 1.5rem;display:flex;justify-content:space-between;align-items:center">
-        <span style="font-size:10px;color:#94a3b8;font-weight:700">Carnet PVC: 88.9×55.88mm · 8 por hoja · A4 vertical</span>
+        <span style="font-size:10px;color:#94a3b8;font-weight:700">Carnet PVC: 88.9×55.88mm · 1 por hoja (frente + reverso) · A4 vertical</span>
         <div style="display:flex;gap:0.5rem">
           <button onclick="window._carnetsClose()" style="padding:0.625rem 1.25rem;border:2px solid #e2e8f0;color:#475569;font-weight:700;font-size:12px;border-radius:0.75rem;cursor:pointer;background:#fff;transition:all 0.2s">Cancelar</button>
           <button id="btnCarnetGenerate" onclick="window._carnetsGenerate()" style="padding:0.625rem 1.25rem;background:linear-gradient(135deg,#198754,#146C43);color:#fff;font-weight:700;font-size:12px;border-radius:0.75rem;border:none;cursor:pointer;box-shadow:0 10px 15px -3px rgba(90,198,122,0.3);display:flex;align-items:center;gap:0.375rem;transition:all 0.2s">
@@ -330,7 +324,7 @@ class CarnetsManager {
     if (!jsPDF) throw new Error('Librería jsPDF no disponible');
 
     const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-    const totalPages = Math.ceil(students.length / CARDS_PER_PAGE);
+    const totalPages = students.length;
     const now = new Date();
     const dateStr = now.toLocaleDateString('es-ES');
     const timeStr = now.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
@@ -344,46 +338,24 @@ class CarnetsManager {
       this._updateProgress(`Generando QR ${i + 1} de ${students.length}`, ((i + 1) / students.length) * 40);
     }
 
-    const totalPagesAll = totalPages * 2;
+    // 1 hoja A4 por estudiante: FRENTE centrado arriba, REVERSO centrado abajo.
+    const cardX = (PAGE_W - CARD_W) / 2;
+    const frontY = PAGE_H / 4 - CARD_H / 2;
+    const backY = (PAGE_H * 3) / 4 - CARD_H / 2;
 
-    for (let page = 0; page < totalPages; page++) {
-      if (page > 0) doc.addPage('a4', 'portrait');
+    for (let i = 0; i < students.length; i++) {
+      if (i > 0) doc.addPage('a4', 'portrait');
+      const s = students[i];
+
       this._drawPageBackground(doc);
-      this._drawCutGrid(doc);
-      this._drawFooter(doc, `Frente · Página ${page + 1} de ${totalPages}`, totalPagesAll, students.length, dateStr, timeStr);
+      this._drawFooter(doc, `Carnet ${i + 1} de ${students.length} · Frente + Reverso`, students.length, dateStr, timeStr);
 
-      for (let i = 0; i < CARDS_PER_PAGE; i++) {
-        const idx = page * CARDS_PER_PAGE + i;
-        if (idx >= students.length) break;
-        const col = i % COLS;
-        const row = Math.floor(i / COLS);
-        const cx = MARGIN_LR + col * (CARD_W + GAP_X);
-        const cy = MARGIN_TB + row * (CARD_H + GAP_Y);
-        this._drawFrontCard(doc, students[idx], cx, cy, this._qrCache[students[idx].id]);
-        this._drawCutMarks(doc, cx, cy);
-      }
+      this._drawFrontCard(doc, s, cardX, frontY, this._qrCache[s.id]);
+      this._drawCutMarks(doc, cardX, frontY);
+      this._drawBackCard(doc, s, cardX, backY);
+      this._drawCutMarks(doc, cardX, backY);
 
-      this._updateProgress(`Generando frentes: página ${page + 1} de ${totalPages}`, 40 + ((page + 1) / totalPages) * 30);
-    }
-
-    for (let page = 0; page < totalPages; page++) {
-      doc.addPage('a4', 'portrait');
-      this._drawPageBackground(doc);
-      this._drawCutGrid(doc);
-      this._drawFooter(doc, `Reverso · Página ${page + 1} de ${totalPages}`, totalPagesAll, students.length, dateStr, timeStr);
-
-      for (let i = 0; i < CARDS_PER_PAGE; i++) {
-        const idx = page * CARDS_PER_PAGE + i;
-        if (idx >= students.length) break;
-        const col = i % COLS;
-        const row = Math.floor(i / COLS);
-        const cx = MARGIN_LR + col * (CARD_W + GAP_X);
-        const cy = MARGIN_TB + row * (CARD_H + GAP_Y);
-        this._drawBackCard(doc, students[idx], cx, cy);
-        this._drawCutMarks(doc, cx, cy);
-      }
-
-      this._updateProgress(`Generando reversos: página ${page + 1} de ${totalPages}`, 70 + ((page + 1) / totalPages) * 28);
+      this._updateProgress(`Generando carnet ${i + 1} de ${students.length}`, 40 + ((i + 1) / students.length) * 58);
     }
 
     this._updateProgress('Completado · PDF listo para descargar', 100);
@@ -404,27 +376,6 @@ class CarnetsManager {
     doc.setFontSize(10);
     doc.setTextColor(90, 198, 122);
     doc.text('Centro de Desarrollo Infantil', PAGE_W / 2, PAGE_H / 2 + 12, { align: 'center', angle: 90 });
-  }
-
-  _drawCutGrid(doc) {
-    doc.setDrawColor(200, 210, 205);
-    doc.setLineWidth(0.1);
-    for (let col = 0; col <= COLS; col++) {
-      const cx = MARGIN_LR + col * (CARD_W + GAP_X) - (col === 0 ? 0 : GAP_X / 2);
-      if (col > 0 && col < COLS) {
-        for (let y = MARGIN_TB; y < PAGE_H - MARGIN_TB; y += 4) {
-          doc.line(cx, y, cx, Math.min(y + 2, PAGE_H - MARGIN_TB));
-        }
-      }
-    }
-    for (let row = 0; row <= ROWS; row++) {
-      const ry = MARGIN_TB + row * (CARD_H + GAP_Y) - (row === 0 ? 0 : GAP_Y / 2);
-      if (row > 0 && row < ROWS) {
-        for (let x = MARGIN_LR; x < PAGE_W - MARGIN_LR; x += 4) {
-          doc.line(x, ry, Math.min(x + 2, PAGE_W - MARGIN_LR), ry);
-        }
-      }
-    }
   }
 
   _drawCutMarks(doc, x, y) {

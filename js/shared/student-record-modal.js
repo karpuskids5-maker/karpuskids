@@ -1723,6 +1723,40 @@ export const StudentRecordModal = {
     document.getElementById('srm-delete-auth')?.addEventListener('click', () => this._deleteAndRecreateAuth());
   },
 
+  _previewMonthLabel(today) {
+    const yy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    const name = new Date(Number(yy), Number(mm) - 1, 1)
+      .toLocaleDateString('es-DO', { month: 'long' });
+    return name.charAt(0).toUpperCase() + name.slice(1) + ' ' + yy;
+  },
+
+  _pushUpfrontPreview(lines, plan, monthly, months, net) {
+    if (monthly <= 0) return;
+    if (plan === 'unico') {
+      lines.push({ label: 'Cuota Única Anual (' + months + ' meses)', amount: net(monthly * months) });
+    } else {
+      const half = Math.floor(months / 2);
+      lines.push({ label: 'Semestre I (' + half + ' meses)', amount: net(monthly * half) });
+      lines.push({ label: 'Semestre II (' + (months - half) + ' meses)', amount: net(monthly * (months - half)) });
+    }
+  },
+
+  _pushMonthlyPreview(lines, notes, monthly, prolong, canBill, monthsLeft, today, net) {
+    if (monthly > 0) {
+      if (canBill) {
+        lines.push({ label: 'Mensualidad ' + this._previewMonthLabel(today), amount: net(monthly) });
+      }
+      notes.push(monthsLeft + ' mensualidad(es) restante(s) se generarán solas el día 25 de cada mes.');
+    }
+    if (prolong > 0) {
+      if (canBill && monthly > 0) lines.push({ label: 'Día Prolongado', amount: net(prolong) });
+      if (!lines.some(l => l.label.startsWith('Día Prolongado'))) {
+        notes.push('Día prolongado se cobra cada día 25 junto con la mensualidad.');
+      }
+    }
+  },
+
   _previewCharges(monthly, prolong, insc, disc) {
     const lines = [];
     const notes = [];
@@ -1732,49 +1766,35 @@ export const StudentRecordModal = {
     // Día de generación del ciclo (mismo valor que school_settings.generation_day).
     // Regla: el cobro del mes en curso solo aparece a partir del día 25.
     const today = new Date();
-    const GEN_DAY = 25;
-    const canBill = today.getDate() >= GEN_DAY;
+    const canBill = today.getDate() >= 25;
     const monthsLeft = canBill ? months - 1 : months;
+    const plan = this._form.payment_plan || 'mensual';
 
     if (insc > 0) lines.push({ label: 'Inscripción', amount: net(insc) });
 
-    const plan = this._form.payment_plan || 'mensual';
-    if (plan === 'unico') {
-      if (monthly > 0) {
-        lines.push({ label: 'Cuota Única Anual (' + months + ' meses)', amount: net(monthly * months) });
-      }
-    } else if (plan === 'doble') {
-      const half = Math.floor(months / 2);
-      if (monthly > 0) {
-        lines.push({ label: 'Semestre I (' + half + ' meses)', amount: net(monthly * half) });
-        lines.push({ label: 'Semestre II (' + (months - half) + ' meses)', amount: net(monthly * (months - half)) });
+    if (plan === 'unico' || plan === 'doble') {
+      this._pushUpfrontPreview(lines, plan, monthly, months, net);
+      if (prolong > 0) {
+        lines.push({ label: 'Día Prolongado', amount: net(plan === 'unico' ? prolong * months : prolong) });
       }
     } else {
       // Plan mensual: NO se adelanta el año completo. Cada mes se genera el día 25.
-      if (monthly > 0) {
-        if (canBill) {
-          const yy = today.getFullYear();
-          const mm = String(today.getMonth() + 1).padStart(2, '0');
-          const name = new Date(Number(yy), Number(mm) - 1, 1)
-            .toLocaleDateString('es-DO', { month: 'long' });
-          lines.push({ label: 'Mensualidad ' + name.charAt(0).toUpperCase() + name.slice(1) + ' ' + yy, amount: net(monthly) });
-        }
-        notes.push(monthsLeft + ' mensualidad(es) restante(s) se generarán solas el día 25 de cada mes.');
-      }
-    }
-    if (prolong > 0) {
-      if (plan === 'mensual') {
-        if (canBill && monthly > 0) lines.push({ label: 'Día Prolongado', amount: net(prolong) });
-        if (!lines.some(l => l.label.startsWith('Día Prolongado'))) {
-          notes.push('Día prolongado se cobra cada día 25 junto con la mensualidad.');
-        }
-      } else {
-        lines.push({ label: 'Día Prolongado', amount: net(plan === 'unico' ? prolong * months : prolong) });
-      }
+      this._pushMonthlyPreview(lines, notes, monthly, prolong, canBill, monthsLeft, today, net);
     }
 
     const total = lines.reduce((s, l) => s + l.amount, 0);
     return { lines, notes, total };
+  },
+
+  _previewLine(label, amount) {
+    return `<div class="flex items-center justify-between text-xs font-bold px-3 py-2 rounded-xl bg-slate-50 border border-slate-100">
+      <span>${Helpers.escapeHTML(label)}</span>
+      <span class="text-indigo-600">${this._fmt(amount)}</span>
+    </div>`;
+  },
+
+  _previewNote(note) {
+    return `<p class="text-[10px] font-bold text-slate-400 leading-snug">💡 ${Helpers.escapeHTML(note)}</p>`;
   },
 
   _updatePreview() {
@@ -1786,20 +1806,20 @@ export const StudentRecordModal = {
     const insc = this._num('inscription_fee');
     const disc = this._num('discount_pct');
     const preview = this._previewCharges(monthly, prolong, insc, disc);
-    const listHtml = preview.lines.length
-      ? `<div class="space-y-1.5">${preview.lines.slice(0, 12).map(l => `
-          <div class="flex items-center justify-between text-xs font-bold px-3 py-2 rounded-xl bg-slate-50 border border-slate-100">
-            <span>${Helpers.escapeHTML(l.label)}</span>
-            <span class="text-indigo-600">${this._fmt(l.amount)}</span>
-          </div>`).join('')}
-         ${preview.lines.length > 12 ? `<p class="text-[10px] text-slate-400 font-black">… y ${preview.lines.length - 12} cargos más</p>` : ''}
-         <div class="flex items-center justify-between text-sm font-black px-3 py-2.5 rounded-xl bg-indigo-50 border border-indigo-100 text-indigo-700 mt-2">
-           <span>TOTAL</span><span>${this._fmt(preview.total)}</span>
-         </div></div>`
-      : '<p class="text-xs text-slate-400 font-bold">Sin montos definidos — no se generarán cargos.</p>';
+    let listHtml;
+    if (preview.lines.length) {
+      const rows = preview.lines.slice(0, 12).map(l => this._previewLine(l.label, l.amount)).join('');
+      const more = preview.lines.length > 12
+        ? '<p class="text-[10px] text-slate-400 font-black">… y ' + (preview.lines.length - 12) + ' cargos más</p>'
+        : '';
+      listHtml = '<div class="space-y-1.5">' + rows + more +
+        '<div class="flex items-center justify-between text-sm font-black px-3 py-2.5 rounded-xl bg-indigo-50 border border-indigo-100 text-indigo-700 mt-2">' +
+        '<span>TOTAL</span><span>' + this._fmt(preview.total) + '</span></div></div>';
+    } else {
+      listHtml = '<p class="text-xs text-slate-400 font-bold">Sin montos definidos — no se generarán cargos.</p>';
+    }
     const notesHtml = preview.notes.length
-      ? `<div class="mt-2 space-y-1">${preview.notes.map(n => `
-          <p class="text-[10px] font-bold text-slate-400 leading-snug">💡 ${Helpers.escapeHTML(n)}</p>`).join('')}</div>`
+      ? '<div class="mt-2 space-y-1">' + preview.notes.map(n => this._previewNote(n)).join('') + '</div>'
       : '';
     el.innerHTML = listHtml + notesHtml;
   },
@@ -1942,7 +1962,6 @@ export const StudentRecordModal = {
 
     // ✅ CURAR AUTOVINCULACIÓN CORRUPTA: si sibling_id apunta a sí mismo → invalidar
     if (siblingId && studentId && siblingId === String(studentId)) {
-      siblingId = '';
       this._siblingId = '';
       if (this._form) {
         this._form.sibling_id = '';
@@ -1996,7 +2015,6 @@ export const StudentRecordModal = {
         // El hermano no tiene parent_id pero el estudiante actual sí → asignarle al hermano
         if (studentParentId && !sibParentId) {
           updatesForSib.parent_id = studentParentId;
-          finalParentId = studentParentId;
         }
 
         if (Object.keys(updatesForThis).length) {
