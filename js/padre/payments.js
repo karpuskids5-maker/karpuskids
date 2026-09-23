@@ -199,8 +199,17 @@ export const PaymentsModule = {
         }
       }
       
-      // Mostrar siempre: pagados + pendientes + vencidos + en revisión
-      let filteredPayments = Array.from(monthMap.values());
+      // Mostrar siempre: pagados + vencidos + en revisión
+      // Ocultar: pendientes con due_date en el futuro (el padre no los ve hasta que vencen)
+      const todayMidnight = new Date(); todayMidnight.setHours(0, 0, 0, 0);
+      let filteredPayments = Array.from(monthMap.values()).filter(p => {
+        const status = (p.status || '').toLowerCase();
+        // Siempre mostrar pagados, en revisión, vencidos
+        if (['paid', 'review', 'overdue'].includes(status)) return true;
+        // Para pendientes: solo mostrar si due_date ya llegó o no tiene fecha
+        if (!p.due_date) return true;
+        return new Date(p.due_date + 'T00:00:00') <= todayMidnight;
+      });
       
       this._payments = filteredPayments
         .sort((a, b) => {

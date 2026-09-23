@@ -261,7 +261,10 @@ export const StudentRecordModal = {
       emg_cedula: student.emg_cedula || '', emg_phone: student.emg_phone || '',
       emg_observations: student.emergency_protocol || '',
       payment_plan: student.payment_plan || 'mensual',
-      monthly_fee: student.monthly_fee || '', prolongado_fee: student.prolongado_fee || '',
+      // Usar el monthly_fee guardado en students como fuente de verdad.
+      // Dejar vacío SOLO si la columna es NULL (no si es 0).
+      monthly_fee: student.monthly_fee != null ? student.monthly_fee : '',
+      prolongado_fee: student.prolongado_fee != null ? student.prolongado_fee : '',
       inscription_fee: student.inscription_fee || '', discount_pct: student.discount_pct || 0,
       due_day: student.due_day || 5,
       avatar_url: student.avatar_url || '',
@@ -276,11 +279,13 @@ export const StudentRecordModal = {
     this._charges = charges.data || [];
 
     if (this._charges.length) {
-      if (!this._form.monthly_fee) {
+      // Solo rellenar desde student_charges si students.monthly_fee es NULL
+      // (no si es 0 — 0 significa "sin mensualidad configurada intencionalmente")
+      if (this._form.monthly_fee === '') {
         const lastM = this._charges.find(c => c.type === 'mensualidad' && c.amount > 0);
         if (lastM) this._form.monthly_fee = lastM.amount;
       }
-      if (!this._form.prolongado_fee) {
+      if (this._form.prolongado_fee === '') {
         const lastP = this._charges.find(c => c.type === 'prolongado' && c.amount > 0);
         if (lastP) this._form.prolongado_fee = lastP.amount;
       }
@@ -292,28 +297,10 @@ export const StudentRecordModal = {
         const lastD = this._charges.find(c => c.discount_pct > 0);
         if (lastD) this._form.discount_pct = lastD.discount_pct;
       }
-    } else {
-      const { data: pays } = await supabase
-        .from('payments')
-        .select('amount, concept')
-        .eq('student_id', id)
-        .order('created_at', { ascending: false })
-        .limit(20);
-      if (pays?.length) {
-        if (!this._form.monthly_fee) {
-          const m = pays.find(p => /mensualidad/i.test(p.concept) && p.amount > 0);
-          if (m) this._form.monthly_fee = m.amount;
-        }
-        if (!this._form.prolongado_fee) {
-          const p2 = pays.find(p => /prolongado/i.test(p.concept) && p.amount > 0);
-          if (p2) this._form.prolongado_fee = p2.amount;
-        }
-        if (!this._form.inscription_fee) {
-          const i = pays.find(p => /inscripci/i.test(p.concept) && p.amount > 0);
-          if (i) this._form.inscription_fee = i.amount;
-        }
-      }
     }
+    // ELIMINADO: el fallback a payments para rellenar monthly_fee.
+    // Los pagos históricos pueden tener montos incorrectos de generaciones
+    // anteriores. La única fuente de verdad es students.monthly_fee.
 
     await this._loadSiblings();
     await this._loadHistory();
@@ -1738,12 +1725,24 @@ export const StudentRecordModal = {
 
   _previewCharges(monthly, prolong, insc, disc) {
     const lines = [];
+    const notes = [];
     const months = 10;
     const net = (v) => Math.round((v * (1 - disc / 100)) * 100) / 100;
+
+    // Día de generación del ciclo (mismo valor que school_settings.generation_day).
+    // Regla: el cobro del mes en curso solo aparece a partir del día 25.
+    const today = new Date();
+    const GEN_DAY = 25;
+    const canBill = today.getDate() >= GEN_DAY;
+    const monthsLeft = canBill ? months - 1 : months;
+
     if (insc > 0) lines.push({ label: 'Inscripción', amount: net(insc) });
+
     const plan = this._form.payment_plan || 'mensual';
     if (plan === 'unico') {
-      if (monthly > 0) lines.push({ label: 'Cuota Única Anual (' + months + ' meses)', amount: net(monthly * months) });
+      if (monthly > 0) {
+        lines.push({ label: 'Cuota Única Anual (' + months + ' meses)', amount: net(monthly * months) });
+      }
     } else if (plan === 'doble') {
       const half = Math.floor(months / 2);
       if (monthly > 0) {
@@ -1751,13 +1750,31 @@ export const StudentRecordModal = {
         lines.push({ label: 'Semestre II (' + (months - half) + ' meses)', amount: net(monthly * (months - half)) });
       }
     } else {
-      for (let i = 1; i <= months; i++) lines.push({ label: 'Mensualidad ' + i, amount: net(monthly) });
+      // Plan mensual: NO se adelanta el año completo. Cada mes se genera el día 25.
+      if (monthly > 0) {
+        if (canBill) {
+          const yy = today.getFullYear();
+          const mm = String(today.getMonth() + 1).padStart(2, '0');
+          const name = new Date(Number(yy), Number(mm) - 1, 1)
+            .toLocaleDateString('es-DO', { month: 'long' });
+          lines.push({ label: 'Mensualidad ' + name.charAt(0).toUpperCase() + name.slice(1) + ' ' + yy, amount: net(monthly) });
+        }
+        notes.push(monthsLeft + ' mensualidad(es) restante(s) se generarán solas el día 25 de cada mes.');
+      }
     }
     if (prolong > 0) {
-      for (let i = 1; i <= months; i++) lines.push({ label: 'Día Prolongado ' + i, amount: net(prolong) });
+      if (plan === 'mensual') {
+        if (canBill && monthly > 0) lines.push({ label: 'Día Prolongado', amount: net(prolong) });
+        if (!lines.some(l => l.label.startsWith('Día Prolongado'))) {
+          notes.push('Día prolongado se cobra cada día 25 junto con la mensualidad.');
+        }
+      } else {
+        lines.push({ label: 'Día Prolongado', amount: net(plan === 'unico' ? prolong * months : prolong) });
+      }
     }
+
     const total = lines.reduce((s, l) => s + l.amount, 0);
-    return { lines, total };
+    return { lines, notes, total };
   },
 
   _updatePreview() {
@@ -1769,7 +1786,7 @@ export const StudentRecordModal = {
     const insc = this._num('inscription_fee');
     const disc = this._num('discount_pct');
     const preview = this._previewCharges(monthly, prolong, insc, disc);
-    el.innerHTML = preview.lines.length
+    const listHtml = preview.lines.length
       ? `<div class="space-y-1.5">${preview.lines.slice(0, 12).map(l => `
           <div class="flex items-center justify-between text-xs font-bold px-3 py-2 rounded-xl bg-slate-50 border border-slate-100">
             <span>${Helpers.escapeHTML(l.label)}</span>
@@ -1780,6 +1797,11 @@ export const StudentRecordModal = {
            <span>TOTAL</span><span>${this._fmt(preview.total)}</span>
          </div></div>`
       : '<p class="text-xs text-slate-400 font-bold">Sin montos definidos — no se generarán cargos.</p>';
+    const notesHtml = preview.notes.length
+      ? `<div class="mt-2 space-y-1">${preview.notes.map(n => `
+          <p class="text-[10px] font-bold text-slate-400 leading-snug">💡 ${Helpers.escapeHTML(n)}</p>`).join('')}</div>`
+      : '';
+    el.innerHTML = listHtml + notesHtml;
   },
 
   _loadQRLib(cb) {
