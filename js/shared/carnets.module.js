@@ -140,18 +140,28 @@ class CarnetsManager {
         </div>
 
         <div style="border:2px solid #f1f5f9;border-radius:1rem;padding:1rem;margin-bottom:1.25rem">
-          <h4 style="font-size:12px;font-weight:900;color:#94a3b8;text-transform:uppercase;letter-spacing:0.1em;margin:0 0 1rem">Filtros de Generación</h4>
+          <h4 style="font-size:12px;font-weight:900;color:#94a3b8;text-transform:uppercase;letter-spacing:0.1em;margin:0 0 1rem">Configuración de Carnets</h4>
 
-          <div style="margin-bottom:0.75rem">
-            <label style="display:block;font-size:10px;font-weight:900;color:#94a3b8;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:6px;margin-left:4px">Opción de selección</label>
-            <select id="carnetFilter" style="width:100%;padding:0.625rem 1rem;border:2px solid #f1f5f9;border-radius:0.75rem;outline:none;font-size:0.875rem;font-weight:500;background:#fff;transition:all 0.2s"
-              onchange="document.getElementById('carnetFilterDetail').classList.toggle('hidden', this.value === 'all')">
-              <option value="all">Todos los estudiantes activos</option>
-              <option value="classroom">Por aula</option>
-              <option value="student">Buscar estudiante específico</option>
-              <option value="matricula">Por rango de matrícula</option>
-              <option value="selected">Solo inactivos (incluidos)</option>
-            </select>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;margin-bottom:0.75rem">
+            <div>
+              <label style="display:block;font-size:10px;font-weight:900;color:#94a3b8;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:6px;margin-left:4px">Formato de Hoja / Maquetación</label>
+              <select id="carnetLayoutMode" style="width:100%;padding:0.625rem 1rem;border:2px solid #f1f5f9;border-radius:0.75rem;outline:none;font-size:0.875rem;font-weight:600;background:#fff;color:#1e293b">
+                <option value="single_page" selected>1 Carnet por Hoja (Frente + Reverso) · Ideal Maquina PVC / JPG</option>
+                <option value="single_page_side">1 Carnet por Hoja (Lado a Lado) · Panorámico</option>
+                <option value="grid_a4">Pliego A4 Masivo (8 carnets por hoja)</option>
+              </select>
+            </div>
+            <div>
+              <label style="display:block;font-size:10px;font-weight:900;color:#94a3b8;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:6px;margin-left:4px">Filtro de Selección</label>
+              <select id="carnetFilter" style="width:100%;padding:0.625rem 1rem;border:2px solid #f1f5f9;border-radius:0.75rem;outline:none;font-size:0.875rem;font-weight:500;background:#fff;transition:all 0.2s"
+                onchange="document.getElementById('carnetFilterDetail').classList.toggle('hidden', this.value === 'all')">
+                <option value="all">Todos los estudiantes activos</option>
+                <option value="classroom">Por aula</option>
+                <option value="student">Buscar estudiante específico</option>
+                <option value="matricula">Por rango de matrícula</option>
+                <option value="selected">Solo inactivos (incluidos)</option>
+              </select>
+            </div>
           </div>
 
           <div id="carnetFilterDetail" class="hidden" style="display:none">
@@ -175,7 +185,7 @@ class CarnetsManager {
 
           <div style="display:flex;align-items:center;gap:0.5rem;font-size:12px;color:#64748b;font-weight:500">
             <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color:#198754"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-            Se generarán <strong id="carnetEstimate" style="color:#198754">${active.length}</strong> carnets · 8 por hoja (frente + reverso)
+            Se generarán <strong id="carnetEstimate" style="color:#198754">${active.length}</strong> carnets · <span id="carnetEstimateDetail">1 carnet por hoja (Frente + Reverso)</span>
           </div>
         </div>
 
@@ -210,7 +220,7 @@ class CarnetsManager {
       </div>
 
       <div style="padding:1.5rem;border-top:1px solid #f1f5f9;background:#f8fafc;border-radius:0 0 1.5rem 1.5rem;display:flex;justify-content:space-between;align-items:center">
-        <span style="font-size:10px;color:#94a3b8;font-weight:700">Carnet PVC: 88.9×55.88mm · 8 por hoja · A4 vertical</span>
+        <span style="font-size:10px;color:#94a3b8;font-weight:700" id="carnetFooterSpecs">Carnet PVC: 88.9×55.88mm (3.5"×2.2") · Configurable por hoja</span>
         <div style="display:flex;gap:0.5rem">
           <button onclick="window._carnetsClose()" style="padding:0.625rem 1.25rem;border:2px solid #e2e8f0;color:#475569;font-weight:700;font-size:12px;border-radius:0.75rem;cursor:pointer;background:#fff;transition:all 0.2s">Cancelar</button>
           <button id="btnCarnetGenerate" onclick="window._carnetsGenerate()" style="padding:0.625rem 1.25rem;background:linear-gradient(135deg,#198754,#146C43);color:#fff;font-weight:700;font-size:12px;border-radius:0.75rem;border:none;cursor:pointer;box-shadow:0 10px 15px -3px rgba(90,198,122,0.3);display:flex;align-items:center;gap:0.375rem;transition:all 0.2s">
@@ -232,28 +242,44 @@ class CarnetsManager {
 
   _bindFilterEvents() {
     const filter = document.getElementById('carnetFilter');
-    if (!filter) return;
-    filter.addEventListener('change', () => {
-      const val = filter.value;
-      document.getElementById('filterClassroom')?.classList.toggle('hidden', val !== 'classroom');
-      document.getElementById('filterStudent')?.classList.toggle('hidden', val !== 'student');
-      document.getElementById('filterMatricula')?.classList.toggle('hidden', val !== 'matricula');
-
-      const filtered = this._getFiltered();
-      const el = document.getElementById('carnetEstimate');
-      if (el) el.textContent = filtered.length;
-    });
-
-    const classSelect = document.getElementById('carnetClassroom');
-    const searchInput = document.getElementById('carnetStudentSearch');
-    const matStart = document.getElementById('carnetMatStart');
-    const matEnd = document.getElementById('carnetMatEnd');
+    const layout = document.getElementById('carnetLayoutMode');
 
     const updateEstimate = () => {
       const filtered = this._getFiltered();
       const el = document.getElementById('carnetEstimate');
       if (el) el.textContent = filtered.length;
+
+      const layoutVal = layout?.value || 'single_page';
+      const detailEl = document.getElementById('carnetEstimateDetail');
+      if (detailEl) {
+        if (layoutVal === 'single_page') {
+          detailEl.textContent = '1 carnet por hoja (Frente arriba, Reverso abajo) · Ideal Maquina PVC / JPG';
+        } else if (layoutVal === 'single_page_side') {
+          detailEl.textContent = '1 carnet por hoja (Frente y Reverso lado a lado) · Panorámico';
+        } else {
+          detailEl.textContent = '8 carnets por hoja A4 (frente + reverso)';
+        }
+      }
     };
+
+    if (filter) {
+      filter.addEventListener('change', () => {
+        const val = filter.value;
+        document.getElementById('filterClassroom')?.classList.toggle('hidden', val !== 'classroom');
+        document.getElementById('filterStudent')?.classList.toggle('hidden', val !== 'student');
+        document.getElementById('filterMatricula')?.classList.toggle('hidden', val !== 'matricula');
+        updateEstimate();
+      });
+    }
+
+    if (layout) {
+      layout.addEventListener('change', updateEstimate);
+    }
+
+    const classSelect = document.getElementById('carnetClassroom');
+    const searchInput = document.getElementById('carnetStudentSearch');
+    const matStart = document.getElementById('carnetMatStart');
+    const matEnd = document.getElementById('carnetMatEnd');
 
     classSelect?.addEventListener('change', updateEstimate);
     searchInput?.addEventListener('input', updateEstimate);
@@ -310,8 +336,16 @@ class CarnetsManager {
         return;
       }
 
+      const layoutMode = document.getElementById('carnetLayoutMode')?.value || 'single_page';
+
       document.getElementById('carnetProgressContainer')?.classList.remove('hidden');
-      await this._generatePDF(students);
+      if (layoutMode === 'single_page') {
+        await this._generatePDFSingleCardStacked(students);
+      } else if (layoutMode === 'single_page_side') {
+        await this._generatePDFSingleCardSide(students);
+      } else {
+        await this._generatePDF(students);
+      }
       this._toast(`PDF generado correctamente: ${students.length} carnets`, 'success');
     } catch (e) {
       console.error('Carnets PDF error:', e);
@@ -322,6 +356,124 @@ class CarnetsManager {
         btn.innerHTML = '<svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color:#fff"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg> Generar Carnets';
       }
     }
+  }
+
+  async _generatePDFSingleCardStacked(students) {
+    await ensureJspdf();
+    const { jsPDF } = window.jspdf || {};
+    if (!jsPDF) throw new Error('Librería jsPDF no disponible');
+
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const now = new Date();
+    const dateStr = now.toLocaleDateString('es-ES');
+    const timeStr = now.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+
+    await this._loadLogo();
+
+    this._qrCache = {};
+    for (let i = 0; i < students.length; i++) {
+      const s = students[i];
+      this._qrCache[s.id] = await this._generateQRWithLogo(s.matricula || String(s.id));
+      this._updateProgress(`Generando QR ${i + 1} de ${students.length}`, ((i + 1) / students.length) * 30);
+    }
+
+    const cx = (PAGE_W - CARD_W) / 2;
+    const cyFront = 38;
+    const cyBack = cyFront + CARD_H + 28;
+
+    for (let i = 0; i < students.length; i++) {
+      if (i > 0) doc.addPage('a4', 'portrait');
+
+      this._drawPageBackground(doc);
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9);
+      doc.setTextColor(...GREEN.dark);
+      doc.text('▲ FRENTE DEL CARNET (3.5" × 2.2" / 88.9 × 55.88 mm)', PAGE_W / 2, cyFront - 4, { align: 'center' });
+
+      this._drawFrontCard(doc, students[i], cx, cyFront, this._qrCache[students[i].id]);
+      this._drawCutMarks(doc, cx, cyFront);
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9);
+      doc.setTextColor(...GREEN.dark);
+      doc.text('▼ REVERSO DEL CARNET (3.5" × 2.2" / 88.9 × 55.88 mm)', PAGE_W / 2, cyBack - 4, { align: 'center' });
+
+      this._drawBackCard(doc, students[i], cx, cyBack);
+      this._drawCutMarks(doc, cx, cyBack);
+
+      this._drawFooter(doc, `Estudiante ${i + 1} de ${students.length} · 1 Hoja (Frente + Reverso)`, students.length, students.length, dateStr, timeStr);
+
+      this._updateProgress(`Generando carnets individuales: ${i + 1} de ${students.length}`, 30 + ((i + 1) / students.length) * 68);
+    }
+
+    this._updateProgress('Completado · PDF listo para descargar', 100);
+    await this._generatePreview(students[0]);
+
+    const ts = now.toISOString().slice(0, 16).replace(/[-:T]/g, '');
+    doc.save(`carnet-individual-karpus-${ts}.pdf`);
+  }
+
+  async _generatePDFSingleCardSide(students) {
+    await ensureJspdf();
+    const { jsPDF } = window.jspdf || {};
+    if (!jsPDF) throw new Error('Librería jsPDF no disponible');
+
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+    const now = new Date();
+    const dateStr = now.toLocaleDateString('es-ES');
+    const timeStr = now.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+
+    await this._loadLogo();
+
+    this._qrCache = {};
+    for (let i = 0; i < students.length; i++) {
+      const s = students[i];
+      this._qrCache[s.id] = await this._generateQRWithLogo(s.matricula || String(s.id));
+      this._updateProgress(`Generando QR ${i + 1} de ${students.length}`, ((i + 1) / students.length) * 30);
+    }
+
+    const pageW = 297;
+    const pageH = 210;
+    const gap = 16;
+    const totalW = CARD_W * 2 + gap;
+    const cxFront = (pageW - totalW) / 2;
+    const cxBack = cxFront + CARD_W + gap;
+    const cy = (pageH - CARD_H) / 2;
+
+    for (let i = 0; i < students.length; i++) {
+      if (i > 0) doc.addPage('a4', 'landscape');
+
+      doc.setFillColor(...GREEN.bg);
+      doc.rect(0, 0, pageW, pageH, 'F');
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9);
+      doc.setTextColor(...GREEN.dark);
+      doc.text('FRENTE (3.5" × 2.2")', cxFront + CARD_W / 2, cy - 5, { align: 'center' });
+      doc.text('REVERSO (3.5" × 2.2")', cxBack + CARD_W / 2, cy - 5, { align: 'center' });
+
+      this._drawFrontCard(doc, students[i], cxFront, cy, this._qrCache[students[i].id]);
+      this._drawCutMarks(doc, cxFront, cy);
+
+      this._drawBackCard(doc, students[i], cxBack, cy);
+      this._drawCutMarks(doc, cxBack, cy);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(5);
+      doc.setTextColor(...GREEN.slate);
+      doc.text(`Karpus Kids — Carnet Individual (Frente + Reverso) · ${dateStr} · ${timeStr}`, MARGIN_LR, pageH - 5);
+      doc.text(`Estudiante ${i + 1} de ${students.length} · ${students[i].name || ''} ${students[i].last_name || ''}`, pageW / 2, pageH - 5, { align: 'center' });
+      doc.text(`Admin: ${this._adminName}`, pageW - MARGIN_LR, pageH - 5, { align: 'right' });
+
+      this._updateProgress(`Generando panorámicos: ${i + 1} de ${students.length}`, 30 + ((i + 1) / students.length) * 68);
+    }
+
+    this._updateProgress('Completado · PDF listo para descargar', 100);
+    await this._generatePreview(students[0]);
+
+    const ts = now.toISOString().slice(0, 16).replace(/[-:T]/g, '');
+    doc.save(`carnet-panoramico-karpus-${ts}.pdf`);
   }
 
   async _generatePDF(students) {
