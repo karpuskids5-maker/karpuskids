@@ -250,6 +250,21 @@ DROP POLICY IF EXISTS "attendance_parent" ON public.attendance;
 CREATE POLICY "attendance_parent" ON public.attendance FOR SELECT
   USING (EXISTS (SELECT 1 FROM public.students s WHERE s.id = attendance.student_id AND s.parent_id = auth.uid()));
 
+-- ── ATTENDANCE REQUESTS ──
+DROP POLICY IF EXISTS "attendance_requests_staff" ON public.attendance_requests;
+CREATE POLICY "attendance_requests_staff" ON public.attendance_requests FOR SELECT
+  USING (get_my_role() IN ('directora','asistente','maestra','admin'));
+DROP POLICY IF EXISTS "attendance_requests_staff_update" ON public.attendance_requests;
+CREATE POLICY "attendance_requests_staff_update" ON public.attendance_requests FOR UPDATE
+  USING (get_my_role() IN ('directora','asistente','maestra','admin'))
+  WITH CHECK (get_my_role() IN ('directora','asistente','maestra','admin'));
+DROP POLICY IF EXISTS "attendance_requests_parent_select" ON public.attendance_requests;
+CREATE POLICY "attendance_requests_parent_select" ON public.attendance_requests FOR SELECT
+  USING (EXISTS (SELECT 1 FROM public.students s WHERE s.id = attendance_requests.student_id AND s.parent_id = auth.uid()));
+DROP POLICY IF EXISTS "attendance_requests_parent_insert" ON public.attendance_requests;
+CREATE POLICY "attendance_requests_parent_insert" ON public.attendance_requests FOR INSERT
+  WITH CHECK (EXISTS (SELECT 1 FROM public.students s WHERE s.id = attendance_requests.student_id AND s.parent_id = auth.uid()));
+
 -- ── TASKS ──
 DROP POLICY IF EXISTS "tasks_staff" ON public.tasks;
 CREATE POLICY "tasks_staff" ON public.tasks FOR ALL
