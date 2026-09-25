@@ -1,6 +1,6 @@
 import { logError, runWithRetry } from './db-utils.js';
 import { Helpers } from './helpers.js';
-import { SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js';
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js?v=1.0.456';
 
 // Supabase JS — cargado localmente (js/shared/supabase-js.min.js via script tag en HTML)
 // El UMD expone window.supabase.createClient

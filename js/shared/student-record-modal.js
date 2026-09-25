@@ -2,7 +2,7 @@ import { supabase, createClient, SUPABASE_URL, SUPABASE_ANON_KEY, sendEmail } fr
 import { Helpers } from './helpers.js';
 import { auditLog } from './db-utils.js';
 import { QueryCache } from './query-cache.js';
-import { SCHEDULE_DEFINITIONS, SCHEDULE_IDS } from './config.js';
+import { SCHEDULE_DEFINITIONS, SCHEDULE_IDS } from './config.js?v=1.0.456';
 import { computeAge } from './birthday-utils.js';
 
 const TABS = [

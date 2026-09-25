@@ -15,7 +15,7 @@ self.addEventListener('message', event => {
   if (data && data.type === 'SKIP_WAITING') self.skipWaiting();
 });
 
-const CACHE_VERSION = 'karpus-live-v6';
+const CACHE_VERSION = 'karpus-live-v7';
 const CACHE_NAME    = CACHE_VERSION;
 
 const PRECACHE = [

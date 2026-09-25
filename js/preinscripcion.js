@@ -3,7 +3,7 @@
  * Wizard publico de 7 pasos. Inserta en student_preregistrations
  * y sube documentos comprimidos a Supabase Storage.
  */
-import { SUPABASE_URL, SUPABASE_ANON_KEY, SCHEDULE_DEFINITIONS } from './shared/config.js';
+import { SUPABASE_URL, SUPABASE_ANON_KEY, SCHEDULE_DEFINITIONS } from './shared/config.js?v=1.0.456';
 
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
