@@ -43,8 +43,10 @@
     ]
   }
   </script>
+  <link rel="manifest" href="manifest.json">
   <link rel="icon" href="logo/favicon.ico" sizes="any">
   <link rel="apple-touch-icon" href="logo/apple-touch-icon.png">
+  <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Poppins:wght@700;800;900&display=swap" rel="stylesheet">
@@ -76,7 +78,7 @@
 
     /* ── Hero ── */
     .hero{min-height:100svh;display:flex;align-items:center;position:relative;overflow:hidden;background:#0a0f1e;}
-    .hero-video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0.35;}
+  .hero-video, .video-bg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0.35;}
     .hero-overlay{position:absolute;inset:0;background:linear-gradient(135deg,rgba(10,15,30,0.95) 0%,rgba(10,15,30,0.75) 55%,rgba(10,15,30,0.4) 100%);}
     .hero-content{position:relative;z-index:2;max-width:1280px;margin:0 auto;padding:110px 24px 70px;width:100%;}
 
@@ -299,7 +301,8 @@
 ════════════════════════════════════════════════════════════ -->
 <section class="hero" id="inicio">
   <!-- Video background (muted, autoplay) -->
-  <video class="hero-video" autoplay muted loop playsinline poster="img/karpus.jpg" aria-label="Video de fondo Karpus Kids">
+  <video class="hero-video video-bg" autoplay muted loop playsinline poster="img/karpus.jpg" aria-label="Video de fondo Karpus Kids">
+    <source src="img/14.mp4" type="video/mp4">
     <source src="img/video%20karpus%20kids.mp4" type="video/mp4">
     <track kind="captions" srclang="es" label="Español" default>
   </video>
@@ -1813,6 +1816,30 @@
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', loadCampaigns);
     else loadCampaigns();
   })();
+</script>
+<!-- Service Worker & OneSignal Initialization -->
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/OneSignalSDKWorker.js', { scope: '/' })
+        .then(() => {})
+        .catch(() => {});
+    });
+  }
+
+  window.OneSignalDeferred = window.OneSignalDeferred || [];
+  window.OneSignalDeferred.push(async function(OneSignal) {
+    try {
+      await OneSignal.init({
+        appId: "47ce2d1e-152e-4ea7-9ddc-8e2142992989",
+        safari_web_id: "web.onesignal.auto.63402434-7a0e-473d-9d21-f095166311e9",
+        allowLocalhostAsSecureOrigin: false,
+        serviceWorkerParam: { scope: '/' },
+        serviceWorkerPath: 'OneSignalSDKWorker.js',
+        notifyButton: { enable: false }
+      });
+    } catch (_) {}
+  });
 </script>
 </body>
 </html>
