@@ -42,7 +42,7 @@ export const Api = {
         .select('id, amount, status, due_date, month_paid, evidence_url, proof_url, method')
         .eq('student_id', studentId)
         .in('status', ['pending', 'overdue'])
-        .or(`month_paid.eq.${currentMonth},month_paid.is.null`)
+        .or(`month_paid.gte.${currentMonth},month_paid.is.null`)
         .is('deleted_at', null)
         .order('due_date', { ascending: true })
         .limit(24), 'getPendingPayments'),
