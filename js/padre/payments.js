@@ -175,18 +175,30 @@ export const PaymentsModule = {
       };
       const normalizeMonth = (mp) => {
         if (!mp) return '';
-        const s = mp.toLowerCase().trim();
-        // Already YYYY-MM
+        const s = String(mp).toLowerCase().trim();
         if (/^\d{4}-\d{2}$/.test(s)) return s;
-        // Spanish month name — use current year
-        const num = MONTH_MAP[s];
-        if (num) return `${new Date().getFullYear()}-${num}`;
+        if (s.includes('/')) {
+          const parts = s.split('/');
+          if (parts.length === 3) {
+            const yr = parts[2].length === 4 ? parts[2] : `20${parts[2]}`;
+            const mo = String(parts[1] || parts[0]).padStart(2, '0');
+            return `${yr}-${mo}`;
+          }
+        }
+        for (const [mName, mNum] of Object.entries(MONTH_MAP)) {
+          if (s.includes(mName)) {
+            const yrMatch = s.match(/\d{4}/);
+            const yr = yrMatch ? yrMatch[0] : new Date().getFullYear();
+            return `${yr}-${mNum}`;
+          }
+        }
         return s;
       };
 
       const statusPriority = { paid: 4, review: 3, overdue: 2, pending: 1 };
       const monthMap = new Map();
       for (const p of data || []) {
+        if (p.deleted_at) continue;
         const key = normalizeMonth(p.month_paid);
         const ex  = monthMap.get(key);
         if (!ex) { monthMap.set(key, p); continue; }
@@ -199,16 +211,17 @@ export const PaymentsModule = {
         }
       }
       
-      // Mostrar siempre: pagados + vencidos + en revisión
-      // Ocultar: pendientes con due_date en el futuro (el padre no los ve hasta que vencen)
+      // Mostrar siempre: pagados + en revisión + pendientes/vencidos válidos
       const todayMidnight = new Date(); todayMidnight.setHours(0, 0, 0, 0);
       let filteredPayments = Array.from(monthMap.values()).filter(p => {
+        if (p.deleted_at) return false;
         const status = (p.status || '').toLowerCase();
-        // Siempre mostrar pagados, en revisión, vencidos
-        if (['paid', 'review', 'overdue'].includes(status)) return true;
-        // Para pendientes: solo mostrar si due_date ya llegó o no tiene fecha
-        if (!p.due_date) return true;
-        return new Date(p.due_date + 'T00:00:00') <= todayMidnight;
+        if (status === 'paid' || status === 'review') return true;
+        if (status === 'overdue' || status === 'pending') {
+          if (!p.due_date) return true;
+          return new Date(p.due_date + 'T00:00:00') <= todayMidnight;
+        }
+        return true;
       });
       
       this._payments = filteredPayments
