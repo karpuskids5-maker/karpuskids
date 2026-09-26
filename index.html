@@ -45,6 +45,8 @@
   </script>
   <link rel="icon" href="logo/favicon.ico" sizes="any">
   <link rel="apple-touch-icon" href="logo/apple-touch-icon.png">
+  <link rel="manifest" href="manifest.json">
+  <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Poppins:wght@700;800;900&display=swap" rel="stylesheet">
@@ -60,12 +62,14 @@
     a{text-decoration:none;}
 
     /* ── Brand colors ── */
-    .kk .k1{color:#FF9800}.kk .k2{color:#2196F3}.kk .k3{color:#E91E63}
-    .kk .k4{color:#4CAF50}.kk .k5{color:#FF9800}.kk .k6{color:#2196F3}
-    .kk .k7{color:#4CAF50}.kk .k8{color:#E91E63}.kk .k9{color:#2196F3}.kk .k10{color:#FF9800}
+    .kk .k1, .karpus-kids-colored .k1{color:#FF9800}.kk .k2, .karpus-kids-colored .k2{color:#2196F3}.kk .k3, .karpus-kids-colored .k3{color:#E91E63}
+    .kk .k4, .karpus-kids-colored .k4{color:#4CAF50}.kk .k5, .karpus-kids-colored .k5{color:#FF9800}.kk .k6, .karpus-kids-colored .k6{color:#2196F3}
+    .kk .k7, .karpus-kids-colored .k7{color:#4CAF50}.kk .k8, .karpus-kids-colored .k8{color:#E91E63}.kk .k9, .karpus-kids-colored .k9{color:#2196F3}.kk .k10, .karpus-kids-colored .k10{color:#FF9800}
 
     /* ── Nav ── */
-    .site-header{position:fixed;top:0;left:0;width:100%;z-index:200;transition:all .35s;}
+    .site-header{position:fixed;top:0;left:0;width:100%;z-index:110;transition:all .35s;}
+    #mobMenuOverlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:90;display:none;backdrop-filter:blur(4px);transition:opacity .3s;}
+    #mobMenu{position:fixed;top:70px;left:0;width:100%;max-height:calc(100vh - 70px);overflow-y:auto;z-index:100;}
     .site-header.scrolled{background:rgba(255,255,255,0.97);box-shadow:0 2px 24px rgba(0,0,0,0.09);backdrop-filter:blur(14px);}
     .nav-link{font-weight:700;font-size:14px;color:rgba(255,255,255,0.9);padding:6px 2px;position:relative;transition:color .2s;}
     .nav-link::after{content:'';position:absolute;bottom:-2px;left:0;width:0;height:2px;background:#FF9800;border-radius:2px;transition:width .25s;}
@@ -238,6 +242,9 @@
 </head>
 <body>
 
+<!-- Mobile Menu Overlay -->
+<div id="mobMenuOverlay"></div>
+
 <!-- ════════════════════════════════════════════════════════════
      NAVBAR
 ════════════════════════════════════════════════════════════ -->
@@ -299,7 +306,8 @@
 ════════════════════════════════════════════════════════════ -->
 <section class="hero" id="inicio">
   <!-- Video background (muted, autoplay) -->
-  <video class="hero-video" autoplay muted loop playsinline poster="img/karpus.jpg" aria-label="Video de fondo Karpus Kids">
+  <video class="hero-video video-bg" autoplay muted loop playsinline poster="img/karpus.jpg" aria-label="Video de fondo Karpus Kids" style="object-fit:cover;">
+    <source src="img/14.mp4" type="video/mp4">
     <source src="img/video%20karpus%20kids.mp4" type="video/mp4">
     <track kind="captions" srclang="es" label="Español" default>
   </video>
@@ -1304,18 +1312,41 @@
   window.addEventListener('scroll', () => hdr.classList.toggle('scrolled', scrollY > 40), { passive: true });
 
   // ── Mobile menu ───────────────────────────────────────────────────────────
-  const mobBtn  = document.getElementById('mobBtn');
-  const mobMenu = document.getElementById('mobMenu');
-  const mobIcon = document.getElementById('mobIcon');
-  mobBtn.addEventListener('click', () => {
-    const open = mobMenu.style.display === 'block';
-    mobMenu.style.display = open ? 'none' : 'block';
-    mobIcon.className = open ? 'bi bi-list' : 'bi bi-x-lg';
-  });
-  mobMenu.querySelectorAll('a').forEach(a => a.addEventListener('click', () => {
+  const mobBtn     = document.getElementById('mobBtn');
+  const mobMenu    = document.getElementById('mobMenu');
+  const mobIcon    = document.getElementById('mobIcon');
+  const mobOverlay = document.getElementById('mobMenuOverlay');
+
+  function closeMobileMenu() {
     mobMenu.style.display = 'none';
-    mobIcon.className = 'bi bi-list';
-  }));
+    if (mobOverlay) mobOverlay.style.display = 'none';
+    if (mobIcon) mobIcon.className = 'bi bi-list';
+  }
+
+  function openMobileMenu() {
+    mobMenu.style.display = 'block';
+    if (mobOverlay) mobOverlay.style.display = 'block';
+    if (mobIcon) mobIcon.className = 'bi bi-x-lg';
+  }
+
+  if (mobBtn) {
+    mobBtn.addEventListener('click', () => {
+      const isOpen = mobMenu.style.display === 'block';
+      if (isOpen) closeMobileMenu(); else openMobileMenu();
+    });
+  }
+
+  if (mobOverlay) {
+    mobOverlay.addEventListener('click', closeMobileMenu);
+  }
+
+  mobMenu.querySelectorAll('a').forEach(a => a.addEventListener('click', closeMobileMenu));
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && mobMenu.style.display === 'block') {
+      closeMobileMenu();
+    }
+  });
 
   // ── Lightbox ──────────────────────────────────────────────────────────────
   function openLb(src) {
@@ -1399,13 +1430,23 @@
           db: { schema: 'public' }
         });
 
-        const { data, error } = await client
+        let res = await client
           .from('donation_campaigns')
           .select('id, title, description, target_amount, raised_amount, cover_image_url, images, is_active, end_date')
           .eq('is_active', true)
           .order('created_at', { ascending: false });
 
-        if (error) throw error;
+        if (res.error) {
+          // Fallback en caso de que la columna 'images' no exista en el esquema
+          res = await client
+            .from('donation_campaigns')
+            .select('id, title, description, target_amount, raised_amount, cover_image_url, is_active, end_date')
+            .eq('is_active', true)
+            .order('created_at', { ascending: false });
+        }
+
+        if (res.error) throw res.error;
+        const data = res.data;
         window.kkCampaigns = data || [];
 
         // Opciones del formulario
@@ -1813,6 +1854,26 @@
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', loadCampaigns);
     else loadCampaigns();
   })();
+</script>
+
+<!-- OneSignal & Service Worker Registration -->
+<script>
+  window.OneSignalDeferred = window.OneSignalDeferred || [];
+  OneSignalDeferred.push(async function(OneSignal) {
+    await OneSignal.init({
+      appId: "47ce2d1e-152e-4ea7-9ddc-8e2142992989",
+      safari_web_id: "web.onesignal.auto.63402434-7a0e-473d-9d21-f095166311e9",
+      notifyButton: { enable: false }
+    });
+  });
+
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/OneSignalSDKWorker.js', { scope: '/' })
+        .then(() => {})
+        .catch(() => {});
+    });
+  }
 </script>
 </body>
 </html>
