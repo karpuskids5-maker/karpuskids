@@ -222,30 +222,6 @@ export const MaestraApi = {
   },
 
   /**
-   * 📤 Upload con Cola Secuencial
-   * Evita saturar la red celular subiendo una imagen a la vez
-   */
-  async uploadMedia(file, bucket = 'posts') {
-    if (!this._uploadQueue) this._uploadQueue = Promise.resolve();
-
-    return this._uploadQueue = this._uploadQueue.then(async () => {
-      const { ImageLoader } = await import('/js/shared/image-loader.js');
-      const compressed = await ImageLoader.compress(file);
-      
-      const fileName = `${Date.now()}_${crypto.randomUUID()}.webp`;
-      const path = `${fileName}`;
-
-      const { data, error } = await supabase.storage
-        .from(bucket)
-        .upload(path, compressed);
-
-      if (error) throw error;
-      const { data: { publicUrl } } = supabase.storage.from(bucket).getPublicUrl(path);
-      return publicUrl;
-    });
-  },
-
-  /**
    * Crear tarea — vinculada al período activo del aula
    */
   async createTask(payload) {

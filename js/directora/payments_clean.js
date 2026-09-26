@@ -105,6 +105,12 @@ export const PaymentsModule = {
       const today  = currentDate.getDate();
       const genDay = this.settings.generation_day || 25; // Día de generación
 
+      // Piso del periodo 2026-2027. Debe coincidir con el literal de
+      // payments_month_floor_check y con public.school_year_floor_month()
+      // (migracion 10, bloque N). Sin este tope, el 1-24 de agosto la vista
+      // caía a julio y listaba meses que no se pueden facturar.
+      const PAYMENT_FLOOR_MONTH = '2026-08';
+
       // El mes actual solo es visible si hoy es >= 25.
       const currentYear  = currentDate.getFullYear();
       const currentMonth = currentDate.getMonth() + 1; // 1-12
@@ -117,6 +123,7 @@ export const PaymentsModule = {
         const prevY = currentMonth === 1 ? currentYear - 1 : currentYear;
         maxVisibleMonthKey = `${prevY}-${String(prevM).padStart(2, '0')}`;
       }
+      if (maxVisibleMonthKey < PAYMENT_FLOOR_MONTH) maxVisibleMonthKey = PAYMENT_FLOOR_MONTH;
 
       const monthKey = (yv && mv && mv !== 'all') ? `${yv}-${String(mv).padStart(2,'0')}` : maxVisibleMonthKey;
 
@@ -126,8 +133,13 @@ export const PaymentsModule = {
       const build = (s) => {
         let q = supabase.from('v_payments_with_mora').select(s);
         if (mv === 'all' || !mv) {
-          // Todos los meses del año seleccionado
-          q = q.gte('month_paid', (yv || currentYear) + '-01')
+          // Todos los meses del año seleccionado, acotados al piso del periodo:
+          // sin esto el rango '-01' .. maxVisibleMonthKey incluía enero a julio
+          // de 2026, meses fuera del año escolar 2026-2027.
+          const rangeStart = ((yv || currentYear) + '-01') < PAYMENT_FLOOR_MONTH
+            ? PAYMENT_FLOOR_MONTH
+            : (yv || currentYear) + '-01';
+          q = q.gte('month_paid', rangeStart)
                .lte('month_paid', maxVisibleMonthKey);
           if (sf && sf !== 'all') q = q.eq('status', sf);
         } else if (sf === 'all') {
@@ -207,10 +219,13 @@ export const PaymentsModule = {
 
   _st(p) {
     const s = (p.status || '').toLowerCase();
-    if (s === 'paid') return 'paid';
+    // Alias tolerados por normalizeStatus (approved/pagado/confirmado).
+    // La tabla tiene CHECK de vocabulario, pero por vistas o filas legacy
+    // un pago ya aprobado se marcaba como pendiente y podia ser sobrescrito.
+    if (['paid', 'approved', 'pagado', 'confirmado'].includes(s)) return 'paid';
     if (s === 'review') return 'review';
     if (s === 'overdue') return 'overdue';
-    if (s === 'rejected') return 'rechazado';
+    if (s === 'rejected' || s === 'rechazado') return 'rejected';
     // Si tiene comprobante subido → mostrar como en revisión aunque el status sea pending
     if (p.evidence_url) return 'review';
     // Si el due_date ya pasó y sigue pending → mostrar como overdue en UI
@@ -224,10 +239,11 @@ export const PaymentsModule = {
   _row(p) {
     const sk = this._st(p);
     const sm = {
-      paid:    { l: 'Aprobado',    c: 'bg-emerald-100 text-emerald-700', i: 'check-circle' },
-      pending: { l: 'Pendiente',   c: 'bg-amber-100 text-amber-700',     i: 'clock' },
-      review:  { l: 'En Revision', c: 'bg-blue-100 text-blue-700',       i: 'file-search' },
-      overdue: { l: 'Vencido',     c: 'bg-rose-100 text-rose-700',       i: 'alert-triangle' }
+      paid:     { l: 'Aprobado',    c: 'bg-emerald-100 text-emerald-700', i: 'check-circle' },
+      pending:  { l: 'Pendiente',   c: 'bg-amber-100 text-amber-700',     i: 'clock' },
+      review:   { l: 'En Revision', c: 'bg-blue-100 text-blue-700',       i: 'file-search' },
+      overdue:  { l: 'Vencido',     c: 'bg-rose-100 text-rose-700',       i: 'alert-triangle' },
+      rejected: { l: 'Rechazado',   c: 'bg-rose-100 text-rose-700',       i: 'x-circle' }
     };
     const st  = sm[sk] || { l: p.status, c: 'bg-slate-100 text-slate-700', i: 'help-circle' };
     const stu = { name: p.student_name || 'Desconocido', classrooms: { name: p.classroom_name || '-' } };
@@ -679,20 +695,25 @@ export const PaymentsModule = {
 
     UIHelpers.setLoading(true, '#modalPayment');
     try {
-      // Buscar pago existente por YYYY-MM y también por nombre de mes (legacy)
+      // Buscar pago existente por YYYY-MM y también por nombre de mes (legacy).
+      // Filtra por concepto: un mes puede tener Mensualidad + Dia Prolongado +
+      // Materiales. Antestomaba la primera fila y, si estaba pagada, bloqueaba
+      // el registro de los demas conceptos; si estaba pendiente, la
+      // sobreescribia cambiando su concepto.
       const mesNombre = MES[parseInt(mp.split('-')[1], 10) - 1];
       const { data: existingList } = await supabase
         .from('payments')
-        .select('id, status, month_paid')
+        .select('id, status, month_paid, concept')
         .eq('student_id', sid)
+        .eq('deleted_at', null)
         .or(`month_paid.eq.${mp},month_paid.eq.${mesNombre}`)
-        .limit(5);
+        .limit(20);
 
-      const existing = existingList?.[0] || null;
+      const existing = (existingList || []).find(p => (p.concept || 'Mensualidad') === con) || null;
       let pay;
 
       if (existing) {
-        if (existing.status === 'paid') {
+        if (this._st(existing) === 'paid') {
           Helpers.toast('Este estudiante ya tiene un pago aprobado para este mes', 'warning');
           return;
         }
@@ -721,8 +742,11 @@ export const PaymentsModule = {
       }
 
       // Si está pagado, activar estudiante
+      // students no tiene columna `status`: escribirla hacia fallar TODO el
+      // update (no solo ese campo) y el estudiante quedaba inactivo sin aviso.
+      // El estado del alumno vive en `is_active`.
       if (sta === 'paid') {
-        await supabase.from('students').update({ is_active: true, status: 'activo' }).eq('id', sid);
+        await supabase.from('students').update({ is_active: true }).eq('id', sid);
       }
 
       Helpers.toast('Pago registrado correctamente', 'success');
@@ -992,9 +1016,11 @@ export const PaymentsModule = {
       }
 
       // Activar estudiante al aprobar pago
+      // Solo `is_active`: students.status no existe y su presence hacia fallar
+      // el update completo, dejando al alumno sin activar.
       if (pay?.student_id) {
         await supabase.from('students')
-          .update({ is_active: true, status: 'activo' })
+          .update({ is_active: true })
           .eq('id', pay.student_id);
       }
 

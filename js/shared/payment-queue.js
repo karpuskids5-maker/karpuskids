@@ -107,8 +107,6 @@ export const PaymentQueue = {
           </button>` : ''}
         </div>` : ''}
 
-        ${p.excuse_text ? `` : ''}
-
         <div id="ocr-result-${p.id}" class="hidden px-4 py-3 bg-blue-50 border-b border-blue-100 text-xs font-mono text-blue-800"></div>
         <div id="dup-alert-${p.id}" class="hidden px-4 py-3 bg-rose-50 border-b border-rose-200 text-xs font-bold text-rose-700 flex items-center gap-2">
           <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
@@ -213,28 +211,6 @@ export const PaymentQueue = {
       Helpers.toast('Error al rechazar: ' + e.message, 'error');
       if (card) { card.style.opacity = ''; card.style.pointerEvents = ''; }
     }
-  },
-
-  /** Aprobar excusa del padre */
-  async approveExcuse(id) {
-    try {
-      await PaymentService.reviewExcuse(id, true);
-      Helpers.toast('✅ Excusa aprobada. Mora suspendida.', 'success');
-      const container = document.getElementById('payment-queue-container');
-      if (container) await this._render(container, {});
-    } catch (e) { Helpers.toast('Error: ' + e.message, 'error'); }
-  },
-
-  /** Rechazar excusa del padre */
-  async rejectExcuse(id) {
-    const note = prompt('Motivo del rechazo (se enviará al padre):') ?? null;
-    if (note === null) return;
-    try {
-      await PaymentService.reviewExcuse(id, false, note);
-      Helpers.toast('Excusa rechazada. Padre notificado.', 'success');
-      const container = document.getElementById('payment-queue-container');
-      if (container) await this._render(container, {});
-    } catch (e) { Helpers.toast('Error: ' + e.message, 'error'); }
   },
 
   /** Toast cuando llega un nuevo voucher en tiempo real */

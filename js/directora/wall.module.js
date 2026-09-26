@@ -1,13 +1,19 @@
 /**
  * 📰 WALL MODULE — Directora / Maestra
  * Extiende SharedWallModule con modal de publicación mejorado:
- * compresión WebP, validación 2min, álbum multi-foto, grabación directa,
+ * compresión WebP, validación 30s/25MB/9:16, álbum multi-foto, grabación directa,
  * programación, borradores, preview, etiquetado de alumnos.
  */
 import { supabase, sendPush, emitEvent } from '../shared/supabase.js';
 import { Helpers } from '../shared/helpers.js';
 import { showNotifyFeedback } from '../shared/notify-feedback.js';
-import { WallModule as SharedWallModule, generateVideoThumbnail, generateVideoThumbnailsMulti } from '../shared/wall.js';
+import {
+  WallModule as SharedWallModule,
+  generateVideoThumbnail,
+  generateVideoThumbnailsMulti,
+  WALL_LIMITS,
+  validateWallVideo
+} from '../shared/wall.js';
 
 export const WallModule = {
   ...SharedWallModule,
@@ -71,12 +77,12 @@ export const WallModule = {
             </label>
           </div>
           <input type="file" id="postMediaFile" class="hidden" accept="image/*,video/*" multiple>
-          <p class="text-[10px] text-slate-400">Imágenes (máx 5 para álbum) o 1 video de hasta 2min / 50MB.</p>
+          <p class="text-[10px] text-slate-400">Imágenes (máx ${WALL_LIMITS.maxAlbumPhotos} para álbum) o 1 video vertical 9:16 de hasta ${WALL_LIMITS.maxVideoDurationSec}s / ${WALL_LIMITS.maxVideoSizeMB}MB.</p>
 
           <!-- Botón grabadora -->
           <button onclick="WallModule._openRecorderFromModal()" type="button"
             class="flex items-center gap-2 text-xs font-black text-red-500 hover:text-red-600 bg-red-50 hover:bg-red-100 px-4 py-2 rounded-2xl transition-all">
-            <i data-lucide="video" class="w-4 h-4"></i> Grabar video (2min)
+            <i data-lucide="video" class="w-4 h-4"></i> Grabar video (${WALL_LIMITS.maxVideoDurationSec}s)
           </button>
         </div>
 
@@ -165,22 +171,24 @@ export const WallModule = {
     if (isVideo) {
       if (files.length > 1) { Helpers.toast('Solo 1 video por publicación', 'warning'); return; }
       const file = files[0];
-      const maxBytes = 50 * 1024 * 1024;
-      if (file.size > maxBytes) { Helpers.toast('Video demasiado grande (máx 50MB)', 'error'); return; }
 
-      const { ok, duration } = await SharedWallModule.validateVideoDuration
-        ? SharedWallModule.validateVideoDuration(file)
-        : this._validateDuration(file);
-
-      if (!ok) {
-        Helpers.toast(`El video excede 2min (${duration.toFixed(1)}s). Recórtalo.`, 'warning');
-        this.openVideoTrimmer(file, () => {
-          this._recordedBlob = null;
-          this._albumFiles = [file];
-          this._renderMediaPreviews([file]);
-        });
+      // Límites y validación 9:16 vienen de js/shared/wall.js: una sola fuente
+      // de verdad para los tres paneles. Antes este módulo repetía 50MB y 2min
+      // y el motor compartido aplicaba otros.
+      const check = await validateWallVideo(file);
+      if (!check.ok) {
+        if (check.reason === 'duration') {
+          this.openVideoTrimmer(file, () => {
+            this._recordedBlob = null;
+            this._albumFiles = [file];
+            this._renderMediaPreviews([file]);
+          });
+          return;
+        }
+        Helpers.toast(check.message, 'error');
         return;
       }
+
       this._albumFiles = [file];
       this._recordedBlob = null;
       this._renderMediaPreviews([file]);
@@ -238,16 +246,6 @@ export const WallModule = {
 
     if (files.length < 5) area.appendChild(addBtn);
     if (window.lucide) lucide.createIcons();
-  },
-
-  _validateDuration(file) {
-    return new Promise(resolve => {
-      const v = document.createElement('video');
-      const url = URL.createObjectURL(file);
-      v.onloadedmetadata = () => { URL.revokeObjectURL(url); resolve({ ok: v.duration <= 120, duration: v.duration }); };
-      v.onerror = () => { URL.revokeObjectURL(url); resolve({ ok: false, duration: -1 }); };
-      v.src = url;
-    });
   },
 
   // ── Grabadora desde modal ─────────────────────────────────────────────────────

@@ -49,13 +49,22 @@ const _uuid = () => {
 // ─── Constantes ───────────────────────────────────────────────────────────────
 const REACTION_EMOJIS = ['❤️', '👏', '😊', '🎉', '👍', '😍'];
 const _SPAM_COOLDOWN_MS = 10_000;
-const MAX_VIDEO_DURATION = 120;      // segundos máximo (2 minutos)
-const MAX_VIDEO_SIZE_MB = 50;        // MB
-const MAX_IMAGE_SIZE_MB = 5;         // MB
-const MAX_IMAGE_WIDTH = 1920;        // px
-const SIGNED_URL_EXPIRY_SEC = 3600;  // 1 hora
+// Límites del Muro Escolar. Fuente única: los tres flujos (directora, maestra y
+// asistente) deben leer de aquí para no divergir.
+// Ver propuesta.md sección 18 (9:16, 30 s, 25 MB) y sección 24.
+const MAX_VIDEO_DURATION = 30;         // segundos máximo (propuesta.md L117/L461)
+const MAX_VIDEO_SIZE_MB = 25;          // MB (propuesta.md L495)
+const MAX_IMAGE_SIZE_MB = 5;           // MB
+const MAX_IMAGE_WIDTH = 1920;          // px
+const SIGNED_URL_EXPIRY_SEC = 3600;    // 1 hora
 const MAX_PINNED_POSTS = 2;
 const MAX_ALBUM_PHOTOS = 5;
+
+// Relación de aspecto vertical del Muro (propuesta.md L110).
+const TARGET_ASPECT_RATIO = 9 / 16;    // 0.5625
+const ASPECT_TOLERANCE = 0.04;         // margen: videos de teléfono caen en 0.46-0.60
+const MIN_ASPECT_RATIO = TARGET_ASPECT_RATIO - ASPECT_TOLERANCE;
+const MAX_ASPECT_RATIO = TARGET_ASPECT_RATIO + ASPECT_TOLERANCE;
 
 // ─── Compresión WebP cliente ────────────────────────────────────────────────
 const compressImageToWebP = (file, maxWidth = MAX_IMAGE_WIDTH, quality = 0.80) => {
@@ -186,6 +195,37 @@ const generateVideoThumbnailsMulti = (file, count = 5) => {
   });
 };
 
+/**
+ * Lee duración y dimensiones de un video.
+ * Devuelve { ok, duration, width, height, ratio, tooLong, wrongAspect, error }.
+ * Never rejects: un video que el navegador no puede leer devuelve error y el
+ * llamador decide si bloquear.
+ */
+const probeVideo = (file) => {
+  return new Promise((resolve) => {
+    const video = document.createElement('video');
+    const url = URL.createObjectURL(file);
+    const done = (r) => { URL.revokeObjectURL(url); resolve(r); };
+    video.preload = 'metadata';
+    video.onloadedmetadata = () => {
+      const w = video.videoWidth || 0;
+      const h = video.videoHeight || 0;
+      const ratio = h > 0 ? w / h : 0;
+      done({
+        ok: true,
+        duration: video.duration,
+        width: w,
+        height: h,
+        ratio,
+        tooLong: video.duration > MAX_VIDEO_DURATION,
+        wrongAspect: h > 0 && (ratio < MIN_ASPECT_RATIO || ratio > MAX_ASPECT_RATIO)
+      });
+    };
+    video.onerror = () => done({ ok: false, error: 'No se pudo leer el video' });
+    video.src = url;
+  });
+};
+
 /** Valida duración de video (retorna promesa con {ok, duration}) */
 const validateVideoDuration = (file) => {
   return new Promise((resolve) => {
@@ -198,6 +238,29 @@ const validateVideoDuration = (file) => {
     video.onerror = () => { URL.revokeObjectURL(url); resolve({ ok: false, duration: -1 }); };
     video.src = url;
   });
+};
+
+/**
+ * Valida un video contra los límites del Muro: 25 MB, 30 s y 9:16 vertical.
+ * Se llama antes de subir, en los tres paneles.
+ */
+const validateWallVideo = async (file) => {
+  if (file.size > MAX_VIDEO_SIZE_MB * 1024 * 1024) {
+    return { ok: false, reason: 'size', message: `El video supera los ${MAX_VIDEO_SIZE_MB}MB permitidos` };
+  }
+  const info = await probeVideo(file);
+  if (!info.ok) {
+    return { ok: false, reason: 'unreadable', message: 'No se pudo leer el video. Prueba con otro archivo.' };
+  }
+  if (info.tooLong) {
+    return { ok: false, reason: 'duration', ...info,
+      message: `El video excede ${MAX_VIDEO_DURATION}s (${info.duration.toFixed(1)}s). Recórtalo.` };
+  }
+  if (info.wrongAspect) {
+    return { ok: false, reason: 'aspect', ...info,
+      message: `El Muro es vertical 9:16. Este video es ${info.width}×${info.height}. Grábalo con el teléfono en vertical.` };
+  }
+  return { ok: true, ...info };
 };
 
 // ─── Upload con reintentos ────────────────────────────────────────────────────
@@ -2135,7 +2198,7 @@ const WallModule = {
           <div class="w-10 h-10 bg-orange-100 rounded-2xl flex items-center justify-center text-xl">✂️</div>
           <div>
             <h3 class="font-black text-slate-800">Recortar Video</h3>
-            <p class="text-xs text-slate-500">El video excede ${MAX_VIDEO_DURATION / 60} min. Elige el segmento a publicar.</p>
+            <p class="text-xs text-slate-500">El video excede ${MAX_VIDEO_DURATION}s. Elige el segmento a publicar.</p>
           </div>
         </div>
         <video id="trimmer-preview" src="${_sanitizeHTML(url)}" controls muted class="w-full rounded-2xl max-h-48 bg-black" preload="metadata"></video>
@@ -2192,10 +2255,23 @@ const WallModule = {
     modal?.remove();
   },
 
-  // ── Grabador Directo de Video 2min ────────────────────────────────────────────
+  // ── Grabador Directo de Video (30s, vertical 9:16) ───────────────────────────
   async openVideoRecorder(onRecorded) {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: true });
+      // El Muro es vertical 9:16. Con la cámara trasera ('environment') el
+      // teléfono entrega 16:9 horizontal y el video se rechazaba al validarlo.
+      // La frontal con el dispositivo en vertical es la que produce 9:16.
+      const constraints = {
+        video: { facingMode: 'user', aspectRatio: { ideal: TARGET_ASPECT_RATIO }, width: { ideal: 720 }, height: { ideal: 1280 } },
+        audio: true
+      };
+      let stream = null;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia(constraints);
+      } catch (_) {
+        // Navegador que no acepta aspectRatio: se reintenta sin el hint.
+        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: true });
+      }
       this._recordStream = stream;
     } catch (_) {
       Helpers.toast('No se pudo acceder a la cámara', 'error');
@@ -2296,20 +2372,24 @@ const WallModule = {
       // 1) Validar tamaño
       if (file.size > MAX_VIDEO_SIZE_MB * 1024 * 1024) throw new Error(`El video supera los ${MAX_VIDEO_SIZE_MB}MB permitidos`);
 
-      // 2) Validar duración (solo para File, no para Blob grabado en tiempo real)
+      // 2) Validar duración y relación de aspecto 9:16 (solo para File; un Blob
+      //    grabado en tiempo real ya sale de la cámara en vertical).
       if (file instanceof File) {
-        const { ok } = await validateVideoDuration(file);
-        if (!ok) {
-          // Abrir trimmer como alternativa
-          return new Promise((resolve, reject) => {
-            this.openVideoTrimmer(file, async ({ start, end, originalUrl }) => {
-              try {
-                const result = await this._uploadVideoFile(file, onProgress);
-                resolve(result);
-              } catch (e) { reject(e); }
+        const check = await validateWallVideo(file);
+        if (!check.ok) {
+          if (check.reason === 'duration') {
+            // Abrir trimmer como alternativa
+            return new Promise((resolve, reject) => {
+              this.openVideoTrimmer(file, async ({ start, end, originalUrl }) => {
+                try {
+                  const result = await this._uploadVideoFile(file, onProgress);
+                  resolve(result);
+                } catch (e) { reject(e); }
+              });
+              reject(new Error('TRIM_REQUESTED'));
             });
-            reject(new Error('TRIM_REQUESTED'));
-          });
+          }
+          throw new Error(check.message);
         }
       }
 
@@ -2410,4 +2490,25 @@ if (typeof window !== 'undefined') {
   window.openLightbox = (url, type) => WallModule.openLightbox(url, type);
 }
 
-export { WallModule, generateVideoThumbnail, generateVideoThumbnailsMulti };
+// Los límites y el validador se exportan para que los tres paneles del Muro
+// (directora, maestra, asistente) apliquen exactamente las mismas reglas en vez
+// de repetir literales que luego divergen.
+const WALL_LIMITS = Object.freeze({
+  maxVideoDurationSec: MAX_VIDEO_DURATION,
+  maxVideoSizeMB: MAX_VIDEO_SIZE_MB,
+  maxImageSizeMB: MAX_IMAGE_SIZE_MB,
+  maxAlbumPhotos: MAX_ALBUM_PHOTOS,
+  aspectRatio: TARGET_ASPECT_RATIO,
+  minAspectRatio: MIN_ASPECT_RATIO,
+  maxAspectRatio: MAX_ASPECT_RATIO
+});
+
+export {
+  WallModule,
+  generateVideoThumbnail,
+  generateVideoThumbnailsMulti,
+  WALL_LIMITS,
+  validateWallVideo,
+  validateVideoDuration,
+  probeVideo
+};

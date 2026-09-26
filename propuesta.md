@@ -837,4 +837,70 @@ De esta manera, el Muro Escolar puede convertirse en una experiencia audiovisual
 
 **Karpus Kids — Muro Escolar v4.0**
 **Experiencia de microvideo inspirada en Instagram, adaptada al entorno educativo.**
-APLICA MI 
+
+---
+
+# 33. Brechas seguras aplicadas
+
+Esta sección documenta lo que se implementó de esta propuesta, por decisión de
+aplicar únicamente los puntos de bajo riesgo y alto impacto.
+
+## 33.1 Límites del video (secciones 18 y 24)
+
+Los tres paneles del Muro comparten ahora una **fuente única de límites** en
+`js/shared/wall.js`, exportada como `WALL_LIMITS`:
+
+| Límite | Antes | Ahora | Propuesta |
+|--------|-------|-------|-----------|
+| Duración máxima | 120 s (2 min) | **30 s** | L117 / L461 |
+| Tamaño máximo | 50 MB | **25 MB** | L495 |
+| Relación de aspecto | sin validar | **9:16 vertical** | L110 |
+
+Archivos afectados:
+
+* `js/shared/wall.js` — constantes, `probeVideo()`, `validateWallVideo()`,
+  validación integrada en `uploadMedia()`, y el grabador directo.
+* `js/directora/wall.module.js` — el módulo tenía sus propios 50 MB / 2 min y
+  un `_validateDuration()` duplicado. Ahora consume `validateWallVideo()` y
+  `WALL_LIMITS`; se eliminó el duplicado.
+* `js/maestra/main.js` y `js/asistente/main.js` — llegan por el mismo
+  `WallModule` de `js/shared/wall.js`, así que heredan los límites sin cambios.
+* `js/maestra/api.js` — se eliminó un `uploadMedia()` sin uso que subía al
+  bucket `posts` saltándose toda validación.
+
+## 33.2 Validación 9:16
+
+`validateWallVideo()` lee duración y dimensiones con `probeVideo()` antes de
+subir y rechaza con mensaje explícito:
+
+```text
+El Muro es vertical 9:16. Este video es 1920×1080. Grábalo con el teléfono en vertical.
+```
+
+La tolerancia es de ±0.04 sobre 0.5625, para aceptar los ratios reales de los
+teléfonos (típicamente 0.46–0.60) sin abrir la puerta a material horizontal.
+
+Si el video excede los 30 s se abre el **trimmer** (comportamiento preexistente)
+en vez de rechazar; el error de formato o tamaño sí bloquea.
+
+## 33.3 Grabador directo
+
+`openVideoRecorder()` pedía `facingMode: 'environment'` (cámara trasera), que
+entrega 16:9 horizontal y por tanto era incompatible con un Muro vertical. Ahora
+pide la frontal con `aspectRatio: { ideal: 9/16 }` y reintenta sin el hint si el
+navegador lo rechaza.
+
+## 33.4 Bucket y límite en base de datos
+
+La migración `20260920121000_10_correcciones_auditoria.sql` (bloque J) crea el
+bucket `posts` con límite de 25 MB, de modo que el límite se aplica también del
+lado del servidor y no solo en el cliente.
+
+## 33.5 Lo que queda pendiente
+
+Corresponde a las fases 2 y 3 de la sección 31 y **no** se implementó:
+
+* Compresión de video del lado del cliente y MP4 H.264.
+* HTTP Range, CDN, caché y precarga inteligente.
+* HLS con bitrate adaptativo (1080p/720p/480p).
+* Marca de agua institucional (sección 25).

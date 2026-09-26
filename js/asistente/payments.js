@@ -1,21 +1,17 @@
 import { supabase } from '../shared/supabase.js';
 import { Helpers } from '../shared/helpers.js';
 import { AppState } from './state.js';
-import { calcMora } from '../shared/payment-service.js';
+import { calcMora, normalizeStatus } from '../shared/payment-service.js';
 import { QueryCache } from '../shared/query-cache.js';
 
 const MONTH_NAMES_ES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
 const MONTH_LABELS   = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 const FILTER_KEY = 'asistente_pagos_filters_v1';
 
+// Delegar en normalizeStatus para no duplicar (y desincronizar) los alias de estado:
+// paid/approved/pagado/confirmado → 'paid', rejected/rechazado → 'rejected', etc.
 function calcStatus(p) {
-  const s = p?.status?.toLowerCase?.().trim();
-  if (s === 'paid') return 'paid';
-  if (s === 'review') return 'review';
-  if (s === 'overdue') return 'overdue';
-  if (s === 'rejected') return 'rejected';
-  if (p?.evidence_url) return 'review';
-  return 'pending';
+  return normalizeStatus(p);
 }
 
 export const PaymentsModule = {
@@ -421,8 +417,9 @@ export const PaymentsModule = {
     const nowTs = new Date().setHours(0, 0, 0, 0);
     let income = 0, pending = 0, overdue = 0, review = 0;
     for (const p of payments) {
-      if (p.status === 'paid') { income += Number(p.amount || 0); continue; }
-      if (p.status === 'review') { review++; continue; }
+      const sk = calcStatus(p);
+      if (sk === 'paid') { income += Number(p.amount || 0); continue; }
+      if (sk === 'review') { review++; continue; }
       if (p.due_date) {
         const ddTs = new Date(p.due_date + 'T00:00:00').getTime();
         if (nowTs > ddTs) { overdue++; continue; }
@@ -545,15 +542,27 @@ export const PaymentsModule = {
       const orFilter = mesN
         ? `month_paid.eq."${monthPaid}",month_paid.eq.${mesN}`
         : `month_paid.eq."${monthPaid}"`;
-      const { data: exList } = await supabase.from('payments').select('id, status').eq('student_id', studentId).or(orFilter).limit(5);
-      const ex = exList?.[0] || null;
+      // La busqueda del cobro existente debe filtrar tambien por concepto: un
+      // estudiante tiene varias filas por mes (Mensualidad + Dia Prolongado +
+      // Materiales...). Antes se tomaba la primera y, si esa ya estaba pagada,
+      // se rechazaba el registro de cualquier otro concepto con el mensaje
+      // "Pago ya aprobado para este mes"; y si estaba pendiente, se
+      // sobreescribia cambiando su concepto.
+      const { data: exList } = await supabase
+        .from('payments')
+        .select('id, status, concept')
+        .eq('student_id', studentId)
+        .eq('deleted_at', null)
+        .or(orFilter)
+        .limit(20);
+      const ex = (exList || []).find(p => (p.concept || 'Mensualidad') === concept) || null;
       if (ex) {
-        if (ex.status === 'paid') { Helpers.toast('Pago ya aprobado para este mes', 'warning'); return; }
+        if (calcStatus(ex) === 'paid') { Helpers.toast('Pago ya aprobado para este mes', 'warning'); return; }
         const { error } = await supabase.from('payments').update({ amount, concept, method, status, month_paid: monthPaid, due_date: dueDate || null, paid_date: paidDate }).eq('id', ex.id);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from('payments').insert({ student_id: studentId, amount, concept, method, status, month_paid: monthPaid, due_date: dueDate || null, paid_date: paidDate, created_at: new Date().toISOString() });
-        if (error) { if (error.code === '23505') throw new Error('Ya existe un registro para este mes.'); throw error; }
+        const { error } = await supabase.from('payments').insert({ student_id: studentId, amount, original_amount: amount, concept, method, status, month_paid: monthPaid, due_date: dueDate || null, paid_date: paidDate, created_at: new Date().toISOString() });
+        if (error) { if (error.code === '23505') throw new Error('Ya existe un registro para este mes con ese concepto.'); throw error; }
       }
       if (status === 'paid') {
         try {

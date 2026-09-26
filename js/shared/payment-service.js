@@ -19,10 +19,10 @@ export function getMoraBreakdown(dueDate) {
 }
 export function normalizeStatus(p) {
   const s = (p.status || '').toLowerCase();
-  if (['paid','pagado','confirmado'].includes(s))      return 'paid';
-  if (['overdue','vencido'].includes(s))               return 'overdue';
-  if (['rechazado','rejected'].includes(s))            return 'rechazado';
-  if (['review','revision','en revision'].includes(s)) return 'review';
+  if (['paid','pagado','confirmado','approved'].includes(s)) return 'paid';
+  if (['overdue','vencido'].includes(s))                return 'overdue';
+  if (['rechazado','rejected'].includes(s))             return 'rejected';
+  if (['review','revision','en revision'].includes(s))  return 'review';
   if ((s === 'pending' || s === 'pendiente') && p.evidence_url) return 'review';
   return 'pending';
 }
@@ -93,7 +93,7 @@ export const PaymentService = {
 
     const { error } = await supabase
       .from('payments')
-      .update({ status: 'rechazado', notes: reason || null })
+      .update({ status: 'rejected', notes: reason || null })
       .eq('id', id);
     if (error) throw error;
 

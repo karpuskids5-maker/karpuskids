@@ -48,6 +48,12 @@ export const DirectorApi = {
 
   async getDashboardKPIs(monthText = '') {
     try {
+      // Piso del periodo 2026-2027. Debe coincidir con el literal de
+      // payments_month_floor_check y con public.school_year_floor_month()
+      // (migracion 10, bloque N). Sin esto, antes del dia 25 la UI caia al mes
+      // anterior y mostraba deuda de mayo/junio/julio, que no son facturables.
+      const PAYMENT_FLOOR_MONTH = '2026-08';
+
       const todayDate = new Date();
       const genDay = 25;
       let maxVisibleMonthKey;
@@ -58,6 +64,7 @@ export const DirectorApi = {
         const prevY = todayDate.getMonth() === 0 ? todayDate.getFullYear() - 1 : todayDate.getFullYear();
         maxVisibleMonthKey = `${prevY}-${String(prevM).padStart(2, '0')}`;
       }
+      if (maxVisibleMonthKey < PAYMENT_FLOOR_MONTH) maxVisibleMonthKey = PAYMENT_FLOOR_MONTH;
 
       // Auto-detección de ausentes antes de medir (check_in_end + 2h)
       try { await autoMarkAbsentStudents(); } catch (_) {}

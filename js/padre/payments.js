@@ -4,17 +4,45 @@
 import { supabase } from '../shared/supabase.js';
 import { AppState, TABLES } from './appState.js';
 import { Helpers } from './helpers.js';
-import { calcMora, getMoraBreakdown, normalizeStatus, daysUntilDue } from '../shared/payment-service.js';
+import { calcMora, getMoraBreakdown, normalizeStatus, daysUntilDue, MES } from '../shared/payment-service.js';
 import { emitEvent } from '../shared/supabase.js';
 
-// 🗓️ "2026-08" → "Agosto 2026" (etiqueta legible; si no es YYYY-MM devuelve tal cual)
+// 🔢 "agosto" → "08" · null si no es un mes en español
+function monthNum(s) {
+  const i = MES.indexOf(String(s || '').toLowerCase().trim());
+  return i === -1 ? null : String(i + 1).padStart(2, '0');
+}
+
+// 🗓️ Normaliza month_paid a 'YYYY-MM' para poder comparar. Acepta '2026-08' y 'Agosto'.
+// Si es un nombre de mes sin año, usa paidAt (paid_date/created_at) como año; si no, el actual.
+function monthKey(mp, paidAt) {
+  const s = String(mp || '').toLowerCase().trim();
+  if (!s) return '';
+  if (/^\d{4}-\d{2}$/.test(s)) return s;
+  const num = monthNum(s);
+  if (num) {
+    const refYear = paidAt ? new Date(paidAt).getFullYear() : new Date().getFullYear();
+    return `${refYear}-${num}`;
+  }
+  return s;
+}
+
+// 🗓️ "2026-08" → "Agosto 2026" · "agosto" → "Agosto" (si no es reconocible, devuelve tal cual)
 function monthLabel(m) {
-  const s = String(m || '');
-  if (!/^\d{4}-\d{2}$/.test(s)) return s;
-  const [y, mo] = s.split('-');
-  const name = new Date(Number(y), Number(mo) - 1, 1)
-    .toLocaleDateString('es-DO', { month: 'long' });
-  return `${name.charAt(0).toUpperCase()}${name.slice(1)} ${y}`;
+  const s = String(m || '').trim();
+  if (!s) return s;
+  if (/^\d{4}-\d{2}$/.test(s)) {
+    const [y, mo] = s.split('-');
+    const name = new Date(Number(y), Number(mo) - 1, 1)
+      .toLocaleDateString('es-DO', { month: 'long' });
+    return `${name.charAt(0).toUpperCase()}${name.slice(1)} ${y}`;
+  }
+  // Nombre de mes en español sin año → capitalizar ("agosto" → "Agosto")
+  if (MES.includes(s.toLowerCase())) {
+    const name = s.toLowerCase();
+    return name.charAt(0).toUpperCase() + name.slice(1);
+  }
+  return s;
 }
 
 export const PaymentsModule = {
@@ -57,7 +85,7 @@ export const PaymentsModule = {
    */
   applyUrgentPayment() {
     const urgent = (this._payments || [])
-      .filter(p => !['paid'].includes((p.status || '').toLowerCase()))
+      .filter(p => normalizeStatus(p) !== 'paid')
       .map(p => ({ ...p, days: daysUntilDue(p.due_date) }))
       .filter(p => p.days !== null)
       .sort((a, b) => a.days - b.days)[0];
@@ -72,14 +100,7 @@ export const PaymentsModule = {
     // Seleccionar el mes del pago urgente si está entre las opciones
     const monthSelect = document.getElementById('paymentMonth');
     if (monthSelect && urgent.month_paid) {
-      const MONTH_MAP = {
-        'enero':'01','febrero':'02','marzo':'03','abril':'04','mayo':'05','junio':'06',
-        'julio':'07','agosto':'08','septiembre':'09','octubre':'10','noviembre':'11','diciembre':'12'
-      };
-      const key = String(urgent.month_paid).toLowerCase().trim();
-      const norm = /^\d{4}-\d{2}$/.test(key)
-        ? key
-        : (MONTH_MAP[key] ? `${new Date().getFullYear()}-${MONTH_MAP[key]}` : null);
+      const norm = monthKey(urgent.month_paid, urgent.paid_date || urgent.created_at);
       if (norm && [...monthSelect.options].some(o => o.value === norm)) {
         monthSelect.value = norm;
       }
@@ -160,38 +181,32 @@ export const PaymentsModule = {
 
       const { data, error } = await supabase
         .from(TABLES.PAYMENTS)
-        .select('id,student_id,amount,concept,status,due_date,created_at,paid_date,method,month_paid,evidence_url,notes')
+        .select('id,student_id,amount,concept,status,due_date,created_at,paid_date,method,bank,reference,month_paid,evidence_url,notes')
         .eq('student_id', this._studentId)
         .is('deleted_at', null)
         .order('due_date', { ascending: false })
         .limit(60);
       if (error) throw error;
 
-      // Deduplicar: por mes — normalizar month_paid a YYYY-MM para comparar
-      // Handles both '2026-04' and 'Abril' formats
-      const MONTH_MAP = {
-        'enero':'01','febrero':'02','marzo':'03','abril':'04','mayo':'05','junio':'06',
-        'julio':'07','agosto':'08','septiembre':'09','octubre':'10','noviembre':'11','diciembre':'12'
-      };
-      const normalizeMonth = (mp) => {
-        if (!mp) return '';
-        const s = mp.toLowerCase().trim();
-        // Already YYYY-MM
-        if (/^\d{4}-\d{2}$/.test(s)) return s;
-        // Spanish month name — use current year
-        const num = MONTH_MAP[s];
-        if (num) return `${new Date().getFullYear()}-${num}`;
-        return s;
-      };
+      // Deduplicar: por mes — se usa monthKey() (módulo scope) que normaliza
+      // '2026-04' y 'Abril' a 'YYYY-MM'.
 
-      const statusPriority = { paid: 4, review: 3, overdue: 2, pending: 1 };
+      // Prioridad por estado NORMALIZADO. La tabla tiene CHECK de vocabulario
+      // (pending|review|paid|overdue|rejected), pero normalizeStatus tolera los
+      // alias (approved/pagado/confirmado) por si hay filas legacy o vistas.
+      // 'rejected' no estaba en el mapa: caía en 0 y perdía contra cualquier otro.
+      const statusPriority = { paid: 4, review: 3, overdue: 2, rejected: 1, pending: 1 };
       const monthMap = new Map();
       for (const p of data || []) {
-        const key = normalizeMonth(p.month_paid);
+        // Clave única: usar month_paid normalizado; si es null/vacío usar el id del pago
+        // para que no colisionen entre sí (no se pierdan pagos sin month_paid)
+        const normalized = monthKey(p.month_paid, p.paid_date || p.created_at);
+        // Para pagos sin month_paid, usar una clave única por id para no perderlos
+        const key = normalized || `_nomen_${p.id}`;
         const ex  = monthMap.get(key);
         if (!ex) { monthMap.set(key, p); continue; }
-        const pPri  = statusPriority[(p.status||'').toLowerCase()] || 0;
-        const exPri = statusPriority[(ex.status||'').toLowerCase()] || 0;
+        const pPri  = statusPriority[normalizeStatus(p)] || 0;
+        const exPri = statusPriority[normalizeStatus(ex)] || 0;
         if (pPri > exPri) { monthMap.set(key, p); continue; }
         if (pPri === exPri) {
           if (p.evidence_url && !ex.evidence_url) { monthMap.set(key, p); continue; }
@@ -203,9 +218,12 @@ export const PaymentsModule = {
       // Ocultar: pendientes con due_date en el futuro (el padre no los ve hasta que vencen)
       const todayMidnight = new Date(); todayMidnight.setHours(0, 0, 0, 0);
       let filteredPayments = Array.from(monthMap.values()).filter(p => {
-        const status = (p.status || '').toLowerCase();
-        // Siempre mostrar pagados, en revisión, vencidos
-        if (['paid', 'review', 'overdue'].includes(status)) return true;
+        // Estado NORMALIZADO (tolera alias: approved/pagado/confirmado → 'paid')
+        const status = normalizeStatus(p);
+        // Siempre mostrar pagados, en revisión, vencidos y rechazados: el filtro
+        // de abajo solo debe descartar *pendientes* con due_date en el futuro.
+        // 'rejected' no estaba en la lista y se ocultaba igual que un pendiente.
+        if (['paid', 'review', 'overdue', 'rejected'].includes(status)) return true;
         // Para pendientes: solo mostrar si due_date ya llegó o no tiene fecha
         if (!p.due_date) return true;
         return new Date(p.due_date + 'T00:00:00') <= todayMidnight;
@@ -214,8 +232,8 @@ export const PaymentsModule = {
       this._payments = filteredPayments
         .sort((a, b) => {
           // Sort: pending/overdue first (by due_date asc), then paid (by paid_date desc)
-          const aIsPaid = ['paid'].includes((a.status||'').toLowerCase());
-          const bIsPaid = ['paid'].includes((b.status||'').toLowerCase());
+          const aIsPaid = normalizeStatus(a) === 'paid';
+          const bIsPaid = normalizeStatus(b) === 'paid';
           if (!aIsPaid && !bIsPaid) return new Date(a.due_date||0) - new Date(b.due_date||0);
           if (!aIsPaid) return -1;
           if (!bIsPaid) return 1;
@@ -231,7 +249,7 @@ export const PaymentsModule = {
 
       // Update header stats (always calculate from all payments)
       const paidTotal = this._payments
-        .filter(p => ['paid'].includes((p.status||'').toLowerCase()))
+        .filter(p => normalizeStatus(p) === 'paid')
         .reduce((s, p) => s + Number(p.amount || 0), 0);
       const el = document.getElementById('paymentsBalance');
       if (el) el.textContent = Helpers.formatCurrency(paidTotal);
@@ -246,7 +264,7 @@ export const PaymentsModule = {
     const banner = document.getElementById('paymentAlertBanner');
     if (!banner) return;
 
-    const pending = payments.filter(p => !['paid'].includes((p.status||'').toLowerCase()));
+    const pending = payments.filter(p => normalizeStatus(p) !== 'paid');
     const totalDebt = pending.reduce((sum, p) => sum + Number(p.amount || 0), 0);
 
     if (totalDebt <= 0) {
@@ -344,6 +362,7 @@ export const PaymentsModule = {
       paid:      { label: 'Aprobado',    cls: 'bg-emerald-100 text-emerald-700', icon: 'check-circle',   border: '' },
       review:    { label: 'En Revisión', cls: 'bg-blue-100 text-blue-700',       icon: 'clock',          border: '' },
       overdue:   { label: 'Vencido',     cls: 'bg-rose-100 text-rose-700',       icon: 'alert-triangle', border: 'border-l-4 border-l-rose-500' },
+      rejected:  { label: 'Rechazado',   cls: 'bg-rose-100 text-rose-700',       icon: 'x-circle',       border: 'border-l-4 border-l-rose-400' },
       rechazado: { label: 'Rechazado',   cls: 'bg-rose-100 text-rose-700',       icon: 'x-circle',       border: 'border-l-4 border-l-rose-400' },
       pending:   { label: 'Pendiente',   cls: 'bg-amber-100 text-amber-700',     icon: 'alert-circle',   border: '' }
     };
@@ -688,7 +707,7 @@ export const PaymentsModule = {
         .select('id, status, month_paid')
         .eq('student_id', student.id)
         .or(`month_paid.eq."${month}",month_paid.eq."${monthRaw}"`)
-        .neq('status', 'paid')
+        .not('status', 'in', '("paid","approved","pagado","confirmado")')
         .is('deleted_at', null)
         .limit(1);
 

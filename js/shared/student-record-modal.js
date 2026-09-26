@@ -4,6 +4,16 @@ import { auditLog } from './db-utils.js';
 import { QueryCache } from './query-cache.js';
 import { SCHEDULE_DEFINITIONS, SCHEDULE_IDS } from './config.js?v=1.0.456';
 import { computeAge } from './birthday-utils.js';
+import { normalizeStatus } from './payment-service.js';
+
+// Colores del badge de estado de pago (clave = estado normalizado)
+const PAY_BADGE_CLS = {
+  paid:     'bg-emerald-100 text-emerald-700',
+  review:   'bg-blue-100 text-blue-700',
+  overdue:  'bg-rose-100 text-rose-700',
+  rejected: 'bg-rose-100 text-rose-700',
+  pending:  'bg-amber-100 text-amber-700',
+};
 
 const TABS = [
   { id: 'info',     label: 'Info General', icon: 'user-square' },
@@ -1532,7 +1542,7 @@ export const StudentRecordModal = {
         <span class="truncate">${esc(p.concept || p.month_paid || 'Pago')}</span>
         <div class="flex items-center gap-2 shrink-0">
           <span class="text-indigo-600">${this._fmt(p.amount)}</span>
-          <span class="px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${p.status === 'paid' ? 'bg-emerald-100 text-emerald-700' : p.status === 'rejected' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'}">${esc(p.status || '')}</span>
+          <span class="px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${PAY_BADGE_CLS[normalizeStatus(p)] || 'bg-amber-100 text-amber-700'}">${esc(p.status || '')}</span>
         </div>
       </div>`).join('') : '<p class="text-xs text-slate-400 font-bold">Sin pagos registrados.</p>';
 

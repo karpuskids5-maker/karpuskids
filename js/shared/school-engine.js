@@ -476,22 +476,6 @@ export const SchoolEngine = {
     return { data: data || [], error };
   },
 
-  /** Obtener historial del padre */
-  async getParentYearData(parentId) {
-    const { data, error } = await supabase.rpc('get_parent_year_data', {
-      p_parent_id: parentId
-    });
-    return { data, error };
-  },
-
-  /** Obtener datos del año para la maestra */
-  async getTeacherYearData(teacherId) {
-    const { data, error } = await supabase.rpc('get_teacher_year_data', {
-      p_teacher_id: teacherId
-    });
-    return { data, error };
-  },
-
   /** Obtener estadísticas de un período */
   async getPeriodStats(periodId) {
     const { data, error } = await supabase.rpc('get_period_stats', {

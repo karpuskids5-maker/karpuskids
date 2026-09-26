@@ -1668,7 +1668,9 @@ function isPaidStatus(s) {
 function renderPayments() {
   const approved = allPayments.filter(p => isPaidStatus(p.status)).length;
   const pending  = allPayments.filter(p => ['pending','pendiente','review'].includes((p.status||'').toLowerCase())).length;
-  const rejected = allPayments.filter(p => !isPaidStatus(p.status) && !['pending','pendiente','review'].includes((p.status||'').toLowerCase())).length;
+  // Antes contaba como "rechazado" cualquier estado que no fuera pagado ni
+  // pending/review, lo que metia en el mismo grupo a los vencidos (overdue).
+  const rejected = allPayments.filter(p => ['rejected','rechazado'].includes((p.status||'').toLowerCase())).length;
   const total    = allPayments.filter(p => isPaidStatus(p.status)).reduce((s,p) => s + Number(p.amount||0), 0);
   document.getElementById('pay-approved').textContent = approved;
   document.getElementById('pay-pending').textContent  = pending;

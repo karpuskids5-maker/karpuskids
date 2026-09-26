@@ -1,20 +1,40 @@
 /**
  * auto-payment-cycle — Edge Function
- * Genera cobros mensuales automáticamente para todos los estudiantes activos.
- * - REGLA DE NEGOCIO: los cobros del mes M se generan a partir del día
- *   `generation_day` (25) de ese mismo mes — antes de esa fecha el padre
- *   NO ve ningún cobro nuevo.
- * - NUNCA genera cobros de meses anteriores (backfill) ni de meses futuros:
- *   se respeta la fecha de inscripción (start_date) de cada estudiante.
- * - Se puede forzar con header x-force-run: true o body {"force":true}
  *
- * Cron recomendado: DIARIO a las 6am RD (10:00 UTC) — '0 10 * * *'
- * (es idempotente y está blindado por generation_day, así que correr
- * diario es seguro y garantiza que genere apenas llegue el día 25).
+ * Disparador HTTP opcional del ciclo de pagos. La lógica vive ÚNICAMENTE en
+ * la función SQL `public.run_payment_cycle()`; esta Edge Function es un wrapper
+ * delgado que la invoca con la service role.
+ *
+ * Antes esta función reimplementaba el ciclo en TypeScript. Eso duplicaba la
+ * lógica y divergía de la SQL en cuatro puntos:
+ *   1) No filtraba por `concept`, así que un cargo de "Dia Prolongado" o similar
+ *      del mismo mes hacía creer al estudiante que ya tenía "Mensualidad" y la
+ *      mensualidad nunca se generaba.
+ *   2) No aplicaba descuentos: insertaba `monthly_fee` crudo en vez de
+ *      `get_monthly_fee_for(student_id)`.
+ *   3) No generaba los cargos de "Dia Prolongado".
+ *   4) El insert masivo no era idempotente: dos ejecuciones simultáneas (cron
+ *      diario + corrida manual) hacían fallar el lote completo por violar el
+ *      índice único (student_id, month_paid, concept).
+ * La SQL ya resuelve todo con `ON CONFLICT DO NOTHING`, el filtro por concepto,
+ * `deleted_at IS NULL` y el guard de rol.
+ *
+ * Reglas de negocio (las aplica la SQL, se documentan aquí):
+ *   - Los cobros del mes M se generan a partir del día `generation_day` (25).
+ *     Antes de esa fecha el padre NO ve ningún cobro nuevo.
+ *   - NUNCA hay backfill de meses anteriores ni cobros de meses futuros: se
+ *     respeta la `start_date` de cada estudiante.
+ *
+ * Cron recomendado: DIARIO a las 6am RD (10:00 UTC) — '0 10 * * *'.
+ * Es idempotente y está blindado por `generation_day`.
+ *
+ * Uso:
+ *   curl -X POST <url> -H "Authorization: Bearer <jwt>" -H "x-force-run: true"
+ *   body opcional: { "force": true }
  */
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { verifyAuth } from "../_shared/auth.ts";
+import { getServiceClient } from "../_shared/auth.ts";
 
 const ALLOWED_ROLES = ['admin', 'directora', 'asistente'];
 
@@ -29,136 +49,61 @@ Deno.serve(async (req) => {
 
   try {
     // ── Auth verification ──────────────────────────────────────────────────
+    // Mismos roles que permite la propia función SQL.
     const auth = await verifyAuth(req, ALLOWED_ROLES);
     if (!auth.ok) {
       return json({ error: auth.error }, auth.status || 401, req);
     }
 
-    const SUPABASE_URL = Deno.env.get('SUPABASE_URL')              ?? '';
-    const SERVICE_KEY  = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
-    if (!SUPABASE_URL || !SERVICE_KEY) return json({ error: 'Missing env vars' }, 500, req);
-
-    const supabase = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
+    const supabase = getServiceClient();
 
     const body = await req.json().catch(() => ({}));
     const forceRun = req.headers.get('x-force-run') === 'true' || body?.force === true;
 
-    // ── Configuración ────────────────────────────────────────────────────────
+    // ── Regla del día 25 (misma que la SQL, para responder sin escribir) ────
+    // Antes de `generation_day` la SQL solo vencen cobros, no crea nuevos.
     const { data: settings } = await supabase
-      .from('school_settings').select('generation_day, due_day').eq('id', 1).single();
-    const dueDay        = settings?.due_day ?? 5;
+      .from('school_settings').select('generation_day, due_day').eq('id', 1).maybeSingle();
     const generationDay = settings?.generation_day ?? 25;
 
-    const now = new Date();
-
-    // ── Fecha LOCAL de República Dominicana (evita desfase UTC al cerrar mes:
-    //    sin esto, el 31/ago 8pm RD ya contaría como septiembre) ─────────────
     const rdDate = new Intl.DateTimeFormat('en-CA', {
       timeZone: 'America/Santo_Domingo',
-    }).format(now); // "YYYY-MM-DD"
-    const [rdY, rdM, rdD] = rdDate.split('-').map(Number);
+    }).format(new Date()); // "YYYY-MM-DD"
+    const rdDay = Number(rdDate.split('-')[2]);
 
-    // ── Regla: NO generar antes del día 25 (generation_day) del mes ─────────
-    // Mientras tanto el padre no ve ningún cobro nuevo. x-force-run lo omite.
-    if (!forceRun && rdD < generationDay) {
+    if (!forceRun && rdDay < generationDay) {
       return json({
         ok: true,
         skipped: true,
-        reason: `Hoy es día ${rdD} (RD): los cobros se generan a partir del día ${generationDay}.`,
-        ran_at: now.toISOString(),
+        reason: `Hoy es día ${rdDay} (RD): los cobros se generan a partir del día ${generationDay}.`,
+        ran_at: new Date().toISOString(),
       });
     }
 
-    // ── Estudiantes activos con cuota ────────────────────────────────────────
-    const { data: students, error: sErr } = await supabase
-      .from('students')
-      .select('id, name, monthly_fee, start_date')
-      .eq('is_active', true)
-      .gt('monthly_fee', 0);
-    if (sErr) return json({ error: sErr.message }, 500, req);
-    if (!students?.length) return json({ ok: true, generated: 0, message: 'No active students with fee' }, 200, req);
-
-    // ── Determinar qué meses necesitan cobros ────────────────────────────────
-    // SOLO el mes actual. Sin backfill: los cobros de meses anteriores se
-    // registran manualmente desde el panel para no cobrar a estudiantes que
-    // aún no estaban inscritos.
-    const monthKey = `${rdY}-${String(rdM).padStart(2, '0')}`;
-    const monthsToProcess: string[] = [monthKey];
-
-    console.log('[auto-payment-cycle] Processing months:', monthsToProcess);
-
-    // Último día del mes en proceso (para comparar con la fecha de inscripción)
-    const lastDayOfMonth = new Date(rdY, rdM, 0)
-      .toISOString().split('T')[0];
-
-    let totalGenerated = 0;
-    const results: Record<string, number> = {};
-
-    for (const monthKey of monthsToProcess) {
-      const [yr, mo] = monthKey.split('-').map(Number);
-
-      // due_date = día 5 del mes siguiente
-      const dueMonth = mo > 11 ? 1 : mo + 1;
-      const dueYear  = mo > 11 ? yr + 1 : yr;
-      const dueDate  = `${dueYear}-${String(dueMonth).padStart(2,'0')}-${String(dueDay).padStart(2,'0')}`;
-
-      // Estudiantes que YA tienen cobro en este mes
-      const { data: existing } = await supabase
-        .from('payments')
-        .select('student_id')
-        .or(`month_paid.eq.${monthKey},month_paid.eq.${monthKey.replace('-0','-').replace(/^(\d{4})-(\d)$/,'$1-0$2')}`)
-        .not('status', 'eq', 'deleted');
-
-      const existingIds = new Set((existing || []).map((p: { student_id: string }) => String(p.student_id)));
-
-      // Solo estudiantes inscritos a más tardar el último día del mes:
-      // evita cobrar a quienes ingresan después o aún no ingresan.
-      const missing = students.filter(s =>
-        !existingIds.has(String(s.id)) &&
-        (!s.start_date || s.start_date <= lastDayOfMonth)
-      );
-
-      if (!missing.length) {
-        console.log(`[auto-payment-cycle] ${monthKey}: all students covered`);
-        results[monthKey] = 0;
-        continue;
-      }
-
-      const inserts = missing.map(s => ({
-        student_id: s.id,
-        amount:     s.monthly_fee,
-        status:     'pending',
-        due_date:   dueDate,
-        month_paid: monthKey,
-        concept:    'Mensualidad',
-        created_at: new Date().toISOString(),
-      }));
-
-      const { error: insErr } = await supabase.from('payments').insert(inserts);
-      if (insErr) {
-        console.error(`[auto-payment-cycle] Insert error for ${monthKey}:`, insErr.message);
-        results[monthKey] = -1;
-        continue;
-      }
-
-      console.log(`[auto-payment-cycle] ${monthKey}: generated ${missing.length} payments`);
-      results[monthKey] = missing.length;
-      totalGenerated += missing.length;
+    // ── Ciclo: una sola fuente de verdad (SQL) ─────────────────────────────
+    const { data, error } = await supabase.rpc('run_payment_cycle');
+    if (error) {
+      console.error('[auto-payment-cycle] run_payment_cycle:', error.message);
+      return json({ error: error.message }, 500, req);
     }
 
-    // ── Marcar vencidos ──────────────────────────────────────────────────────
-    await supabase.from('payments')
-      .update({ status: 'overdue' })
-      .eq('status', 'pending')
-      .lt('due_date', rdDate);
+    const result = (data ?? {}) as {
+      generated?: number; expired?: number; month?: string;
+      due_date?: string; generation_day?: number; skipped?: string | null;
+    };
 
-    console.log(`[auto-payment-cycle] ✅ Total generated: ${totalGenerated}`);
+    console.log(
+      `[auto-payment-cycle] ${result.month}: generated=${result.generated} expired=${result.expired}`
+    );
 
     return json({
-      ok:        true,
-      generated: totalGenerated,
-      by_month:  results,
-      ran_at:    now.toISOString(),
+      ok: true,
+      generated: result.generated ?? 0,
+      expired: result.expired ?? 0,
+      month: result.month ?? null,
+      due_date: result.due_date ?? null,
+      by_month: result.month ? { [result.month]: result.generated ?? 0 } : {},
+      ran_at: new Date().toISOString(),
     }, 200, req);
 
   } catch (e) {
