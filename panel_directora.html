@@ -6,7 +6,7 @@
   <meta name="robots" content="noindex,nofollow">
   <meta http-equiv="X-Content-Type-Options" content="nosniff">
   <meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self' https://*.supabase.co wss://*.supabase.co; script-src 'self' 'unsafe-inline' https://cdn.onesignal.com https://onesignal.com https://api.onesignal.com https://meet.jit.si https://8x8.vc https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net; img-src 'self' data: blob: https:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://cdn.onesignal.com https://onesignal.com https://api.onesignal.com https://meet.jit.si https://8x8.vc https://fonts.googleapis.com https://fonts.gstatic.com https://cdn.jsdelivr.net; frame-src 'self' blob: https://meet.jit.si https://8x8.vc; worker-src 'self' blob:; object-src 'none'; form-action 'self'; base-uri 'self';">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' https://*.supabase.co wss://*.supabase.co; script-src 'self' 'unsafe-inline' https://cdn.onesignal.com https://onesignal.com https://api.onesignal.com https://meet.jit.si https://8x8.vc https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net; img-src 'self' data: blob: https:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://cdn.onesignal.com https://onesignal.com https://api.onesignal.com https://meet.jit.si https://8x8.vc https://fonts.googleapis.com https://fonts.gstatic.com https://cdn.jsdelivr.net; frame-src 'self' blob: https://meet.jit.si https://8x8.vc; media-src 'self' blob: https:; worker-src 'self' blob:; object-src 'none'; form-action 'self'; base-uri 'self';">
   <style>html{display:none;}</style>
   <!-- X-Frame-Options debe ser configurado por el servidor, no por meta tag -->
   <script>if(self===top){document.documentElement.style.display='block';}else{top.location=self.location;}</script>
@@ -963,7 +963,7 @@
             <h2 class="font-black text-slate-800 text-sm flex items-center gap-2"><i data-lucide="file-text" class="w-4 h-4 text-rose-500"></i> Historial de Donaciones</h2>
             <div class="relative w-full md:w-60">
               <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"></i>
-              <input id="donSearch" oninput="App.donations.renderDonations()" placeholder="Buscar donante o ref..." class="pl-9 pr-3 py-2 border border-slate-200 rounded-xl text-sm w-full focus:ring-2 focus:ring-rose-500 outline-none bg-slate-50 focus:bg-white" />
+              <input id="donSearch" aria-label="Buscar donante o referencia" oninput="App.donations.renderDonations()" placeholder="Buscar donante o ref..." class="pl-9 pr-3 py-2 border border-slate-200 rounded-xl text-sm w-full focus:ring-2 focus:ring-rose-500 outline-none bg-slate-50 focus:bg-white" />
             </div>
           </div>
           <div class="px-5 pt-4 flex flex-wrap gap-2" id="donStatusFilters"></div>
@@ -1568,6 +1568,7 @@
                <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Pendientes</span>
              </div>
              <p class="text-2xl font-black text-slate-800" id="kpiPendingCount">0</p>
+             <p class="text-[10px] font-bold text-slate-400 mt-0.5" id="kpiPendingStudents">&nbsp;</p>
           </div>
           <!-- En Revisión (Transferencias) -->
           <div onclick="App.payments.filterBy('review')" class="bg-amber-50 p-4 rounded-2xl border border-amber-100 shadow-sm cursor-pointer hover:shadow-md transition-all group">
@@ -1576,6 +1577,7 @@
                <span class="text-xs font-bold text-amber-600 uppercase tracking-wider">En Revisión</span>
              </div>
              <p class="text-2xl font-black text-slate-800" id="kpiReviewCount">0</p>
+             <p class="text-[10px] font-bold text-amber-400/80 mt-0.5" id="kpiReviewStudents">&nbsp;</p>
           </div>
           <!-- Vencidos -->
           <div onclick="App.payments.filterBy('overdue')" class="bg-rose-50 p-4 rounded-2xl border border-rose-100 shadow-sm cursor-pointer hover:shadow-md transition-all group">
@@ -1584,6 +1586,7 @@
                <span class="text-xs font-bold text-rose-600 uppercase tracking-wider">Vencidos</span>
              </div>
              <p class="text-2xl font-black text-slate-800" id="kpiOverdueCount">0</p>
+             <p class="text-[10px] font-bold text-rose-400/80 mt-0.5" id="kpiOverdueStudents">&nbsp;</p>
           </div>
         </div>
 
@@ -1940,8 +1943,8 @@
 
               <!-- Límite de entrada (check_in_end): usado por asistencia y ausencias automáticas -->
               <div class="mb-4">
-                <label class="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1.5 flex items-center gap-1">
-                  <i data-lucide="timer" class="w-3 h-3 text-violet-500"></i> Límite de entrada (tolerancia)
+                <label for="confCheckInEnd" class="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                  <i data-lucide="timer" class="w-3 h-3 text-violet-500" aria-hidden="true"></i> Límite de entrada (tolerancia)
                 </label>
                 <input id="confCheckInEnd" type="time" value="08:30"
                   class="w-full border-2 border-slate-200 rounded-xl px-3 py-2 text-sm font-bold text-slate-700 bg-white focus:border-violet-400 focus:ring-2 focus:ring-violet-100 outline-none transition-all">

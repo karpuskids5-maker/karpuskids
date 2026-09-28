@@ -188,23 +188,23 @@
     @media(min-width:769px){.md-nav{display:flex!important;}.mob-btn{display:none!important;}}
 
     /* ── Donaciones ── */
-    .kk-don-qck{padding:10px 6px;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.06);color:rgba(255,255,255,.8);font-weight:800;font-size:12.5px;cursor:pointer;transition:all .2s;}
+    .kk-don-qck{padding:10px 6px;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:#1e293b;color:#f1f5f9;font-weight:800;font-size:12.5px;cursor:pointer;transition:all .2s;}
     .kk-don-qck:hover{border-color:#FF9800;color:#FFB74D;}
-    .kk-don-qck.active{background:linear-gradient(135deg,#FF9800,#E91E63);color:#fff;border-color:transparent;box-shadow:0 6px 18px rgba(255,152,0,.35);}
+    .kk-don-qck.active{background:linear-gradient(135deg,#B45309,#BE123C);color:#fff;border-color:transparent;box-shadow:0 6px 18px rgba(255,152,0,.35);}
     .kk-don-camp{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);border-radius:22px;padding:22px;display:flex;gap:18px;align-items:center;transition:transform .25s,border-color .25s;}
     .kk-don-camp:hover{transform:translateY(-4px);border-color:rgba(255,152,0,.35);}
     .kk-don-camp-img{width:76px;height:76px;border-radius:16px;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,rgba(255,152,0,.25),rgba(233,30,99,.25));overflow:hidden;}
     .kk-don-camp-img img{width:100%;height:100%;object-fit:cover;}
     .kk-don-camp-body{flex:1;min-width:0;}
     .kk-don-camp-body h4{font-size:15px;font-weight:900;color:#fff;margin-bottom:3px;}
-    .kk-don-camp-body p{font-size:12px;color:rgba(255,255,255,.55);line-height:1.6;margin-bottom:10px;}
+    .kk-don-camp-body p{font-size:12px;color:rgba(255,255,255,.75);line-height:1.6;margin-bottom:10px;}
     .kk-don-prog{height:8px;background:rgba(255,255,255,.08);border-radius:50px;overflow:hidden;margin-bottom:8px;}
     .kk-don-prog span{display:block;height:100%;background:linear-gradient(90deg,#FF9800,#E91E63);border-radius:50px;transition:width .6s ease;}
     .kk-don-meta{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:11.5px;}
     .kk-don-meta b{color:#FFB74D;font-size:13px;}
-    .kk-don-meta .kk-don-muted{color:rgba(255,255,255,.45);font-weight:700;}
-    .kk-don-btn{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);color:#fff;font-weight:900;font-size:12px;padding:9px 16px;border-radius:10px;cursor:pointer;transition:all .2s;white-space:nowrap;}
-    .kk-don-btn:hover{background:#FF9800;border-color:#FF9800;}
+    .kk-don-meta .kk-don-muted{color:rgba(255,255,255,.75);font-weight:700;}
+.kk-don-btn{background:#1e293b;border:1px solid rgba(255,255,255,.15);color:#fff;font-weight:900;font-size:12px;padding:9px 16px;border-radius:10px;cursor:pointer;transition:all .2s;white-space:nowrap;}
+.kk-don-btn:hover{background:#B45309;border-color:#B45309;}
     .kk-don-thumbs{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;}
     .kk-don-thumb{width:40px;height:40px;border-radius:10px;overflow:hidden;display:block;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);transition:transform .2s,border-color .2s;}
     .kk-don-thumb:hover{transform:scale(1.08);border-color:rgba(255,152,0,.5);}
@@ -220,7 +220,7 @@
       #donQuick{grid-template-columns:repeat(2,1fr) !important;gap:8px;}
       .kk-don-btn{width:100%;}
       .kk-don-meta{flex-wrap:wrap;justify-content:center;}
-      .kk-don-camp-body p{word-break:break-word;overflow-wrap:anywhere;}
+      .kk-don-camp-body p{word-break:normal;overflow-wrap:anywhere;}
       .kk-don-thumbs{justify-content:center;}
     }
     /* Pantallas muy pequeñas: menos padding de la sección y botón a todo el ancho */
@@ -1085,7 +1085,7 @@
   <div style="max-width:1280px;margin:0 auto;position:relative;z-index:1;">
 
     <div class="obs-fade" style="text-align:center;max-width:720px;margin:0 auto 48px;">
-      <span class="sec-label" style="background:rgba(255,152,0,.15);color:#FFB74D;">Filantropía</span>
+      <span class="sec-label" style="background:#4A2E0A;color:#FFB74D;">Filantropía</span>
       <h2 style="font-size:clamp(1.9rem,4vw,2.8rem);font-weight:900;color:#fff;line-height:1.15;margin-bottom:16px;">Tu aporte transforma <span style="background:linear-gradient(90deg,#FF9800,#E91E63);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">vidas</span></h2>
       <p style="color:rgba(255,255,255,.6);font-size:1.02rem;line-height:1.75;font-weight:500;">Cada donación ayuda a financiar becas, mejoras de infraestructura y programas de nutrición para los niños de nuestra comunidad.</p>
     </div>
@@ -1098,33 +1098,34 @@
       <!-- Formulario -->
       <div class="obs-fade" style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:28px;padding:32px;backdrop-filter:blur(10px);height:max-content;">
         <h3 style="font-size:1.35rem;font-weight:900;color:#fff;margin-bottom:6px;">Haz tu donación</h3>
-        <p style="font-size:12.5px;color:rgba(255,255,255,.5);margin-bottom:22px;font-weight:600;">Recibe tu código de referencia de seguimiento al instante.</p>
+        <p style="font-size:12.5px;color:rgba(255,255,255,.8);margin-bottom:22px;font-weight:600;">Recibe tu código de referencia de seguimiento al instante.</p>
 
         <div id="donForm" style="display:flex;flex-direction:column;gap:14px;">
           <div>
-            <label style="font-size:11px;font-weight:800;color:rgba(255,255,255,.65);text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:6px;">Causa</label>
-            <select id="donCamp" style="width:100%;padding:12px 14px;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.06);color:#fff;font-size:13px;font-weight:600;outline:none;"></select>
+            <label for="donCamp" style="font-size:11px;font-weight:800;color:rgba(255,255,255,.85);text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:6px;">Causa</label>
+            <select id="donCamp" style="width:100%;padding:12px 14px;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:#1e293b;color:#fff;font-size:13px;font-weight:600;outline:none;"></select>
           </div>
 
           <div>
-            <label style="font-size:11px;font-weight:800;color:rgba(255,255,255,.65);text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:6px;">Monto (RD$)</label>
+            <label for="donAmount" style="font-size:11px;font-weight:800;color:rgba(255,255,255,.85);text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:6px;">Monto (RD$)</label>
             <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:8px;" id="donQuick">
               <button type="button" data-a="500"   class="kk-don-qck">500</button>
               <button type="button" data-a="1000"  class="kk-don-qck">1,000</button>
               <button type="button" data-a="2500"  class="kk-don-qck">2,500</button>
               <button type="button" data-a="5000"  class="kk-don-qck">5,000</button>
             </div>
-            <input type="number" id="donAmount" min="1" step="any" placeholder="Monto personalizado" style="width:100%;padding:12px 14px;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.06);color:#fff;font-size:14px;font-weight:700;outline:none;">
+            <input type="number" id="donAmount" min="1" step="any" placeholder="Monto personalizado" style="width:100%;padding:12px 14px;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:#1e293b;color:#fff;font-size:14px;font-weight:700;outline:none;" aria-label="Monto personalizado">
           </div>
 
           <div>
-            <label style="font-size:11px;font-weight:800;color:rgba(255,255,255,.65);text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:6px;">Tipo de donante</label>
+            <label for="donType" style="font-size:11px;font-weight:800;color:rgba(255,255,255,.85);text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:6px;">Tipo de donante</label>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-              <select id="donType" style="width:100%;padding:12px 14px;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.06);color:#fff;font-size:13px;font-weight:600;outline:none;">
+              <select id="donType" style="width:100%;padding:12px 14px;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:#1e293b;color:#fff;font-size:13px;font-weight:600;outline:none;">
                 <option value="persona">Persona Física</option>
                 <option value="empresa">Empresa (RNC)</option>
               </select>
-              <select id="donMethod" style="width:100%;padding:12px 14px;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.06);color:#fff;font-size:13px;font-weight:600;outline:none;">
+              <label for="donMethod" class="sr-only">Método de pago</label>
+              <select id="donMethod" style="width:100%;padding:12px 14px;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:#1e293b;color:#fff;font-size:13px;font-weight:600;outline:none;">
                 <option value="transfer">Transferencia</option>
                 <option value="card">Tarjeta</option>
                 <option value="cash">Efectivo</option>
@@ -1132,10 +1133,14 @@
             </div>
           </div>
 
-          <input id="donName" type="text" placeholder="Nombre completo / Razón Social" style="width:100%;padding:12px 14px;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.06);color:#fff;font-size:14px;font-weight:600;outline:none;">
-          <input id="donEmail" type="email" placeholder="Correo electrónico" style="width:100%;padding:12px 14px;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.06);color:#fff;font-size:14px;font-weight:600;outline:none;">
-          <input id="donPhone" type="tel" placeholder="Teléfono / WhatsApp (opcional)" style="width:100%;padding:12px 14px;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.06);color:#fff;font-size:14px;font-weight:600;outline:none;">
-          <input id="donTaxId" type="text" placeholder="Cédula / RNC (para comprobante fiscal)" style="width:100%;padding:12px 14px;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.06);color:#fff;font-size:14px;font-weight:600;outline:none;">
+          <label for="donName" class="sr-only">Nombre completo o Razón Social</label>
+          <input id="donName" type="text" placeholder="Nombre completo / Razón Social" style="width:100%;padding:12px 14px;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:#1e293b;color:#fff;font-size:14px;font-weight:600;outline:none;">
+          <label for="donEmail" class="sr-only">Correo electrónico</label>
+          <input id="donEmail" type="email" placeholder="Correo electrónico" style="width:100%;padding:12px 14px;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:#1e293b;color:#fff;font-size:14px;font-weight:600;outline:none;">
+          <label for="donPhone" class="sr-only">Teléfono o WhatsApp</label>
+          <input id="donPhone" type="tel" placeholder="Teléfono / WhatsApp (opcional)" style="width:100%;padding:12px 14px;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:#1e293b;color:#fff;font-size:14px;font-weight:600;outline:none;">
+          <label for="donTaxId" class="sr-only">Cédula o RNC</label>
+          <input id="donTaxId" type="text" placeholder="Cédula / RNC (para comprobante fiscal)" style="width:100%;padding:12px 14px;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:#1e293b;color:#fff;font-size:14px;font-weight:600;outline:none;">
 
           <div id="donBankBox" style="background:rgba(255,152,0,.08);border:1px dashed rgba(255,152,0,.3);border-radius:14px;padding:14px;">
             <div style="font-size:11px;font-weight:900;color:#FFB74D;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;">Detalles para transferencia</div>
@@ -1143,35 +1148,35 @@
               <div><b>BHD:</b> 0108-8839-72-5234-5564</div>
               <div><b>Popular:</b> 888-234-55-67 (Ahorros)</div>
               <div><b>Banreservas:</b> 960-882-65-43-22</div>
-              <div style="margin-top:6px;color:rgba(255,255,255,.5);font-size:11px;">Adjunta tu volante bancario tras donar.</div>
+              <div style="margin-top:6px;color:rgba(255,255,255,.75);font-size:11px;">Adjunta tu volante bancario tras donar.</div>
             </div>
           </div>
 
           <div>
-            <label style="font-size:11px;font-weight:800;color:rgba(255,255,255,.65);text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:6px;">Volante bancario (opcional)</label>
-            <div id="donUploadBox" style="border:2px dashed rgba(255,255,255,.15);border-radius:14px;padding:20px;text-align:center;cursor:pointer;transition:border-color .2s,background .2s;" onmouseover="this.style.borderColor='rgba(255,152,0,.5)';this.style.background='rgba(255,152,0,.05)'" onmouseout="this.style.borderColor='rgba(255,255,255,.15)';this.style.background='transparent'">
-              <input type="file" id="donReceipt" accept="image/*,.pdf" style="display:none;">
+            <label for="donReceipt" style="font-size:11px;font-weight:800;color:rgba(255,255,255,.85);text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:6px;">Volante bancario (opcional)</label>
+            <button type="button" id="donUploadBox" aria-label="Subir comprobante de pago" style="border:2px dashed rgba(255,255,255,.15);border-radius:14px;padding:20px;text-align:center;cursor:pointer;transition:border-color .2s,background .2s;width:100%;background:transparent;" onmouseover="this.style.borderColor='rgba(255,152,0,.5)';this.style.background='rgba(255,152,0,.05)'" onmouseout="this.style.borderColor='';this.style.background='transparent'" onfocus="this.style.borderColor='rgba(255,152,0,.5)'" onblur="this.style.borderColor=''">
+              <input type="file" id="donReceipt" accept="image/*,.pdf" style="display:none;" aria-label="Seleccionar volante bancario">
               <div id="donUploadPlaceholder">
-                <i class="bi bi-cloud-arrow-up" style="font-size:28px;color:rgba(255,255,255,.3);display:block;margin-bottom:6px;"></i>
-                <span style="font-size:12px;color:rgba(255,255,255,.5);font-weight:600;">Haz clic o arrastra tu comprobante de pago</span>
-                <div style="font-size:10.5px;color:rgba(255,255,255,.3);margin-top:4px;">JPG, PNG o PDF — máx. 5 MB</div>
+                <i class="bi bi-cloud-arrow-up" style="font-size:28px;color:rgba(255,255,255,.3);display:block;margin-bottom:6px;" aria-hidden="true"></i>
+                <span style="font-size:12px;color:rgba(255,255,255,.75);font-weight:600;">Haz clic o arrastra tu comprobante de pago</span>
+                <div style="font-size:10.5px;color:rgba(255,255,255,.6);margin-top:4px;">JPG, PNG o PDF — máx. 5 MB</div>
               </div>
               <div id="donUploadPreview" style="display:none;"></div>
-            </div>
+            </button>
             <div id="donUploadProgress" style="display:none;margin-top:8px;">
               <div style="height:4px;background:rgba(255,255,255,.1);border-radius:4px;overflow:hidden;">
                 <div id="donUploadBar" style="height:100%;width:0%;background:linear-gradient(90deg,#FF9800,#E91E63);border-radius:4px;transition:width .3s;"></div>
               </div>
-              <div style="font-size:10.5px;color:rgba(255,255,255,.4);margin-top:4px;font-weight:600;" id="donUploadStatus">Subiendo…</div>
+              <div style="font-size:10.5px;color:rgba(255,255,255,.75);margin-top:4px;font-weight:600;" id="donUploadStatus">Subiendo…</div>
             </div>
           </div>
 
-          <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:12.5px;color:rgba(255,255,255,.6);font-weight:600;">
+          <label for="donAnon" style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:12.5px;color:rgba(255,255,255,.85);font-weight:600;">
             <input type="checkbox" id="donAnon" style="width:16px;height:16px;accent-color:#FF9800;border-radius:4px;">
             Hacer donación anónima (ocultar mi nombre en la lista pública)
           </label>
 
-          <button id="donBtn" onclick="submitDonation()" style="width:100%;padding:15px;border:none;border-radius:14px;background:linear-gradient(135deg,#FF9800,#E91E63);color:#fff;font-weight:900;font-size:15px;cursor:pointer;box-shadow:0 8px 24px rgba(255,152,0,.4);transition:transform .2s,box-shadow .2s;">Donar ahora</button>
+          <button id="donBtn" onclick="submitDonation()" style="width:100%;padding:15px;border:none;border-radius:14px;background:linear-gradient(135deg,#B45309,#BE123C);color:#fff;font-weight:900;font-size:15px;cursor:pointer;box-shadow:0 8px 24px rgba(255,152,0,.4);transition:transform .2s,box-shadow .2s;">Donar ahora</button>
 
           <div id="donMsg" style="font-size:13px;font-weight:700;color:rgba(255,255,255,.8);text-align:center;display:none;"></div>
         </div>
@@ -1182,10 +1187,10 @@
             <i class="bi bi-check-lg" style="font-size:30px;color:#4ade80;"></i>
           </div>
           <h3 style="font-size:1.4rem;font-weight:900;color:#fff;margin-bottom:8px;">¡Gracias por tu aporte!</h3>
-          <p style="color:rgba(255,255,255,.65);font-size:13.5px;line-height:1.7;margin-bottom:14px;">Tu donación quedó registrada con la referencia de seguimiento:</p>
-          <div id="donRef" style="font-size:15px;font-weight:900;color:#FFB74D;background:rgba(255,152,0,.1);border:1px dashed rgba(255,152,0,.4);border-radius:12px;padding:12px;margin-bottom:18px;"></div>
+          <p style="color:rgba(255,255,255,.85);font-size:13.5px;line-height:1.7;margin-bottom:14px;">Tu donación quedó registrada con la referencia de seguimiento:</p>
+          <div id="donRef" style="font-size:15px;font-weight:900;color:#FFB74D;background:#3F2A10;border:1px dashed rgba(255,152,0,.4);border-radius:12px;padding:12px;margin-bottom:18px;"></div>
           <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
-            <button onclick="downloadReceipt()" style="padding:12px 20px;border:none;border-radius:12px;background:linear-gradient(135deg,#25D366,#128C7E);color:#fff;font-weight:900;font-size:13px;cursor:pointer;"><i class="bi bi-file-earmark-pdf"></i> Descargar Recibo</button>
+            <button onclick="downloadReceipt()" style="padding:12px 20px;border:none;border-radius:12px;background:linear-gradient(135deg,#15803D,#115E59);color:#fff;font-weight:900;font-size:13px;cursor:pointer;"><i class="bi bi-file-earmark-pdf"></i> Descargar Recibo</button>
             <button onclick="resetDonationForm()" style="padding:12px 20px;border:2px solid rgba(255,255,255,.2);background:transparent;color:#fff;font-weight:900;font-size:13px;border-radius:12px;cursor:pointer;">Nueva donación</button>
           </div>
         </div>
@@ -1426,13 +1431,15 @@
         const daysLeft = c => {
           if (!c.end_date) return '';
           const days = Math.ceil((new Date(c.end_date + 'T23:59:59') - now) / 86400000);
-          return days >= 0 ? `Quedan ${days} día${days === 1 ? '' : 's'}` : 'Finalizada';
+          if (days < 0) return 'Finalizada';
+          const plural = days === 1 ? '' : 's';
+          return `Quedan ${days} día${plural}`;
         };
 
         const summary = `<div class="kk-don-camp" style="justify-content:space-between;">
           <div style="flex:1;min-width:0;">
-            <div style="font-size:11px;font-weight:900;color:rgba(255,255,255,.45);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px;">Recaudación general</div>
-            <div style="font-size:12.5px;color:rgba(255,255,255,.7);font-weight:700;">${data.length} campaña(s) activa(s)</div>
+            <div style="font-size:11px;font-weight:900;color:rgba(255,255,255,.75);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px;">Recaudación general</div>
+            <div style="font-size:12.5px;color:rgba(255,255,255,.85);font-weight:700;">${data.length} campaña(s) activa(s)</div>
             <div class="kk-don-prog" style="margin-top:10px;"><span style="width:${pct.toFixed(1)}%"></span></div>
             <div class="kk-don-meta"><b>${fmtRD(totalRaised)}</b><span class="kk-don-muted">de ${fmtRD(totalTarget)} · ${pct.toFixed(0)}%</span></div>
           </div>
@@ -1442,9 +1449,8 @@
           const raised = Number(c.raised_amount || 0);
           const target = Number(c.target_amount || 0);
           const cpct = target > 0 ? Math.min(100, (raised / target) * 100) : 0;
-          const gallery = (c.images && c.images.length
-            ? c.images
-            : (c.cover_image_url ? [c.cover_image_url] : [])).filter(Boolean).slice(0, 5);
+          const rawGallery = (c.images && c.images.length) ? c.images : [c.cover_image_url];
+          const gallery = rawGallery.filter(Boolean).slice(0, 5);
           const mainImg = gallery[0] || c.cover_image_url;
           const img = mainImg
             ? `<img src="${esc(mainImg)}" alt="${esc(c.title)}" loading="lazy" onerror="this.onerror=null;this.outerHTML='<i class=&quot;bi bi-heart-fill&quot; style=&quot;font-size:30px;color:#FFB74D;&quot;></i>'">`
@@ -1513,7 +1519,7 @@
       const btn = document.getElementById('donBtn');
       const setMsg = (t, ok) => { if (msg) { msg.style.display = 'block'; msg.textContent = t; msg.style.color = ok ? '#4ade80' : '#f87171'; } };
 
-      const amount  = parseFloat(document.getElementById('donAmount').value);
+      const amount  = Number.parseFloat(document.getElementById('donAmount').value);
       const name    = (document.getElementById('donName').value || '').trim();
       const email   = (document.getElementById('donEmail').value || '').trim();
       const phone   = (document.getElementById('donPhone').value || '').trim();
@@ -1525,7 +1531,7 @@
 
       if (!amount || amount <= 0) return setMsg('Ingresa un monto válido.', false);
       if (name.length < 2) return setMsg('Ingresa tu nombre o razón social.', false);
-      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return setMsg('Ingresa un correo electrónico válido.', false);
+      if (!/^[^\s@]+@[^@\s]+\.[^@\s.]+$/.test(email)) return setMsg('Ingresa un correo electrónico válido.', false);
 
       btn.disabled = true;
       btn.textContent = 'Procesando donación…';
@@ -1549,7 +1555,7 @@
         }
 
         const { data, error } = await client.rpc('register_donation', {
-          p_campaign_id: campId ? parseInt(campId, 10) : null,
+          p_campaign_id: campId ? Number.parseInt(campId, 10) : null,
           p_donor_name: name,
           p_donor_email: email,
           p_donor_phone: phone || null,
@@ -1612,8 +1618,12 @@
               html,
               text: 'Gracias por tu donación. Referencia: ' + window.kkReceipt.ref
             }
-          }).catch(() => {});
-        } catch (_) {}
+          }).catch((receiptErr) => { console.warn('donation-receipt email failed:', receiptErr?.message); });
+        } catch (receiptEmailErr) {
+          // El correo del recibo es best-effort: la donación ya quedó registrada,
+          // así que un fallo del Edge Function no debe interrumpir el flujo.
+          console.warn('donation-receipt email:', receiptEmailErr?.message);
+        }
       } catch (err) {
         setMsg(err?.message || 'Ocurrió un error. Inténtalo de nuevo.', false);
         console.error('submitDonation:', err);
@@ -1651,7 +1661,7 @@
       const prev   = document.getElementById('donUploadPreview');
       if (!box || !input) return;
 
-      box.addEventListener('click', (e) => { if (e.target === input) return; input.click(); });
+      box.addEventListener('click', (e) => { if (e.target === input) { return; } input.click(); });
 
       box.addEventListener('dragover', (e) => { e.preventDefault(); box.style.borderColor = 'rgba(255,152,0,.6)'; box.style.background = 'rgba(255,152,0,.06)'; });
       box.addEventListener('dragleave', () => { box.style.borderColor = ''; box.style.background = ''; });
@@ -1694,75 +1704,96 @@
       if (ph) ph.style.display = '';
     };
 
-    async function compressDonImage(file) {
-      if (!file.type.startsWith('image/') || file.size < 100 * 1024) return file;
+    function readFileAsDataUrl(file) {
       return new Promise((resolve) => {
         const reader = new FileReader();
-        reader.onload = (e) => {
-          const img = new Image();
-          img.onload = () => {
-            const canvas = document.createElement('canvas');
-            let w = img.width, h = img.height;
-            if (w > 800 || h > 800) { const r = Math.min(800 / w, 800 / h); w = Math.round(w * r); h = Math.round(h * r); }
-            canvas.width = w; canvas.height = h;
-            canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-            canvas.toBlob((blob) => {
-              if (!blob) { resolve(file); return; }
-              resolve(new File([blob], file.name.replace(/\.[^.]+$/, '') + '.webp', { type: 'image/webp' }));
-            }, 'image/webp', 0.75);
-          };
-          img.onerror = () => resolve(file);
-          img.src = e.target.result;
-        };
-        reader.onerror = () => resolve(file);
+        reader.onload = (e) => resolve(String(e.target.result));
+        reader.onerror = () => resolve(null);
         reader.readAsDataURL(file);
       });
     }
 
+    function loadImageElement(src) {
+      return new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = () => resolve(null);
+        img.src = src;
+      });
+    }
+
+    function drawImageToWebpFile(img, file) {
+      const canvas = document.createElement('canvas');
+      let w = img.width, h = img.height;
+      if (w > 800 || h > 800) { const r = Math.min(800 / w, 800 / h); w = Math.round(w * r); h = Math.round(h * r); }
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      return new Promise((resolve) => {
+        canvas.toBlob((blob) => {
+          if (!blob) { resolve(file); return; }
+          resolve(new File([blob], file.name.replace(/\.[^.]+$/, '') + '.webp', { type: 'image/webp' }));
+        }, 'image/webp', 0.75);
+      });
+    }
+
+    async function compressDonImage(file) {
+      if (!file.type.startsWith('image/') || file.size < 100 * 1024) return file;
+      const dataUrl = await readFileAsDataUrl(file);
+      if (!dataUrl) return file;
+      const img = await loadImageElement(dataUrl);
+      if (!img) return file;
+      return drawImageToWebpFile(img, file);
+    }
+
+    async function invokeReceiptUpload(client, file, onProgress) {
+      const dbClient = client.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+        auth: { persistSession: false, autoRefreshToken: false },
+        db: { schema: 'public' }
+      });
+
+      const rawDataUrl = await readFileAsDataUrl(file);
+      if (!rawDataUrl) throw new Error('No se pudo leer el archivo del comprobante');
+      const base64 = rawDataUrl.replace(/^data:[^;]+;base64,/, '');
+
+      if (onProgress) onProgress('70%');
+      // Edge Function upload-receipt: permite subidas anónimas de forma segura
+      const { data, error } = await dbClient.functions.invoke('upload-receipt', {
+        body: { base64, mimeType: file.type || (file.name.endsWith('.pdf') ? 'application/pdf' : 'image/jpeg') }
+      });
+      if (error) throw new Error(error.message || 'Error al subir comprobante');
+      if (!data?.publicUrl) throw new Error('Respuesta inválida al subir comprobante');
+      return data.publicUrl;
+    }
+
     async function uploadDonReceipt(file) {
       if (!file) return null;
-      const prog  = document.getElementById('donUploadProgress');
-      const bar   = document.getElementById('donUploadBar');
-      const stat  = document.getElementById('donUploadStatus');
+      const prog = document.getElementById('donUploadProgress');
+      const bar  = document.getElementById('donUploadBar');
+      const stat = document.getElementById('donUploadStatus');
       if (prog) prog.style.display = 'block';
-      if (bar) bar.style.width = '20%';
-      if (stat) stat.textContent = 'Comprimiendo imagen…';
 
-      const compressed = await compressDonImage(file);
-      if (bar) bar.style.width = '50%';
-      if (stat) stat.textContent = 'Subiendo comprobante…';
+      const setProgress = (pct) => { if (bar) bar.style.width = pct; };
+      const setStatus = (text, color) => {
+        if (!stat) return;
+        stat.textContent = text;
+        stat.style.color = color || '';
+      };
 
       try {
+        setStatus('Comprimiendo imagen…');
+        setProgress('20%');
+        const compressed = await compressDonImage(file);
+
+        setStatus('Subiendo comprobante…');
+        setProgress('50%');
         const client = supabase || await loadSdk();
-        const dbClient = client.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-          auth: { persistSession: false, autoRefreshToken: false },
-          db: { schema: 'public' }
-        });
+        const publicUrl = await invokeReceiptUpload(client, compressed, setProgress);
 
-        // Convertir a base64
-        const base64 = await new Promise((res, rej) => {
-          const r = new FileReader();
-          r.onload  = (e) => res(String(e.target.result).replace(/^data:[^;]+;base64,/, ''));
-          r.onerror = rej;
-          r.readAsDataURL(compressed);
-        });
-
-        // Edge Function upload-receipt: permite subidas anónimas de forma segura
-        if (bar) bar.style.width = '70%';
-        const { data, error } = await dbClient.functions.invoke('upload-receipt', {
-          body: { base64, mimeType: compressed.type || (compressed.name.endsWith('.pdf') ? 'application/pdf' : 'image/jpeg') }
-        });
-        if (error) throw new Error(error.message || 'Error al subir comprobante');
-
-        if (data?.publicUrl) {
-          if (bar) bar.style.width = '100%';
-          if (stat) stat.textContent = '✓ Comprobante subido';
-          if (stat) stat.style.color = '';
-          return data.publicUrl;
-        }
-        throw new Error('Respuesta inválida al subir comprobante');
+        setProgress('100%');
+        setStatus('✓ Comprobante subido');
+        return publicUrl;
       } catch (err) {
-        if (stat) { stat.textContent = '⚠ No se pudo subir el comprobante — la donación se registra sin foto'; stat.style.color = '#fbbf24'; }
+        setStatus('⚠ No se pudo subir el comprobante — la donación se registra sin foto', '#fbbf24');
         console.error('don-receipt-upload:', err);
         return null;
       }
@@ -1772,6 +1803,12 @@
       const r = window.kkReceipt;
       if (!r) return;
       const METHODLABEL = methodLabel(r.method);
+      const phoneRow = r.phone
+        ? `<div style="display:flex;justify-content:space-between;"><span style="color:#64748b;">Teléfono</span><b>${esc(r.phone)}</b></div>`
+        : '';
+      const taxIdRow = r.taxId
+        ? `<div style="display:flex;justify-content:space-between;"><span style="color:#64748b;">Cédula / RNC</span><b>${esc(r.taxId)}</b></div>`
+        : '';
       const receipt = document.createElement('div');
       receipt.id = 'kkReceipt';
       receipt.style.cssText = 'display:none;font-family:Nunito,sans-serif;color:#0f172a;background:#fff;padding:32px;max-width:640px;margin:0 auto;';
@@ -1792,8 +1829,8 @@
             <div style="display:flex;justify-content:space-between;"><span style="color:#64748b;">Fecha</span><b>${esc(r.date)}</b></div>
             <div style="display:flex;justify-content:space-between;"><span style="color:#64748b;">Donante</span><b>${esc(r.name)}</b></div>
             <div style="display:flex;justify-content:space-between;"><span style="color:#64748b;">Correo</span><b>${esc(r.email)}</b></div>
-            ${r.phone ? `<div style="display:flex;justify-content:space-between;"><span style="color:#64748b;">Teléfono</span><b>${esc(r.phone)}</b></div>` : ''}
-            ${r.taxId ? `<div style="display:flex;justify-content:space-between;"><span style="color:#64748b;">Cédula / RNC</span><b>${esc(r.taxId)}</b></div>` : ''}
+            ${phoneRow}
+            ${taxIdRow}
             <div style="display:flex;justify-content:space-between;"><span style="color:#64748b;">Campaña</span><b>${esc(r.campaign)}</b></div>
             <div style="display:flex;justify-content:space-between;"><span style="color:#64748b;">Método</span><b>${esc(METHODLABEL)}</b></div>
           </div>

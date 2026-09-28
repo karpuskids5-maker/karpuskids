@@ -45,6 +45,21 @@ function monthLabel(m) {
   return s;
 }
 
+// 🗓️ Meses excluidos del historial del padre (ciclo 'YYYY-MM').
+// '2026-05': cobro del ciclo anterior (mayo 2026) que se generó y aprobó por error
+// el 2026-09-23 desde el panel de directora; no corresponde al ciclo 2026-08 → 2027-07.
+// Se aplica antes de la deduplicación para que no aparezca en la lista, ni sume en el
+// balance, ni entre en el banner de alertas ni en el cálculo del pago urgente.
+// La anulación definitiva de esos pagos en la BD está en la migración
+// supabase/migrations/20260920121200_12_archivo_pagos_fuera_ciclo.sql; mientras
+// no esté aplicada, este filtro es la vía que los oculta en el panel del padre.
+const EXCLUDED_MONTHS = new Set(['2026-05']);
+
+function isExcludedMonth(p) {
+  if (EXCLUDED_MONTHS.size === 0) return false;
+  return EXCLUDED_MONTHS.has(monthKey(p?.month_paid, p?.paid_date || p?.created_at));
+}
+
 export const PaymentsModule = {
   _studentId: null,
   _payments:  [],
@@ -198,6 +213,8 @@ export const PaymentsModule = {
       const statusPriority = { paid: 4, review: 3, overdue: 2, rejected: 1, pending: 1 };
       const monthMap = new Map();
       for (const p of data || []) {
+        // Meses excluidos (cobros que no corresponden): no entran al historial.
+        if (isExcludedMonth(p)) continue;
         // Clave única: usar month_paid normalizado; si es null/vacío usar el id del pago
         // para que no colisionen entre sí (no se pierdan pagos sin month_paid)
         const normalized = monthKey(p.month_paid, p.paid_date || p.created_at);
@@ -215,18 +232,21 @@ export const PaymentsModule = {
       }
       
       // Mostrar siempre: pagados + vencidos + en revisión
-      // Ocultar: pendientes con due_date en el futuro (el padre no los ve hasta que vencen)
-      const todayMidnight = new Date(); todayMidnight.setHours(0, 0, 0, 0);
+      // Ocultar SOLO pendientes de meses FUTUROS (cargos adelantados que aún no
+      // corresponden). Los cargos del mes en curso se muestran aunque su
+      // vencimiento (día 5 del mes siguiente) aún esté por llegar: el alumno ya
+      // tiene esa mensualidad facturada y el banner "Estás al día" no debe salir.
+      const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
       let filteredPayments = Array.from(monthMap.values()).filter(p => {
         // Estado NORMALIZADO (tolera alias: approved/pagado/confirmado → 'paid')
         const status = normalizeStatus(p);
-        // Siempre mostrar pagados, en revisión, vencidos y rechazados: el filtro
-        // de abajo solo debe descartar *pendientes* con due_date en el futuro.
-        // 'rejected' no estaba en la lista y se ocultaba igual que un pendiente.
+        // Siempre mostrar pagados, en revisión, vencidos y rechazados.
         if (['paid', 'review', 'overdue', 'rejected'].includes(status)) return true;
-        // Para pendientes: solo mostrar si due_date ya llegó o no tiene fecha
-        if (!p.due_date) return true;
-        return new Date(p.due_date + 'T00:00:00') <= todayMidnight;
+        // Pendientes sin mes (materiales, etc.): mostrar siempre.
+        if (!p.month_paid) return true;
+        // Pendientes: mostrar mes en curso o anteriores; ocultar futuros.
+        const mk = monthKey(p.month_paid, p.paid_date || p.created_at);
+        return !mk || mk <= currentMonthKey;
       });
       
       this._payments = filteredPayments
@@ -477,7 +497,19 @@ export const PaymentsModule = {
       ? new Date(payment.paid_date).toLocaleDateString('es-DO', { day: 'numeric', month: 'long', year: 'numeric' })
       : new Date().toLocaleDateString('es-DO', { day: 'numeric', month: 'long', year: 'numeric' });
     const method      = (payment.method || 'efectivo').charAt(0).toUpperCase() + (payment.method || 'efectivo').slice(1);
-    const receiptNo   = `KK-${String(payment.id).slice(-6).toUpperCase().padStart(6,'0')}`;
+    // Correlativo secuencial por mes, sin huecos. Lo calcula el servidor
+    // (SECURITY DEFINER) porque un padre solo puede leer los pagos de sus
+    // propios hijos segun la RLS, asi que no se puede listar el mes aqui.
+    // Si la funcion aun no esta aplicada, se cae al numero historico por id.
+    let receiptNo = `KK-${String(payment.id).slice(-6).toUpperCase().padStart(6,'0')}`;
+    const { data: no, error: receiptErr } = await supabase.rpc('payment_receipt_no', { p_payment_id: payment.id });
+    if (receiptErr) {
+      // La RPC payment_receipt_no puede no existir (migración no aplicada) o fallar por
+      // permisos: no invalida el recibo, por eso se registra y se sigue con el id como número.
+      console.warn('payment_receipt_no no disponible, se usa el id como numero de recibo:', receiptErr.message);
+    } else if (no) {
+      receiptNo = no;
+    }
 
     // Construir modal
     const modal = document.createElement('div');

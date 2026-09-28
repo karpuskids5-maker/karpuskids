@@ -1,7 +1,7 @@
 import { supabase } from '../shared/supabase.js';
 import { Helpers } from '../shared/helpers.js';
 import { AppState } from './state.js';
-import { calcMora, normalizeStatus } from '../shared/payment-service.js';
+import { calcMora, normalizeStatus, computePaymentStats, isFutureMonth } from '../shared/payment-service.js';
 import { QueryCache } from '../shared/query-cache.js';
 
 const MONTH_NAMES_ES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
@@ -387,46 +387,24 @@ export const PaymentsModule = {
     try {
       const mv  = document.getElementById('filterPaymentMonth')?.value;
       const yv  = document.getElementById('filterPaymentYear')?.value || String(new Date().getFullYear());
-      const { data: pays } = await supabase.from('payments').select('id, amount, status, due_date, month_paid')
-        .gte('created_at', yv + '-01-01T00:00:00').lte('created_at', yv + '-12-31T23:59:59').limit(2000);
+      const y   = String(yv);
+      // Sin mes seleccionado se usa el actual: antes el KPI "Ingresos Mes"
+      // sumaba el AÑO entero cuando el filtro venía vacío.
+      const mo  = mv ? String(mv).padStart(2, '0') : String(new Date().getMonth() + 1).padStart(2, '0');
+
+      const { data: pays } = await supabase.from('payments')
+        .select('id, student_id, amount, status, due_date, month_paid, paid_date, created_at, evidence_url')
+        .is('deleted_at', null)          // la migración 10 anula pagos; no contarlos
+        .gte('created_at', y + '-01-01').lte('created_at', y + '-12-31T23:59:59').limit(2000);
       if (!pays) return;
-      const filtered = this._filterStatsByMonth(pays, mv, yv);
-      const counts = this._computePaymentCounters(filtered);
+
+      const c = computePaymentStats(pays, y, mo);
       const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
-      set('kpiIncomeMonth', '$' + counts.income.toLocaleString('es-DO', { minimumFractionDigits: 2 }));
-      set('kpiPendingCount', counts.pending);
-      set('kpiOverdueCount', counts.overdue);
-      set('kpiReviewCount', counts.review);
+      set('kpiIncomeMonth', '$' + c.income.toLocaleString('es-DO', { minimumFractionDigits: 2 }));
+      set('kpiPendingCount', c.pending);
+      set('kpiOverdueCount', c.overdue);
+      set('kpiReviewCount', c.review);
     } catch (error_) { Helpers.safeLog?.(error_); }
-  },
-
-  _filterStatsByMonth(pays, mv, yv) {
-    if (!mv) return pays;
-    const mk = yv + '-' + String(mv).padStart(2, '0');
-    const mkn = MONTH_NAMES_ES[Number.parseInt(mv, 10) - 1];
-    const mknAlt = yv + '-' + Number.parseInt(mv, 10);
-    return pays.filter(p => {
-      const mp = (p.month_paid || '').toLowerCase();
-      if (mp === mk) return true;
-      if (mp === mknAlt) return true;
-      return mp.startsWith(mkn);
-    });
-  },
-
-  _computePaymentCounters(payments) {
-    const nowTs = new Date().setHours(0, 0, 0, 0);
-    let income = 0, pending = 0, overdue = 0, review = 0;
-    for (const p of payments) {
-      const sk = calcStatus(p);
-      if (sk === 'paid') { income += Number(p.amount || 0); continue; }
-      if (sk === 'review') { review++; continue; }
-      if (p.due_date) {
-        const ddTs = new Date(p.due_date + 'T00:00:00').getTime();
-        if (nowTs > ddTs) { overdue++; continue; }
-      }
-      pending++;
-    }
-    return { income, pending, overdue, review };
   },
 
   async loadIncomeChart() {
@@ -534,6 +512,7 @@ export const PaymentsModule = {
     const paidDate  = status === 'paid' ? new Date().toISOString() : null;
     if (!studentId) return Helpers.toast('Selecciona un estudiante', 'warning');
     if (!amount || amount <= 0) return Helpers.toast('Ingresa un monto válido', 'warning');
+    if (isFutureMonth(monthPaid)) return Helpers.toast('No se pueden generar cargos de meses futuros. El cargo de un mes se crea el día de generación de ese mes.', 'warning');
     const btn = document.getElementById('btnSavePaymentAction');
     if (btn) { btn.disabled = true; btn.textContent = 'Guardando...'; }
     try {
@@ -660,7 +639,7 @@ export const PaymentsModule = {
       // con `RETURN OLD` descartaba los UPDATE de pagos no aprobados sin error).
       const { data: chk } = await supabase.from('payments').select('status').eq('id', id).single();
       if (!chk || chk.status !== 'paid') {
-        Helpers.toast('No se pudo aprobar: aplica la migración 16 (sección 8) en Supabase SQL Editor y reintenta.', 'error');
+        Helpers.toast('No se pudo aprobar el pago. Verifica que el registro esté pendiente o en revisión (puede haber un duplicado del mismo mes) y reintenta.', 'error');
         this.closeModal();
         await this.loadPayments();
         this.loadStats();
@@ -801,7 +780,7 @@ export const PaymentsModule = {
     fixedBtn?.addEventListener('click', () => { valueInput.dataset.touched = '1'; paint('fixed'); if (valueInput) valueInput.value = saved > 0 ? saved : ''; });
 
     const preview = () => {
-      const v = Math.max(0, parseFloat(valueInput?.value || 0) || 0);
+      const v = Math.max(0, Number.parseFloat(valueInput?.value) || 0);
       let disc = mode === 'pct' ? orig * v / 100 : v;
       disc = Math.min(disc, orig);
       const net = Math.max(0, orig - disc);
@@ -810,9 +789,9 @@ export const PaymentsModule = {
     valueInput?.addEventListener('input', preview);
 
     document.getElementById('btnSaveDiscountAction')?.addEventListener('click', async () => {
-      const v = Math.max(0, parseFloat(valueInput?.value || 0) || 0);
+      const v = Math.max(0, Number.parseFloat(valueInput?.value || 0) || 0);
       const reason = (document.getElementById('discReason')?.value || '').trim();
-      const isRemove = mode === 'pct' ? v === 0 : v === 0;
+      const isRemove = v === 0;
       if (!isRemove && !reason) return Helpers.toast('Indica el motivo del descuento', 'warning');
       if (v > 100 && mode === 'pct') return Helpers.toast('El porcentaje no puede superar 100%', 'warning');
       const btn = document.getElementById('btnSaveDiscountAction');

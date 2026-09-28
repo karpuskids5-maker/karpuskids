@@ -52,12 +52,10 @@ export const DashboardModule = {
             // Auto-detección de ausentes (misma regla: check_in_end + 2h)
             try { await autoMarkAbsentStudents(); } catch (_) {}
 
-            const [studentsRes, attendanceRes, absentRes, paymentsRes, incomeRes] = await Promise.allSettled([
+            const [studentsRes, attendanceRes, paymentsRes, incomeRes] = await Promise.allSettled([
               supabase.from('students').select('*', { count: 'exact', head: true })
                 .eq('is_active', true).not('classroom_id', 'is', null),
               supabase.from('attendance').select('*', { count: 'exact', head: true })
-                .eq('date', today).in('status', ['present', 'presente', 'late', 'tarde']),
-              supabase.from('attendance').select('student_id')
                 .eq('date', today).in('status', ['present', 'presente', 'late', 'tarde']),
               supabase.from('payments').select('*', { count: 'exact', head: true })
                 .in('status', ['pending', 'review']),

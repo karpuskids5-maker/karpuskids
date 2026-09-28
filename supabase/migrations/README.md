@@ -1,11 +1,11 @@
 # Migraciones de base de datos — Karpus Kids
 
-Estas 10 migraciones consolidan **44 fuentes SQL** (36 archivos de
+Estas 12 migraciones consolidan **44 fuentes SQL** (36 archivos de
 `migraciones/operativos/` y 8 de `supabase/migrations/`) y corrigen los defectos
 encontrados al auditarlas.
 
 Los 44 archivos originales **se eliminaron del repositorio** tras la
-consolidación: no son válidos para desplegar. Estas 10 son las únicas
+consolidación: no son válidos para desplegar. Estas 12 son las únicas
 migraciones del proyecto y el único estado desplegable del esquema.
 
 ## Aplicar en este orden
@@ -22,13 +22,15 @@ migraciones del proyecto y el único estado desplegable del esquema.
 | 08 | `20260920120800_08_funciones_vistas_triggers_storage.sql` | Funciones, vistas, triggers, buckets de storage y sus policies |
 | 09 | `20260920120900_09_rls_policies.sql` | RLS de todas las tablas + grants |
 | 10 | `20260920121000_10_correcciones_auditoria.sql` | Correcciones de auditoría (ver abajo) |
+| 11 | `20260920121100_11_numeracion_recibos.sql` | Consolidada (absorbe las antiguas 11, 12 y 13): mes canónico `month_key()`, correlativo de recibo, policy de comprobante en revisión, **reparación de datos** (unificar `month_paid` a `YYYY-MM` y deduplicar), trigger anti-meses-futuros y ciclo de pagos con `GET DIAGNOSTICS` |
+| 12 | `20260920121200_12_archivo_pagos_fuera_ciclo.sql` | Archivar pagos aprobados: `deleted_at` permitido en `fn_protect_paid_records`, `payments_month_floor_check` admite filas archivadas y **anulación del lote de cobros de `2026-05`** (ids 245-262, RD$ 93,603.00) |
 
 Los timestamps arrancan en `20260920`, después de la última migración anterior
 (`20260919120000_asistencia_unifica_horario.sql`), así que se aplican al final.
 
 ```bash
 supabase db push          # aplica lo pendiente en orden
-# o manual, en orden 01 -> 10:
+# o manual, en orden 01 -> 12:
 psql "$DATABASE_URL" -f 20260920120100_01_esquema.sql
 psql "$DATABASE_URL" -f 20260920120200_02_esquema.sql
 # ... etc
@@ -87,6 +89,53 @@ No se generan, no se cobra y no se reportan meses anteriores.
 
 > La marca `NOT VALID` deja pasar filas antiguas a propósito. Para borrar también
 > el historial pagado hay que hacerlo de forma explícita y consciente.
+
+## Migración 12: archivo de pagos aprobados
+
+Antes de la 12, un pago `paid` **no se podía archivar por ninguna vía**:
+
+- `trg_protect_paid_records` solo habilitaba `amount`, `original_amount`,
+  `discount_pct`, `discount_amount`, `discount_reason`, `notes` y `updated_at`.
+  Como `deleted_at` no estaba, cualquier archivo rebotaba con `42501`.
+- El propio mensaje de error mandaba a `reset_payment_to_pending()` o
+  `waive_payment_mora()`, que escriben columnas bloqueadas y fallaban igual;
+  `delete_payment()` (la que sí escribe `deleted_at`) también era bloqueada.
+- `payments_month_floor_check` (`NOT VALID`) revalida en cada `UPDATE`, así que
+  ni siquiera un `deleted_at` simple pasaba en las filas de meses anteriores a
+  agosto 2026 (`23514`).
+
+La 12 lo resuelve en tres partes:
+
+| Bloque | Cambio |
+|--------|--------|
+| A | `fn_protect_paid_records`: `deleted_at` entra en la lista de columnas ajustables. Monto, estado, `paid_date` y `validated_by` siguen protegidos y el control de rol no cambia |
+| B | `payments_month_floor_check` pasa a `(month_paid IS NULL OR month_paid >= '2026-08' OR deleted_at IS NOT NULL) NOT VALID`: lo archivado sale del piso, pero no se puede volver a fechar ni reactivar un mes anterior |
+| C | Anula el lote de `2026-05` (18 pagos, ids 245-262, RD$ 93,603.00) generado y aprobado por error el 2026-09-23/25, con la nota de auditoría en `notes` y el mismo patrón de `DISABLE`/`ENABLE TRIGGER` que ya usa la 11 |
+
+Queda pendiente (aún no aplicado, para no mezclar alcances): el chequeo de rol
+de `fn_protect_paid_records` sigue siendo permisivo cuando `auth.uid()` es NULL
+(`COALESCE` en el `SELECT` no cubre el "no rows found"), o sea que la service
+key pasa el control de rol. El arreglo es `IF v_role IS NULL OR v_role NOT IN (...)`.
+
+## Consolidación en la migración 11
+
+Las antiguas 11, 12 y 13 quedaron en **un solo archivo** (`11_numeracion_recibos.sql`);
+los archivos `12_regla_cargos_no_futuros.sql` y `13_fixes_ciclo_pagos.sql` se eliminaron.
+
+Además de absorber ese contenido, la 11 **repara los datos** que provocaban la
+desincronización entre paneles (propuesta.md):
+
+- Normaliza `payments.month_paid` a la clave canónica `YYYY-MM` (los `'agosto'`,
+  `'mayo'` del piso de la 10 distorsionaban las comparaciones de texto y las
+  vistas). Solo toca meses dentro del periodo escolar (el `CHECK NOT VALID`
+  `payments_month_floor_check` de la 10 se aplica a `UPDATE`).
+- Deduplica `(student_id, mes_normalizado, concept)`: si conviven una fila
+  pagada por el padre (`'agosto'`) y una pendiente generada por el ciclo
+  (`'2026-08'`), se conserva la **pagada** y la pendiente se archiva con
+  `deleted_at` (nunca se borra).
+- El pase requiere desactivar temporalmente `trg_protect_paid_records` (permite
+  tocar filas `paid`); se rehabilita al final, dentro de la misma transacción, y
+  deja rastro en `audit_logs` (`payment.data_normalized`).
 
 ## Vocabulario de estados de pago
 

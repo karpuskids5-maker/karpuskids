@@ -3,7 +3,7 @@ import { AppState } from './state.js';
 import { Helpers } from '/js/shared/helpers.js';
 import { UIHelpers } from './ui.module.js';
 import { supabase } from '/js/shared/supabase.js';
-import { MES, MES_LABEL } from '/js/shared/payment-service.js';
+import { MES, MES_LABEL, isFutureMonth } from '/js/shared/payment-service.js';
 import { SchoolEngine } from '/js/shared/school-engine.js';
 
 export const PaymentsModule = {
@@ -85,6 +85,72 @@ export const PaymentsModule = {
     if (sel) { sel.value = status; this.loadPayments(); }
   },
 
+  // Piso del periodo 2026-2027. Debe coincidir con payments_month_floor_check
+  // y con public.school_year_floor_month() (migración 10, bloque N).
+  _PAYMENT_FLOOR: '2026-08',
+
+  /** Devuelve el último mes-clave visible según el día de generación */
+  _getMaxVisibleMonthKey() {
+    const now = new Date();
+    const today = now.getDate();
+    const genDay = this.settings.generation_day || 25;
+    const yr = now.getFullYear();
+    const mo = now.getMonth() + 1;
+    let key;
+    if (today >= genDay) {
+      key = `${yr}-${String(mo).padStart(2, '0')}`;
+    } else {
+      const prevM = mo === 1 ? 12 : mo - 1;
+      const prevY = mo === 1 ? yr - 1 : yr;
+      key = `${prevY}-${String(prevM).padStart(2, '0')}`;
+    }
+    return key < this._PAYMENT_FLOOR ? this._PAYMENT_FLOOR : key;
+  },
+
+  /** Construye la query de pagos según los filtros activos */
+  _buildPaymentsQuery(s, { mv, yv, sf, monthKey, maxKey }) {
+    const FLOOR = this._PAYMENT_FLOOR;
+    const currentYear = new Date().getFullYear();
+    let q = supabase.from('v_payments_with_mora').select(s);
+    if (mv === 'all' || !mv) {
+      const rangeStart = ((yv || currentYear) + '-01') < FLOOR
+        ? FLOOR : (yv || currentYear) + '-01';
+      q = q.gte('month_paid', rangeStart).lte('month_paid', maxKey);
+      if (sf && sf !== 'all') q = q.eq('status', sf);
+    } else if (sf === 'all') {
+      q = q.or(`and(status.eq.overdue,month_paid.gte.${FLOOR},month_paid.lt.${maxKey}),month_paid.eq.${monthKey}`);
+    } else if (sf === 'pending' || sf === 'overdue' || sf === 'review') {
+      q = q.eq('status', sf).lte('month_paid', maxKey);
+    } else {
+      q = q.eq('month_paid', monthKey);
+      if (sf && sf !== 'all') q = q.eq('status', sf);
+    }
+    return q.order('month_paid', { ascending: false }).order('due_date', { ascending: true });
+  },
+
+  /** Agrupa los pagos en secciones HTML */
+  _buildPaymentsHTML(list, { mv, yv, sf, monthKey, maxKey }) {
+    const prevDebts   = list.filter(p => p.month_paid < monthKey && this._st(p) === 'overdue');
+    const curItems    = list.filter(p => p.month_paid === monthKey);
+    const otherItems  = list.filter(p => p.month_paid !== monthKey && !prevDebts.includes(p));
+    let html = '';
+    if (prevDebts.length) {
+      html += '<tr class="bg-rose-50/30"><td colspan="8" class="px-5 py-2 text-[10px] font-black text-rose-600 uppercase tracking-[0.2em] border-y border-rose-100">\u26A0\uFE0F DEUDAS VENCIDAS (MESES ANTERIORES)</td></tr>';
+      html += prevDebts.map(p => this._row(p)).join('');
+    }
+    if (curItems.length) {
+      const activeMv = (mv && mv !== 'all') ? mv : maxKey.split('-')[1];
+      const monthLabel = MES_LABEL[parseInt(activeMv, 10) - 1]?.toUpperCase() || 'MES SELECCIONADO';
+      html += `<tr class="bg-indigo-50/50"><td colspan="8" class="px-5 py-2 text-[10px] font-black text-indigo-500 uppercase tracking-[0.2em] border-y border-indigo-100">\uD83D\uDCC5 ${monthLabel} ${yv || maxKey.split('-')[0]}</td></tr>`;
+      html += curItems.map(p => this._row(p)).join('');
+    }
+    if (otherItems.length && sf !== 'all') {
+      html += '<tr class="bg-slate-50/30"><td colspan="8" class="px-5 py-2 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] border-y border-slate-100">OTROS REGISTROS</td></tr>';
+      html += otherItems.map(p => this._row(p)).join('');
+    }
+    return html;
+  },
+
   async loadPayments() {
     const tbody = document.getElementById('paymentsTableBody');
     if (!tbody) return;
@@ -96,74 +162,28 @@ export const PaymentsModule = {
     this.loadStats();
     this.loadIncomeChart();
     try {
-      const mv = document.getElementById('filterPaymentMonth')?.value;
-      const yv = document.getElementById('filterPaymentYear')?.value;
-      const sf = document.getElementById('filterPaymentStatus')?.value;
-      const sq = document.getElementById('searchPaymentStudent')?.value?.trim();
-
-      const currentDate = new Date();
-      const today  = currentDate.getDate();
-      const genDay = this.settings.generation_day || 25; // Día de generación
-
-      // Piso del periodo 2026-2027. Debe coincidir con el literal de
-      // payments_month_floor_check y con public.school_year_floor_month()
-      // (migracion 10, bloque N). Sin este tope, el 1-24 de agosto la vista
-      // caía a julio y listaba meses que no se pueden facturar.
-      const PAYMENT_FLOOR_MONTH = '2026-08';
-
-      // El mes actual solo es visible si hoy es >= 25.
-      const currentYear  = currentDate.getFullYear();
-      const currentMonth = currentDate.getMonth() + 1; // 1-12
-      
-      let maxVisibleMonthKey;
-      if (today >= genDay) {
-        maxVisibleMonthKey = `${currentYear}-${String(currentMonth).padStart(2, '0')}`;
-      } else {
-        const prevM = currentMonth === 1 ? 12 : currentMonth - 1;
-        const prevY = currentMonth === 1 ? currentYear - 1 : currentYear;
-        maxVisibleMonthKey = `${prevY}-${String(prevM).padStart(2, '0')}`;
-      }
-      if (maxVisibleMonthKey < PAYMENT_FLOOR_MONTH) maxVisibleMonthKey = PAYMENT_FLOOR_MONTH;
-
-      const monthKey = (yv && mv && mv !== 'all') ? `${yv}-${String(mv).padStart(2,'0')}` : maxVisibleMonthKey;
+      const mv  = document.getElementById('filterPaymentMonth')?.value;
+      const yv  = document.getElementById('filterPaymentYear')?.value;
+      const sf  = document.getElementById('filterPaymentStatus')?.value;
+      const sq  = document.getElementById('searchPaymentStudent')?.value?.trim();
+      const maxKey  = this._getMaxVisibleMonthKey();
+      const monthKey = (yv && mv && mv !== 'all') ? `${yv}-${String(mv).padStart(2, '0')}` : maxKey;
 
       const SEL = 'id,student_id,amount,concept,status,due_date,created_at,paid_date,method,bank,reference,month_paid,evidence_url,proof_url,mora_amount,total_due,student_name,classroom_name,original_amount,discount_pct,discount_amount,discount_reason';
       const SEL_LEGACY = 'id,student_id,amount,concept,status,due_date,created_at,paid_date,method,bank,reference,month_paid,evidence_url,proof_url,mora_amount,total_due,student_name,classroom_name';
-
-      const build = (s) => {
-        let q = supabase.from('v_payments_with_mora').select(s);
-        if (mv === 'all' || !mv) {
-          // Todos los meses del año seleccionado, acotados al piso del periodo:
-          // sin esto el rango '-01' .. maxVisibleMonthKey incluía enero a julio
-          // de 2026, meses fuera del año escolar 2026-2027.
-          const rangeStart = ((yv || currentYear) + '-01') < PAYMENT_FLOOR_MONTH
-            ? PAYMENT_FLOOR_MONTH
-            : (yv || currentYear) + '-01';
-          q = q.gte('month_paid', rangeStart)
-               .lte('month_paid', maxVisibleMonthKey);
-          if (sf && sf !== 'all') q = q.eq('status', sf);
-        } else if (sf === 'all') {
-          q = q.or(`and(status.eq.overdue,month_paid.lt.${maxVisibleMonthKey}),month_paid.eq.${monthKey}`);
-        } else if (sf === 'pending' || sf === 'overdue' || sf === 'review') {
-          q = q.eq('status', sf).lte('month_paid', maxVisibleMonthKey);
-        } else {
-          q = q.eq('month_paid', monthKey);
-          if (sf && sf !== 'all') q = q.eq('status', sf);
-        }
-        return q.order('month_paid', { ascending: false }).order('due_date', { ascending: true });
-      };
+      const ctx = { mv, yv, sf, monthKey, maxKey };
 
       let data, error;
       try {
-        const r = await build(SEL);
+        const r = await this._buildPaymentsQuery(SEL, ctx);
         if (r.error) {
-          const r2 = await build(SEL_LEGACY);
+          const r2 = await this._buildPaymentsQuery(SEL_LEGACY, ctx);
           data = r2.data; error = r2.error;
         } else {
           data = r.data; error = null;
         }
       } catch (err_) {
-        const r2 = await build(SEL_LEGACY).catch(() => null);
+        const r2 = await this._buildPaymentsQuery(SEL_LEGACY, ctx).catch(() => null);
         if (!r2 || r2.error) throw err_;
         data = r2.data; error = null;
       }
@@ -171,10 +191,9 @@ export const PaymentsModule = {
 
       let list = data || [];
       if (sq) {
-        const query = sq.toLowerCase();
-        list = list.filter(p => p.student_name?.toLowerCase().includes(query));
+        const q = sq.toLowerCase();
+        list = list.filter(p => p.student_name?.toLowerCase().includes(q));
       }
-
       AppState.set('paymentsData', list);
 
       if (!list.length) {
@@ -187,28 +206,7 @@ export const PaymentsModule = {
         return;
       }
 
-      const previousMonthDebts = list.filter(p => p.month_paid < monthKey && this._st(p) === 'overdue');
-      const currentMonthItems = list.filter(p => p.month_paid === monthKey);
-      const otherItems = list.filter(p => p.month_paid !== monthKey && !previousMonthDebts.includes(p));
-
-      let html = '';
-      if (previousMonthDebts.length > 0) {
-        html += '<tr class="bg-rose-50/30"><td colspan="8" class="px-5 py-2 text-[10px] font-black text-rose-600 uppercase tracking-[0.2em] border-y border-rose-100">\u26A0\uFE0F DEUDAS VENCIDAS (MESES ANTERIORES)</td></tr>';
-        html += previousMonthDebts.map(p => this._row(p)).join('');
-      }
-      if (currentMonthItems.length > 0) {
-        const activeMv = (mv && mv !== 'all') ? mv : maxVisibleMonthKey.split('-')[1];
-        const monthLabel = MES_LABEL[parseInt(activeMv, 10) - 1]?.toUpperCase() || 'MES SELECCIONADO';
-        html += `<tr class="bg-indigo-50/50"><td colspan="8" class="px-5 py-2 text-[10px] font-black text-indigo-500 uppercase tracking-[0.2em] border-y border-indigo-100">\uD83D\uDCC5 ${monthLabel} ${yv || maxVisibleMonthKey.split('-')[0]}</td></tr>`;
-        html += currentMonthItems.map(p => this._row(p)).join('');
-      }
-      if (otherItems.length > 0 && sf !== 'all') {
-        html += '<tr class="bg-slate-50/30"><td colspan="8" class="px-5 py-2 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] border-y border-slate-100">OTROS REGISTROS</td></tr>';
-        html += otherItems.map(p => this._row(p)).join('');
-      }
-
-      tbody.innerHTML = html;
-
+      tbody.innerHTML = this._buildPaymentsHTML(list, ctx);
       if (window.lucide) lucide.createIcons();
     } catch (e) {
       console.error('Error in loadPayments:', e);
@@ -338,6 +336,8 @@ export const PaymentsModule = {
         Helpers.setTxt('kpiPendingCount', '0');
         Helpers.setTxt('kpiOverdueCount', '0');
         Helpers.setTxt('kpiReviewCount', '0');
+        ['kpiPendingStudents', 'kpiOverdueStudents', 'kpiReviewStudents']
+          .forEach(id => Helpers.setTxt(id, ' '));
         return;
       }
 
@@ -347,9 +347,25 @@ export const PaymentsModule = {
 
       if (!data) return;
       Helpers.setTxt('kpiIncomeMonth', '$' + Number(data.incomeMonth || 0).toLocaleString('es-ES', { minimumFractionDigits: 2 }));
-      Helpers.setTxt('kpiPendingCount', data.pending);
-      Helpers.setTxt('kpiOverdueCount', data.overdue);
-      Helpers.setTxt('kpiReviewCount',  data.toApprove || 0);
+      Helpers.setTxt('kpiPendingCount', data.pendingStudents ?? data.pending);
+      Helpers.setTxt('kpiOverdueCount', data.overdueStudents ?? data.overdue);
+      Helpers.setTxt('kpiReviewCount',  data.reviewStudents  ?? data.toApprove ?? 0);
+
+      // Los KPIs cuentan CARGOS, no estudiantes: un mismo alumno puede tener
+      // Mensualidad + Materiales + Día Prolongado en el mismo mes. Sin este
+      // subtítulo "25 pendientes" con 22 alumnos parece un error.
+      const sub = (id, cargos, alumnos) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        const cargosLabel = `${cargos} cargo${cargos === 1 ? '' : 's'}`;
+        const alumnosLabel = `${alumnos} estudiante${alumnos === 1 ? '' : 's'}`;
+        el.textContent = (alumnos != null && alumnos !== cargos)
+          ? `${cargosLabel} · ${alumnosLabel}`
+          : cargosLabel;
+      };
+      sub('kpiPendingStudents',  data.pending || 0, data.pendingStudents);
+      sub('kpiOverdueStudents',  data.overdue || 0, data.overdueStudents);
+      sub('kpiReviewStudents',   data.toApprove || 0, data.reviewStudents);
     } catch (_) {}
   },
 
@@ -358,10 +374,25 @@ export const PaymentsModule = {
     if (!canvas || !window.Chart) return;
     try {
       const year = document.getElementById('filterPaymentYear')?.value || new Date().getFullYear();
-      const { data: pays } = await supabase.from('payments').select('amount,created_at').eq('status', 'paid').gte('created_at', year + '-01-01').lte('created_at', year + '-12-31');
+      const { data: pays } = await supabase.from('payments').select('amount,month_paid,created_at').eq('status', 'paid').gte('created_at', year + '-01-01').lte('created_at', year + '-12-31');
       const labels = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
       const vals = new Array(12).fill(0);
-      (pays || []).forEach(p => { const d = new Date(p.created_at); vals[d.getMonth()] += Number(p.amount || 0); });
+      // Ingreso por mes cobrado (month_paid), igual que el KPI y el gráfico del
+      // asistente: un pago aprobado hoy del mes de agosto figura en agosto, no en
+      // el mes en que se aprobó. Fallback: mes de created_at si month_paid no es
+      // interpretable.
+      const monthIndex = (mp) => {
+        const s = String(mp || '').toLowerCase().trim();
+        if (!s) return -1;
+        const parts = s.split('-');
+        if (parts.length >= 2) { const n = parseInt(parts[1], 10); return n >= 1 && n <= 12 ? n - 1 : -1; }
+        return MES.indexOf(s);
+      };
+      (pays || []).forEach(p => {
+        let m = monthIndex(p.month_paid);
+        if (m < 0 || m > 11) m = new Date(p.created_at).getMonth();
+        vals[m] += Number(p.amount || 0);
+      });
       if (this._chart) this._chart.destroy();
       this._chart = new Chart(canvas, {
         type: 'bar',
@@ -471,8 +502,8 @@ export const PaymentsModule = {
 
         // Devuelta = montoDado - monto (en tiempo real)
         const recalcChange = () => {
-          const amt = parseFloat(document.getElementById('payAmount')?.value || 0);
-          const tend = parseFloat(document.getElementById('payTendered')?.value || 0);
+          const amt = Number.parseFloat(document.getElementById('payAmount')?.value || 0);
+          const tend = Number.parseFloat(document.getElementById('payTendered')?.value || 0);
           const chgInput = document.getElementById('payChange');
           const alertBox = document.getElementById('payChangeAlert');
           if (chgInput) {
@@ -505,7 +536,7 @@ export const PaymentsModule = {
           // Los estudiantes listados estan pendientes/vencidos → Estado por defecto "Pendiente"
           const statusSel = document.getElementById('payStatus');
           if (statusSel) statusSel.value = 'pending';
-          const fee = parseFloat(opt.dataset.fee || 0);
+          const fee = Number.parseFloat(opt.dataset.fee || 0);
           const dueDate = opt.dataset.due;
           const monthPaid = opt.dataset.month;
           const status = opt.dataset.status;
@@ -594,11 +625,11 @@ export const PaymentsModule = {
           const base = this._disc.base || 0;
           if (!base) return;
           if (this._disc.source === 'amt') {
-            this._disc.amt = Math.max(0, Math.min(parseFloat(discAmtEl?.value || 0) || 0, base));
+            this._disc.amt = Math.max(0, Math.min(Number.parseFloat(discAmtEl?.value || 0) || 0, base));
             this._disc.pct = base > 0 ? +(this._disc.amt / base * 100).toFixed(2) : 0;
             if (discPctEl) discPctEl.value = this._disc.pct > 0 ? this._disc.pct : '';
           } else {
-            this._disc.pct = Math.max(0, Math.min(parseFloat(discPctEl?.value || 0) || 0, 100));
+            this._disc.pct = Math.max(0, Math.min(Number.parseFloat(discPctEl?.value || 0) || 0, 100));
             this._disc.amt = +(base * this._disc.pct / 100).toFixed(2);
             if (discAmtEl) discAmtEl.value = this._disc.amt > 0 ? this._disc.amt : '';
           }
@@ -669,7 +700,7 @@ export const PaymentsModule = {
 
   async saveManualPayment() {
     const sid = document.getElementById('payStudentSelect')?.value;
-    const amt = parseFloat(document.getElementById('payAmount')?.value || 0);
+    const amt = Number.parseFloat(document.getElementById('payAmount')?.value || 0);
     const con = document.getElementById('payConcept')?.value?.trim() || 'Mensualidad';
     const mp  = document.getElementById('payMonthPaid')?.value;
     const dd  = document.getElementById('payDueDate')?.value;
@@ -689,6 +720,7 @@ export const PaymentsModule = {
     if (!amt || amt <= 0) return Helpers.toast('Ingresa un monto valido', 'warning');
     if ((met === 'efectivo') && sta === 'paid' && tendered <= 0) return Helpers.toast('Ingresa el monto dado en efectivo', 'warning');
     if ((met === 'efectivo') && tendered > 0 && tendered < amt) return Helpers.toast('El monto dado no cubre el total', 'warning');
+    if (isFutureMonth(mp)) return Helpers.toast('No se pueden generar cargos de meses futuros. El cargo de un mes se crea el día de generación de ese mes.', 'warning');
 
     const saveBtn = document.getElementById('btnSavePaymentAction');
     if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Guardando...'; }
@@ -742,8 +774,8 @@ export const PaymentsModule = {
       }
 
       // Si está pagado, activar estudiante
-      // students no tiene columna `status`: escribirla hacia fallar TODO el
-      // update (no solo ese campo) y el estudiante quedaba inactivo sin aviso.
+      // students no tiene columna `status`: escribirla haría fallar el
+      // update completo y el estudiante quedaría inactivo sin aviso.
       // El estado del alumno vive en `is_active`.
       if (sta === 'paid') {
         await supabase.from('students').update({ is_active: true }).eq('id', sid);
@@ -768,6 +800,7 @@ export const PaymentsModule = {
             const { buildFactura } = await import('../shared/factura.js');
             const when = new Date();
             const parentName = p?.students?.p1_name || p?.students?.p2_name || null;
+            // NOSONAR: buildFactura es async; SonarLint no resuelve el tipo tras dynamic import
             const built = await buildFactura(p, {
               student: p?.students || {},
               parent: { name: parentName, email: parentEmail, phone: (p?.students?.p1_phone || p?.students?.p2_phone || '') },
@@ -803,7 +836,9 @@ export const PaymentsModule = {
 
           const { notifyPaymentApproved } = await import('../shared/supabase.js');
           await notifyPaymentApproved(pay.id, parentEmail, studentName, amountStr, mp || 'Colegiatura');
-        } catch (_) {}
+        } catch (_) {
+          // Notificación en segundo plano: si falla, no interrumpe el flujo principal
+        }
       }
     } catch (e) {
       console.error('[Payments] saveManualPayment error:', e);
@@ -831,7 +866,7 @@ export const PaymentsModule = {
 
       const { printFactura, getActivePeriodLabel } = await import('../shared/factura.js');
       const sid = opt.value;
-      const amt = parseFloat(document.getElementById('payAmount')?.value || opt.dataset.fee || 0);
+      const amt = Number.parseFloat(document.getElementById('payAmount')?.value || opt.dataset.fee || 0);
       const month = document.getElementById('payMonthPaid')?.value || opt.dataset.month || null;
       const due = document.getElementById('payDueDate')?.value || opt.dataset.due || null;
 
@@ -948,7 +983,7 @@ export const PaymentsModule = {
     fixedBtn?.addEventListener('click', () => { valueInput.dataset.touched = '1'; paint('fixed'); if (valueInput) valueInput.value = saved > 0 ? saved : ''; });
 
     const preview = () => {
-      const v = Math.max(0, parseFloat(valueInput?.value || 0) || 0);
+      const v = Math.max(0, Number.parseFloat(valueInput?.value || 0) || 0);
       let disc = mode === 'pct' ? orig * v / 100 : v;
       disc = Math.min(disc, orig);
       const net = Math.max(0, orig - disc);
@@ -957,7 +992,7 @@ export const PaymentsModule = {
     valueInput?.addEventListener('input', preview);
 
     document.getElementById('btnSaveDiscountAction')?.addEventListener('click', async () => {
-      const v = Math.max(0, parseFloat(valueInput?.value || 0) || 0);
+      const v = Math.max(0, Number.parseFloat(valueInput?.value || 0) || 0);
       const reason = (document.getElementById('discReason')?.value || '').trim();
       const isRemove = v === 0;
       if (!isRemove && !reason) return Helpers.toast('Indica el motivo del descuento', 'warning');
@@ -988,7 +1023,7 @@ export const PaymentsModule = {
       // Descuento ANTES de aprobar: si el pago viene en revisión y aún no tiene
       // descuento, ofrecer aplicarlo primero (el monto queda fijo al aprobar).
       const p = (AppState.get('paymentsData') || []).find(x => String(x.id) === String(id));
-      const hasDisc = p && (Number(p.discount_pct || 0) > 0 || Number(p.discount_amount || 0) > 0);
+      const hasDisc = (Number(p?.discount_pct || 0) > 0 || Number(p?.discount_amount || 0) > 0);
       if (p && this._st(p) === 'review' && !hasDisc && window.confirm('Aplicar un descuento antes de aprobar este pago?\n\nOK = abrir descuento · Cancelar = aprobar ahora mismo')) {
         await this.applyDiscount(id);
         return;
@@ -1009,7 +1044,7 @@ export const PaymentsModule = {
       // Verificar que la aprobación SÍ persistió (el trigger fn_protect_paid_records
       // con `RETURN OLD` descartaba los UPDATE de pagos no aprobados sin error).
       if (!pay || pay.status !== 'paid') {
-        Helpers.toast('No se pudo aprobar: aplica la migración 16 (sección 8) en Supabase SQL Editor y reintenta.', 'error');
+        Helpers.toast('No se pudo aprobar el pago. Verifica que el registro esté pendiente o en revisión (puede haber un duplicado del mismo mes) y reintenta.', 'error');
         await this.loadPayments();
         this.loadStats();
         return;

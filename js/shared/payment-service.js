@@ -32,6 +32,110 @@ export function daysUntilDue(dueDate) {
   return Math.round((new Date(dueDate + 'T00:00:00') - today) / 86400000);
 }
 
+// ── Regla: no se facturan meses futuros ──────────────────────────────────────
+/**
+ * Un cargo solo puede existir para el mes en curso o uno anterior. Los cargos
+ * se crean el día de generación de SU mes (día 25 por school_settings), así que
+ * un '2026-10' un 27 de septiembre es un cargo adelantado: el padre ve un cobro
+ * que todavía no corresponde y el 'pendiente' se descuadra.
+ *
+ * Acepta los dos formatos de month_paid ('2026-10' y 'octubre'). Si el mes no
+ * se puede interpretar devuelve null = no bloquea, para no impedir el registro
+ * de cargos antiguos sin año.
+ */
+export function futureMonthKey(mp, refDate) {
+  const s = String(mp || '').toLowerCase().trim();
+  if (!s) return null;
+  const ymd = s.match(/^(\d{4})-(\d{1,2})$/);
+  if (ymd) return ymd[1] + '-' + ymd[2].padStart(2, '0');
+  const i = MES.indexOf(s);
+  if (i === -1) return null;
+  const d = refDate ? new Date(refDate) : new Date();
+  return d.getFullYear() + '-' + String(i + 1).padStart(2, '0');
+}
+
+export function isFutureMonth(mp, refDate) {
+  const key = futureMonthKey(mp, refDate);
+  if (!key) return false;
+  const today = new Date();
+  const now = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0');
+  return key > now;
+}
+
+// ── KPIs de la gestión financiera ─────────────────────────────────────────────
+/**
+ * Calcula los contadores de un mes sobre un array de pagos YA filtrado por
+ * deleted_at en la query. Lo usan directora y asistente: antes cada panel tenía
+ * su propia copia y por eso mostraban cifras distintas.
+ *
+ * - month_paid acepta los dos formatos que hay en la base: '2026-09' y
+ *   'septiembre'. Comparar solo contra 'YYYY-MM' dejaba fuera la mitad.
+ * - Los contadores son de CARGOS, no de estudiantes (un alumno puede tener
+ *   Mensualidad + Materiales + Día Prolongado). Se devuelven ambos.
+ * - 'overdue' se deriva de due_date, no del status: el status solo lo actualiza
+ *   el cron karpus-mark-overdue (10:00) y entre ejecuciones iba desfasado.
+ * - 'rejected' cuenta como pendiente: el dinero no se cobró.
+ * - El ingreso se atribuye al MES que se cobró (month_paid normalizado), igual
+ *   que financial_summary_month() en SQL; no al día en que se registró la
+ *   aprobación (paid_date). Antes se atribuía por paid_date y septiembre sumaba
+ *   los pagos de mayo/agosto aprobados el 23/09 como si fueran ingreso de
+ *   septiembre ($176,738), cuando nadie había pagado septiembre todavía.
+ * - Un cargo sin month_paid (materiales sueltos, etc.) cae a fecha de cobro.
+ */
+export function computePaymentStats(rows, year, month) {
+  const y = String(year);
+  const m = String(month).padStart(2, '0');
+  const monthKey  = `${y}-${m}`;
+  const monthName = MES[Number(m) - 1] || '';
+  const lastDay   = new Date(Number(y), Number(m), 0).getDate();
+  // Instantes, no strings: comparar ISO con offsets distintos rompe el borde
+  // de mes (30/09 21:00 -04:00 es 01/10 en UTC).
+  const fromTs = new Date(`${y}-${m}-01T00:00:00`).getTime();
+  const toTs   = new Date(`${y}-${m}-${String(lastDay).padStart(2, '0')}T23:59:59`).getTime();
+
+  const inMonth = (mp) => {
+    const s = String(mp || '').toLowerCase().trim();
+    return !!s && (s === monthKey || s === monthName);
+  };
+
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  let income = 0, pending = 0, overdue = 0, review = 0;
+  const pendingStudents = new Set(), overdueStudents = new Set(), reviewStudents = new Set();
+
+  for (const p of rows || []) {
+    const sk = normalizeStatus(p);
+
+    if (sk === 'paid') {
+      // Ingreso por mes cobrado (month_paid normalizado por futureMonthKey; p.ej.
+      // '2026-08' y 'agosto' dan la misma clave). Un pago aprobado hoy pero del
+      // mes de agosto cuenta en agosto, no en el mes en que se aprobó.
+      const mk = futureMonthKey(p.month_paid, p.paid_date || p.created_at);
+      if (mk) {
+        if (mk === monthKey) income += Number(p.amount || 0);
+        continue;
+      }
+      // Cargo sin mes interpretable: atribuir por fecha de cobro (base caja).
+      const t = new Date(p.paid_date || p.created_at).getTime();
+      if (Number.isFinite(t) && t >= fromTs && t <= toTs) income += Number(p.amount || 0);
+      continue;
+    }
+    if (!inMonth(p.month_paid)) continue;
+    if (sk === 'review') { review++; reviewStudents.add(p.student_id); continue; }
+    // Usar el status real de BD para overdue (ya sincronizado por la migración 33)
+    // Solo recalcular como overdue si el status en BD sigue siendo pending pero due_date pasó
+    const isOverdue = sk === 'overdue' || (sk === 'pending' && p.due_date && new Date(p.due_date + 'T00:00:00') < today);
+    if (isOverdue) { overdue++; overdueStudents.add(p.student_id); continue; }
+    pending++; pendingStudents.add(p.student_id);
+  }
+
+  return {
+    income, pending, overdue, review,
+    pendingStudents: pendingStudents.size,
+    overdueStudents: overdueStudents.size,
+    reviewStudents:  reviewStudents.size
+  };
+}
+
 // ── Columnas seguras ──────────────────────────────────────────────────────────
 const PAYMENT_COLS = 'id,student_id,amount,concept,status,due_date,created_at,paid_date,method,bank,reference,month_paid,evidence_url,notes';
 const PAYMENT_COLS_WITH_STUDENT = PAYMENT_COLS + ',students:student_id(name,p1_email,parent_id,classroom_id,classrooms:classroom_id(name))';

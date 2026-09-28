@@ -158,280 +158,337 @@ function _setLoaderMsg(msg) {
   if (span) span.textContent = msg;
 }
 
+// ── Pantallas de bloqueo del loader durante la inicialización ────────────────
+const _BTN_RETRY = '<button onclick="window.location.reload()" style="background:#6366f1;color:white;border:none;padding:10px 20px;border-radius:10px;font-weight:800;cursor:pointer;font-size:12px">Reintentar</button>';
+const _BTN_LOGOUT = '<button onclick="window._signOutAndRedirect()" style="background:rgba(255,255,255,.1);color:#94a3b8;border:1px solid rgba(255,255,255,.1);padding:10px 20px;border-radius:10px;font-weight:800;cursor:pointer;font-size:12px">Cerrar Sesión</button>';
+
+function _loaderHTML(html) {
+  const el = document.getElementById('loader');
+  if (el) el.innerHTML = html;
+}
+
+function _screenInitTimeout() {
+  return `<div style="text-align:center;padding:32px;">
+      <div style="font-size:32px;margin-bottom:12px;">⚠️</div>
+      <p style="color:#f87171;font-weight:800;font-size:14px;margin-bottom:8px;">Tiempo de espera agotado</p>
+      <p style="color:#94a3b8;font-size:12px;margin-bottom:20px;">No se pudo conectar con el servidor. Verifica tu conexión.</p>
+      <button onclick="window.location.href='login.html'" style="background:#6366f1;color:white;border:none;padding:10px 24px;border-radius:10px;font-weight:800;cursor:pointer;font-size:13px;">Volver al Login</button>
+      <button onclick="window.location.reload()" style="background:rgba(255,255,255,.1);color:#94a3b8;border:1px solid rgba(255,255,255,.1);padding:10px 24px;border-radius:10px;font-weight:800;cursor:pointer;font-size:13px;margin-left:8px;">Reintentar</button>
+    </div>`;
+}
+
+function _screenSupabaseTimeout(userEmail) {
+  return [
+    '<div style="text-align:center;padding:32px">',
+    '<div style="font-size:32px;margin-bottom:12px">⚠️</div>',
+    '<p style="color:#f87171;font-weight:800;font-size:14px;margin-bottom:8px">Sin conexión con Supabase</p>',
+    '<p style="color:#94a3b8;font-size:12px;margin-bottom:16px">El servidor no respondió en 8s.</p>',
+    '<p style="color:#64748b;font-size:11px;margin-bottom:16px">Email: ' + escH(userEmail) + '</p>',
+    '<div style="display:flex;gap:8px;justify-content:center">',
+    _BTN_RETRY,
+    _BTN_LOGOUT,
+    '</div></div>'
+  ].join('');
+}
+
+function _screenInitError(title) {
+  return '<div style="text-align:center;padding:32px"><p style="color:#f87171;font-weight:800">' + title + '</p>'
+    + '<button onclick="window.location.reload()" style="background:#6366f1;color:white;border:none;padding:10px 20px;border-radius:10px;font-weight:800;cursor:pointer;margin-top:12px">Reintentar</button></div>';
+}
+
+function _screenNoProfile(userEmail, userId) {
+  return '<div style="text-align:center;padding:32px;max-width:440px"><div style="font-size:32px;margin-bottom:12px">🔒</div><p style="color:#f87171;font-weight:800;font-size:14px;margin-bottom:8px">Sin perfil configurado</p><p style="color:#94a3b8;font-size:12px;margin-bottom:8px">Tu cuenta no tiene un perfil en la tabla profiles.</p><p style="color:#64748b;font-size:11px;margin-bottom:4px">Email: ' + escH(userEmail) + '</p><p style="color:#64748b;font-size:10px;margin-bottom:16px;font-family:monospace">UUID: ' + escH(userId) + '</p><div style="background:#1e293b;border:1px solid rgba(99,102,241,.3);border-radius:10px;padding:12px;margin-bottom:16px;text-align:left"><p style="color:#94a3b8;font-size:11px;font-weight:700;margin-bottom:6px">Ejecuta en Supabase SQL Editor:</p><code style="color:#a5b4fc;font-size:10px;line-height:1.6;display:block;white-space:pre-wrap">INSERT INTO public.profiles (id, email, name, role, accepted_terms) VALUES (\'' + escH(userId) + '\', \'' + escH(userEmail) + '\', \'Administrador\', \'admin\', true) ON CONFLICT (id) DO UPDATE SET role = \'admin\';</code></div><div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">' + _BTN_RETRY + _BTN_LOGOUT + '</div></div>';
+}
+
+function _screenNoRole(userRole, profile) {
+  return `<div style="text-align:center;padding:32px;">
+      <div style="font-size:32px;margin-bottom:12px;">🚫</div>
+      <p style="color:#f87171;font-weight:800;font-size:14px;margin-bottom:8px;">Acceso denegado</p>
+      <p style="color:#94a3b8;font-size:12px;margin-bottom:4px;">Tu rol: <strong style="color:#f1f5f9;">${userRole || '(sin rol)'}</strong></p>
+      <p style="color:#94a3b8;font-size:12px;margin-bottom:20px;">Solo administradores y directoras pueden acceder.</p>
+      <div style="background:rgba(0,0,0,0.2);padding:10px;border-radius:8px;font-family:monospace;font-size:10px;color:#64748b;margin-bottom:20px;text-align:left;overflow-x:auto;">
+        Profile: ${JSON.stringify(profile)}
+      </div>
+      <button onclick="window.location.href='login.html'" style="background:#6366f1;color:white;border:none;padding:10px 24px;border-radius:10px;font-weight:800;cursor:pointer;font-size:13px;">Volver al Login</button>
+    </div>`;
+}
+
+function _screenUnexpected(msg) {
+  return `<div style="text-align:center;padding:32px;">
+      <div style="font-size:32px;margin-bottom:12px;">⚠️</div>
+      <p style="color:#f87171;font-weight:800;font-size:14px;margin-bottom:8px;">Error inesperado</p>
+      <p style="color:#94a3b8;font-size:12px;margin-bottom:20px;">${msg}</p>
+      <button onclick="window.location.href='login.html'" style="background:#6366f1;color:white;border:none;padding:10px 24px;border-radius:10px;font-weight:800;cursor:pointer;font-size:13px;">Volver al Login</button>
+      <button onclick="window.location.reload()" style="background:rgba(255,255,255,.1);color:#94a3b8;border:1px solid rgba(255,255,255,.1);padding:10px 24px;border-radius:10px;font-weight:800;cursor:pointer;font-size:13px;margin-left:8px;">Reintentar</button>
+    </div>`;
+}
+
+const _INIT_ABORT_SCREEN = {
+  db:      () => _screenInitError('Error al conectar con la base de datos'),
+  network: () => _screenInitError('Error de red: verifica tu conexión')
+};
+
+// ── Resolución de sesión y perfil ────────────────────────────────────────────
+const PANEL_ROLES = ['admin', 'directora'];
+
+function _readCachedProfile(userId, userEmail) {
+  try {
+    const cached = JSON.parse(localStorage.getItem('karpus_ctrl_profile_' + userId) || 'null');
+    if (cached && cached.role && cached.ts && (Date.now() - cached.ts) < 3600000) {
+      return { id: userId, email: userEmail, name: cached.name || userEmail.split('@')[0], role: cached.role, bio: cached.bio || '' };
+    }
+  } catch (parseErr) {
+    // Caché local corrupta o storage no disponible: se ignora y se resuelve desde JWT/DB.
+    console.warn('[Karpus] Caché de perfil ilegible:', parseErr?.message);
+  }
+  return null;
+}
+
+function _cacheProfile(userId, profile) {
+  try {
+    localStorage.setItem('karpus_ctrl_profile_' + userId, JSON.stringify({
+      role: profile.role, name: profile.name, bio: profile.bio || '', ts: Date.now()
+    }));
+  } catch (storageErr) {
+    // localStorage puede estar lleno o bloqueado: el perfil se resuelve igual desde la DB.
+    console.warn('[Karpus] No se pudo cachear el perfil:', storageErr?.message);
+  }
+}
+
+async function _initSession(loaderTimeout) {
+  _setLoaderMsg('Verificando sesión...');
+  const { data: sessionData, error: sessionErr } = await supabase.auth.getSession();
+  if (sessionErr || !sessionData?.session?.user) {
+    clearTimeout(loaderTimeout);
+    window._karpusInitializing = false;
+    window.location.href = 'login.html';
+    return null;
+  }
+
+  const session = sessionData.session;
+  let userId    = session.user.id;
+  let userEmail = session.user.email;
+
+  _setLoaderMsg('Validando credenciales...');
+  const expiresAt   = session.expires_at || 0;
+  const needsRefresh = (expiresAt - Math.floor(Date.now() / 1000)) < 300; // menos de 5 min
+  if (needsRefresh) {
+    const { data: refreshed, error: refreshErr } = await supabase.auth.refreshSession();
+    if (refreshErr || !refreshed?.session) {
+      clearTimeout(loaderTimeout);
+      window._karpusInitializing = false;
+      window.location.href = 'login.html';
+      return null;
+    }
+    userId    = refreshed.session.user.id;
+    userEmail = refreshed.session.user.email;
+  }
+
+  return { userId, userEmail, session };
+}
+
+async function _fetchProfileFromDb(userId, userEmail, loaderTimeout) {
+  let timedOut = false;
+  const profileTimer = setTimeout(() => {
+    timedOut = true;
+    clearTimeout(loaderTimeout);
+    window._karpusInitializing = false;
+    _loaderHTML(_screenSupabaseTimeout(userEmail));
+  }, 8000);
+
+  try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('id, name, email, role, bio')
+      .eq('id', userId);
+
+    clearTimeout(profileTimer);
+    if (timedOut) return { abort: 'timeout' };
+    if (error) return { abort: 'db' };
+    // Manejar si viene como array o como objeto único
+    const rawProfile = Array.isArray(data) ? data[0] : data;
+    if (!rawProfile) return { profile: null };
+    _cacheProfile(userId, rawProfile);
+    return { profile: rawProfile };
+  } catch (netErr) {
+    clearTimeout(profileTimer);
+    if (timedOut) return { abort: 'timeout' };
+    console.error('Network error:', netErr);
+    return { abort: 'network' };
+  }
+}
+
+async function _resolveProfile(userId, userEmail, session, loaderTimeout) {
+  const cached = _readCachedProfile(userId, userEmail);
+  if (cached) return { profile: cached };
+
+  const jwtRole = session.user?.app_metadata?.role || session.user?.user_metadata?.role || null;
+  if (jwtRole && PANEL_ROLES.includes(jwtRole)) {
+    return { profile: { id: userId, email: userEmail, name: userEmail.split('@')[0], role: jwtRole } };
+  }
+  return _fetchProfileFromDb(userId, userEmail, loaderTimeout);
+}
+
+// Solo el admin (dueño) accede al panel_control durante una suspensión.
+// Si la directora intenta entrar mientras está suspendido → pantalla de suspensión.
+async function _isBusinessSuspended() {
+  try {
+    const { data, error } = await Promise.race([
+      supabase.rpc('is_business_suspended'),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('susp_timeout')), 4000))
+    ]);
+    return !error && data === true;
+  } catch (suspErr) {
+    // Timeout o fallo de red: se asume NO suspendido para no bloquear el panel a todos
+    // los usuarios por un problema puntual de conectividad.
+    console.warn('[Karpus] is_business_suspended no respondió:', suspErr?.message);
+    return false;
+  }
+}
+
+// ── Arranque del panel (tras validar sesión, perfil y rol) ────────────────────
+function _fillHeader(profile, userEmail) {
+  const adminName   = document.getElementById('adminName');
+  const adminAvatar = document.getElementById('adminAvatar');
+  const cfgEmail    = document.getElementById('cfgEmail');
+  const cfgName     = document.getElementById('cfgName');
+  const cfgBio      = document.getElementById('cfgBio');
+  if (adminName)   adminName.textContent   = profile.name || userEmail;
+  if (adminAvatar) adminAvatar.textContent = (profile.name || userEmail)[0].toUpperCase();
+  if (cfgEmail)    cfgEmail.value          = userEmail || '';
+  if (cfgName)     cfgName.value           = profile.name || '';
+  if (cfgBio)      cfgBio.value            = profile.bio || '';
+}
+
+function _restoreAlertPrefs(userEmail) {
+  const prefs0 = loadPrefs();
+  const alertEmailTo = document.getElementById('alertEmailTo');
+  if (alertEmailTo) alertEmailTo.value = prefs0.reportEmail || userEmail || '';
+  const autoToggle = document.getElementById('autoAlertToggle');
+  if (autoToggle) autoToggle.checked = !!prefs0.autoEmailAlerts;
+  const autoState = document.getElementById('autoAlertState');
+  if (autoState) {
+    autoState.textContent = 'Automático: ' + (prefs0.autoEmailAlerts ? 'ON' : 'OFF');
+    autoState.style.color = prefs0.autoEmailAlerts ? '#4ade80' : 'var(--muted)';
+  }
+}
+
+function _startTopClock() {
+  if (_clockInterval) clearInterval(_clockInterval);
+  _clockInterval = setInterval(() => {
+    const clock = document.getElementById('topClock');
+    if (clock) clock.textContent = new Date().toLocaleString('es-DO', { dateStyle: 'short', timeStyle: 'medium' });
+  }, 1000);
+}
+
+// Refresco proactivo de sesión: cada 4 min verifica si el JWT vence en <5 min
+function _startSessionWatchdog() {
+  if (_sessionInterval) clearInterval(_sessionInterval);
+  _sessionInterval = setInterval(async () => {
+    try {
+      const { data } = await supabase.auth.getSession();
+      const exp = data?.session?.expires_at || 0;
+      if (exp && (exp - Math.floor(Date.now() / 1000)) < 300) {
+        const { error: rErr } = await supabase.auth.refreshSession();
+        if (rErr) console.warn('[Karpus] No se pudo refrescar la sesión:', rErr.message);
+      }
+    } catch (watchErr) {
+      // El refresco proactivo es best-effort: un fallo puntual no debe detener el panel.
+      console.warn('[Karpus] Watchdog de sesión:', watchErr?.message);
+    }
+  }, 4 * 60 * 1000);
+}
+
+async function _startPanel(profile, userEmail, loaderTimeout) {
+  clearTimeout(loaderTimeout);
+  window._karpusInitializing = false;
+  currentUser = profile;
+
+  _fillHeader(profile, userEmail);
+  _restoreAlertPrefs(userEmail);
+
+  const loader = document.getElementById('loader');
+  if (loader) loader.classList.add('hidden');
+
+  _startTopClock();
+
+  const mobMenuBtn = document.getElementById('mobMenuBtn');
+  if (window.innerWidth <= 768 && mobMenuBtn) mobMenuBtn.style.display = 'block';
+
+  await refreshAll();
+  _sectionLoadedAt.dashboard = Date.now();
+
+  // Suspensión: estado inicial del banner/tarjeta (solo admin llega a este punto)
+  refreshSuspensionStatus().catch((suspErr) => console.warn('[Karpus] Estado de suspensión no disponible:', suspErr?.message));
+  startPanelSuspensionWatchdog();
+
+  // Restaurar última sección visitada (preferencias persistidas)
+  const lastSection = loadPrefs().lastSection;
+  const hasLastSection = typeof lastSection === 'string' && document.getElementById('sec-' + lastSection);
+  goTo(hasLastSection ? lastSection : 'dashboard');
+
+  updateNotifUI();
+  checkEdgeFunctionsHealth();
+  startRealtime();
+  _startSessionWatchdog();
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
   // Timeout de seguridad: si en 15s no carga, mostrar error
   const loaderTimeout = setTimeout(() => {
     window._karpusInitializing = false;
-    const loader = document.getElementById('loader');
-    if (loader) {
-      loader.innerHTML = `
-        <div style="text-align:center;padding:32px;">
-          <div style="font-size:32px;margin-bottom:12px;">⚠️</div>
-          <p style="color:#f87171;font-weight:800;font-size:14px;margin-bottom:8px;">Tiempo de espera agotado</p>
-          <p style="color:#94a3b8;font-size:12px;margin-bottom:20px;">No se pudo conectar con el servidor. Verifica tu conexión.</p>
-          <button onclick="window.location.href='login.html'" style="background:#6366f1;color:white;border:none;padding:10px 24px;border-radius:10px;font-weight:800;cursor:pointer;font-size:13px;">Volver al Login</button>
-          <button onclick="window.location.reload()" style="background:rgba(255,255,255,.1);color:#94a3b8;border:1px solid rgba(255,255,255,.1);padding:10px 24px;border-radius:10px;font-weight:800;cursor:pointer;font-size:13px;margin-left:8px;">Reintentar</button>
-        </div>`;
-    }
+    _loaderHTML(_screenInitTimeout());
   }, 15000);
 
   try {
-    // ── Paso 1: Sesión local ──────────────────────────────────────────────────
-    _setLoaderMsg('Verificando sesión...');
-    const { data: sessionData, error: sessionErr } = await supabase.auth.getSession();
+    const auth = await _initSession(loaderTimeout);
+    if (!auth) return;
+    const { userId, userEmail, session } = auth;
 
-    if (sessionErr || !sessionData?.session?.user) {
-      clearTimeout(loaderTimeout);
-      window._karpusInitializing = false;
-      window.location.href = 'login.html';
-      return;
-    }
-
-    const session = sessionData.session;
-    let userId    = session.user.id;
-    let userEmail = session.user.email;
-
-    // ── Paso 2: Refrescar token si está próximo a expirar ────────────────────
-    _setLoaderMsg('Validando credenciales...');
-    const expiresAt = session.expires_at || 0;
-    const nowSec    = Math.floor(Date.now() / 1000);
-    const needsRefresh = (expiresAt - nowSec) < 300; // menos de 5 min
-
-    if (needsRefresh) {
-      const { data: refreshed, error: refreshErr } = await supabase.auth.refreshSession();
-      if (refreshErr || !refreshed?.session) {
-        clearTimeout(loaderTimeout);
-        window._karpusInitializing = false;
-        window.location.href = 'login.html';
-        return;
-      }
-      userId    = refreshed.session.user.id;
-      userEmail = refreshed.session.user.email;
-    }
-
-    // ── Paso 3: Obtener perfil ────────────────────────────────────────────────
     _setLoaderMsg('Verificando permisos...');
-    let profile = null;
-
-    // 1. Cache local
-    const CACHE_KEY = 'karpus_ctrl_profile_' + userId;
-    try {
-      const cached = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null');
-      if (cached && cached.role && cached.ts && (Date.now() - cached.ts) < 3600000) {
-        profile = { id: userId, email: userEmail, name: cached.name || userEmail.split('@')[0], role: cached.role, bio: cached.bio || '' };
-      }
-    } catch (_) {}
-
-    // 2. JWT app_metadata
-    if (!profile) {
-      const jwtRole = session.user?.app_metadata?.role || session.user?.user_metadata?.role || null;
-      if (jwtRole && ['admin', 'directora'].includes(jwtRole)) {
-        profile = { id: userId, email: userEmail, name: userEmail.split('@')[0], role: jwtRole };
-      }
-    }
-
-    // 3. Query a DB
-    if (!profile) {
-      let timedOut = false;
-      const profileTimer = setTimeout(() => {
-        timedOut = true;
+    const resolved = await _resolveProfile(userId, userEmail, session, loaderTimeout);
+    if (resolved.abort) {
+      if (resolved.abort !== 'timeout') {
         clearTimeout(loaderTimeout);
         window._karpusInitializing = false;
-        const el = document.getElementById('loader');
-        if (el) el.innerHTML = [
-          '<div style="text-align:center;padding:32px">',
-          '<div style="font-size:32px;margin-bottom:12px">⚠️</div>',
-          '<p style="color:#f87171;font-weight:800;font-size:14px;margin-bottom:8px">Sin conexión con Supabase</p>',
-          '<p style="color:#94a3b8;font-size:12px;margin-bottom:16px">El servidor no respondió en 8s.</p>',
-          '<p style="color:#64748b;font-size:11px;margin-bottom:16px">Email: ' + userEmail + '</p>',
-          '<div style="display:flex;gap:8px;justify-content:center">',
-          '<button onclick="window.location.reload()" style="background:#6366f1;color:white;border:none;padding:10px 20px;border-radius:10px;font-weight:800;cursor:pointer;font-size:12px">Reintentar</button>',
-          '<button onclick="window._signOutAndRedirect()" style="background:rgba(255,255,255,.1);color:#94a3b8;border:1px solid rgba(255,255,255,.1);padding:10px 20px;border-radius:10px;font-weight:800;cursor:pointer;font-size:12px">Cerrar Sesión</button>',
-          '</div></div>'
-        ].join('');
-      }, 8000);
-
-      try {
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('id, name, email, role, bio')
-          .eq('id', userId);
-
-        clearTimeout(profileTimer);
-        if (timedOut) return;
-
-        if (!error && data) {
-          // Manejar si viene como array o como objeto único
-          const rawProfile = Array.isArray(data) ? data[0] : data;
-          
-          if (rawProfile) {
-            profile = rawProfile;
-            try {
-              localStorage.setItem(CACHE_KEY, JSON.stringify({ role: profile.role, name: profile.name, bio: profile.bio || '', ts: Date.now() }));
-            } catch (_) {}
-          }
-        } else if (error) {
-          clearTimeout(loaderTimeout);
-          window._karpusInitializing = false;
-          const el = document.getElementById('loader');
-          console.error('DB init error:', error);
-          if (el) el.innerHTML = '<div style="text-align:center;padding:32px"><p style="color:#f87171;font-weight:800">Error al conectar con la base de datos</p><button onclick="window.location.reload()" style="background:#6366f1;color:white;border:none;padding:10px 20px;border-radius:10px;font-weight:800;cursor:pointer;margin-top:12px">Reintentar</button></div>';
-          return;
-        }
-      } catch (e) {
-        clearTimeout(profileTimer);
-        if (timedOut) return;
-        clearTimeout(loaderTimeout);
-        window._karpusInitializing = false;
-        const el = document.getElementById('loader');
-        console.error('Network error:', e);
-        if (el) el.innerHTML = '<div style="text-align:center;padding:32px"><p style="color:#f87171;font-weight:800">Error de red: verifica tu conexión</p><button onclick="window.location.reload()" style="background:#6366f1;color:white;border:none;padding:10px 20px;border-radius:10px;font-weight:800;cursor:pointer;margin-top:12px">Reintentar</button></div>';
-        return;
+        _loaderHTML(_INIT_ABORT_SCREEN[resolved.abort]());
       }
-    }
-
-    if (!profile) {
-      clearTimeout(loaderTimeout);
-      window._karpusInitializing = false;
-      const el = document.getElementById('loader');
-      if (el) el.innerHTML = '<div style="text-align:center;padding:32px;max-width:440px"><div style="font-size:32px;margin-bottom:12px">🔒</div><p style="color:#f87171;font-weight:800;font-size:14px;margin-bottom:8px">Sin perfil configurado</p><p style="color:#94a3b8;font-size:12px;margin-bottom:8px">Tu cuenta no tiene un perfil en la tabla profiles.</p><p style="color:#64748b;font-size:11px;margin-bottom:4px">Email: ' + escH(userEmail) + '</p><p style="color:#64748b;font-size:10px;margin-bottom:16px;font-family:monospace">UUID: ' + escH(userId) + '</p><div style="background:#1e293b;border:1px solid rgba(99,102,241,.3);border-radius:10px;padding:12px;margin-bottom:16px;text-align:left"><p style="color:#94a3b8;font-size:11px;font-weight:700;margin-bottom:6px">Ejecuta en Supabase SQL Editor:</p><code style="color:#a5b4fc;font-size:10px;line-height:1.6;display:block;white-space:pre-wrap">INSERT INTO public.profiles (id, email, name, role, accepted_terms) VALUES (\'' + escH(userId) + '\', \'' + escH(userEmail) + '\', \'Administrador\', \'admin\', true) ON CONFLICT (id) DO UPDATE SET role = \'admin\';</code></div><div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap"><button onclick="window.location.reload()" style="background:#6366f1;color:white;border:none;padding:10px 20px;border-radius:10px;font-weight:800;cursor:pointer;font-size:12px">Reintentar</button><button onclick="window._signOutAndRedirect()" style="background:rgba(255,255,255,.1);color:#94a3b8;border:1px solid rgba(255,255,255,.1);padding:10px 20px;border-radius:10px;font-weight:800;cursor:pointer;font-size:12px">Cerrar Sesión</button></div></div>';
       return;
     }
 
-    // ── Paso 4: Verificar rol ─────────────────────────────────────────────────
-    const allowedRoles = ['admin', 'directora'];
+    const profile = resolved.profile;
+    if (!profile) {
+      clearTimeout(loaderTimeout);
+      window._karpusInitializing = false;
+      _loaderHTML(_screenNoProfile(userEmail, userId));
+      return;
+    }
+
     const userRole = (profile.role || '').toLowerCase();
-    
-    if (!allowedRoles.includes(userRole)) {
+    if (!PANEL_ROLES.includes(userRole)) {
       clearTimeout(loaderTimeout);
       window._karpusInitializing = false;
-      const loader = document.getElementById('loader');
-      if (loader) {
-        loader.innerHTML = `
-          <div style="text-align:center;padding:32px;">
-            <div style="font-size:32px;margin-bottom:12px;">🚫</div>
-            <p style="color:#f87171;font-weight:800;font-size:14px;margin-bottom:8px;">Acceso denegado</p>
-            <p style="color:#94a3b8;font-size:12px;margin-bottom:4px;">Tu rol: <strong style="color:#f1f5f9;">${userRole || '(sin rol)'}</strong></p>
-            <p style="color:#94a3b8;font-size:12px;margin-bottom:20px;">Solo administradores y directoras pueden acceder.</p>
-            <div style="background:rgba(0,0,0,0.2);padding:10px;border-radius:8px;font-family:monospace;font-size:10px;color:#64748b;margin-bottom:20px;text-align:left;overflow-x:auto;">
-              Profile: ${JSON.stringify(profile)}
-            </div>
-            <button onclick="window.location.href='login.html'" style="background:#6366f1;color:white;border:none;padding:10px 24px;border-radius:10px;font-weight:800;cursor:pointer;font-size:13px;">Volver al Login</button>
-          </div>`;
-      }
+      _loaderHTML(_screenNoRole(userRole, profile));
       return;
     }
 
-    // ── Paso 5: Suspensión temporal del servicio ──────────────────────────────
-    // Solo el admin (dueño) accede al panel_control durante una suspensión.
-    // Si la directora intenta entrar mientras está suspendido → pantalla de suspensión.
-    let _businessSuspended = false;
-    try {
-      const { data: _susp, error: _suspErr } = await Promise.race([
-        supabase.rpc('is_business_suspended'),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('susp_timeout')), 4000))
-      ]);
-      _businessSuspended = !_suspErr && _susp === true;
-    } catch (_) { _businessSuspended = false; }
-
-    window._businessSuspended = _businessSuspended;
-
-    if (_businessSuspended && userRole !== 'admin') {
-      // Solo el dueño admin gestiona la reactivación; la directora se bloquea igual que el resto.
+    const suspended = await _isBusinessSuspended();
+    window._businessSuspended = suspended;
+    if (suspended && userRole !== 'admin') {
       window._karpusSuspensionRedirect = true;
       await supabase.auth.signOut();
       window.location.href = 'login.html?reason=suspended';
       return;
     }
 
-    // ── Paso 6: Mostrar panel ─────────────────────────────────────────────────
-    clearTimeout(loaderTimeout);
-    window._karpusInitializing = false;
-    currentUser = profile;
-
-    const adminName   = document.getElementById('adminName');
-    const adminAvatar = document.getElementById('adminAvatar');
-    const cfgEmail    = document.getElementById('cfgEmail');
-    const cfgName     = document.getElementById('cfgName');
-    const cfgBio      = document.getElementById('cfgBio');
-
-    if (adminName)   adminName.textContent   = profile.name || userEmail;
-    if (adminAvatar) adminAvatar.textContent = (profile.name || userEmail)[0].toUpperCase();
-    if (cfgEmail)    cfgEmail.value          = userEmail || '';
-    if (cfgName)     cfgName.value           = profile.name || '';
-    if (cfgBio)      cfgBio.value            = profile.bio || '';
-
-    // Restaurar preferencias del módulo de alertas por correo
-    const prefs0 = loadPrefs();
-    const alertEmailTo = document.getElementById('alertEmailTo');
-    if (alertEmailTo) alertEmailTo.value = prefs0.reportEmail || userEmail || '';
-    const autoToggle = document.getElementById('autoAlertToggle');
-    if (autoToggle) autoToggle.checked = !!prefs0.autoEmailAlerts;
-    const autoState = document.getElementById('autoAlertState');
-    if (autoState) {
-      autoState.textContent = 'Automático: ' + (prefs0.autoEmailAlerts ? 'ON' : 'OFF');
-      autoState.style.color = prefs0.autoEmailAlerts ? '#4ade80' : 'var(--muted)';
-    }
-
-    const loader = document.getElementById('loader');
-    if (loader) loader.classList.add('hidden');
-
-    // Reloj superior (intervalo referenciado para poder limpiarlo)
-    if (_clockInterval) clearInterval(_clockInterval);
-    _clockInterval = setInterval(() => {
-      const clock = document.getElementById('topClock');
-      if (clock) clock.textContent = new Date().toLocaleString('es-DO', { dateStyle: 'short', timeStyle: 'medium' });
-    }, 1000);
-
-    const mobMenuBtn = document.getElementById('mobMenuBtn');
-    if (window.innerWidth <= 768 && mobMenuBtn) {
-      mobMenuBtn.style.display = 'block';
-    }
-
-    await refreshAll();
-    _sectionLoadedAt.dashboard = Date.now();
-
-    // Suspensión: estado inicial del banner/tarjeta (solo admin llega a este punto)
-    refreshSuspensionStatus().catch(() => {});
-    startPanelSuspensionWatchdog();
-
-    // Restaurar última sección visitada (preferencias persistidas)
-    const lastSection = loadPrefs().lastSection;
-    goTo(typeof lastSection === 'string' && document.getElementById('sec-' + lastSection) ? lastSection : 'dashboard');
-
-    updateNotifUI();
-    checkEdgeFunctionsHealth();
-    startRealtime();
-
-    // Refresco proactivo de sesión: cada 4 min verifica si el JWT vence en <5 min
-    if (_sessionInterval) clearInterval(_sessionInterval);
-    _sessionInterval = setInterval(async () => {
-      try {
-        const { data } = await supabase.auth.getSession();
-        const exp = data?.session?.expires_at || 0;
-        if (exp && (exp - Math.floor(Date.now() / 1000)) < 300) {
-          const { error: rErr } = await supabase.auth.refreshSession();
-          if (rErr) console.warn('[Karpus] No se pudo refrescar la sesión:', rErr.message);
-        }
-      } catch (_) {}
-    }, 4 * 60 * 1000);
-
+    await _startPanel(profile, userEmail, loaderTimeout);
   } catch (err) {
     clearTimeout(loaderTimeout);
     window._karpusInitializing = false;
-    const loader = document.getElementById('loader');
-    if (loader) {
-      const msg = err?.message || String(err);
-      loader.innerHTML = `
-        <div style="text-align:center;padding:32px;">
-          <div style="font-size:32px;margin-bottom:12px;">⚠️</div>
-          <p style="color:#f87171;font-weight:800;font-size:14px;margin-bottom:8px;">Error inesperado</p>
-          <p style="color:#94a3b8;font-size:12px;margin-bottom:20px;">${msg}</p>
-          <button onclick="window.location.href='login.html'" style="background:#6366f1;color:white;border:none;padding:10px 24px;border-radius:10px;font-weight:800;cursor:pointer;font-size:13px;">Volver al Login</button>
-          <button onclick="window.location.reload()" style="background:rgba(255,255,255,.1);color:#94a3b8;border:1px solid rgba(255,255,255,.1);padding:10px 24px;border-radius:10px;font-weight:800;cursor:pointer;font-size:13px;margin-left:8px;">Reintentar</button>
-        </div>`;
-    }
-    logError('panel_control', err.message || String(err), err.stack || '', 'DOMContentLoaded').catch(() => {});
+    _loaderHTML(_screenUnexpected(err?.message || String(err)));
+    logError('panel_control', err.message || String(err), err.stack || '', 'DOMContentLoaded').catch((logErr) => {
+      console.warn('[Karpus] No se pudo registrar el error de init:', logErr?.message);
+    });
   }
 });
 
@@ -715,12 +772,15 @@ window.renderWallGallery = function() {
   grid.innerHTML = allWallPosts.filter(p => _getWallMediaUrl(p)).slice(0, 100).map(p => {
     const url = _getWallMediaUrl(p);
     const isVid = _isVideoUrl(url);
-    const posterUrl = p.thumbnail_url || null;
     const dt = p.created_at ? new Date(p.created_at).toLocaleDateString('es-DO') : '';
     const author = p.teacher_name || '';
     const content = [p.title, p.content].filter(Boolean).join(' — ');
+    const posterAttr = p.thumbnail_url ? `poster="${escH(p.thumbnail_url)}"` : '';
+    const mediaTag = isVid
+      ? `<video src="${escH(url)}" ${posterAttr} style="width:100%;height:100%;object-fit:cover;" muted preload="metadata"></video>`
+      : `<img src="${escH(url)}" alt="" loading="lazy">`;
     return `<div class="gallery-item" onclick="openLightbox('${escH(url)}','${escH(author + ' — ' + dt)}')">
-      ${isVid ? `<video src="${escH(url)}" ${posterUrl ? `poster="${escH(posterUrl)}"` : ''} style="width:100%;height:100%;object-fit:cover;" muted preload="metadata"></video>` : `<img src="${escH(url)}" alt="" loading="lazy">`}
+      ${mediaTag}
       <div class="overlay"><div class="overlay-text">📷 ${escH(author)} · ${dt}</div></div>
     </div>`;
   }).join('') || '<div style="text-align:center;padding:40px;color:var(--muted);">Sin fotos ni videos</div>';
@@ -744,8 +804,12 @@ window.renderWallMedia = function() {
   grid.innerHTML = allMedia.slice(0, 150).map(m => {
     const dt = m.date ? new Date(m.date).toLocaleDateString('es-DO') : '';
     const isVid = _isVideoUrl(m.url);
+    const posterAttr = m.poster ? `poster="${escH(m.poster)}"` : '';
+    const mediaTag = isVid
+      ? `<video src="${escH(m.url)}" ${posterAttr} style="width:100%;height:100%;object-fit:cover;" muted preload="metadata"></video>`
+      : `<img src="${escH(m.url)}" alt="" loading="lazy">`;
     return `<div class="gallery-item" onclick="openLightbox('${escH(m.url)}','${escH(m.author + ' · ' + dt + ' · ❤' + m.likes)}')">
-      ${isVid ? `<video src="${escH(m.url)}" ${m.poster ? `poster="${escH(m.poster)}"` : ''} style="width:100%;height:100%;object-fit:cover;" muted preload="metadata"></video>` : `<img src="${escH(m.url)}" alt="" loading="lazy">`}
+      ${mediaTag}
       <div class="overlay"><div class="overlay-text">📷 ${escH(m.author)} · ${dt}</div></div>
     </div>`;
   }).join('') || '<div style="text-align:center;padding:40px;color:var(--muted);">Sin fotos ni videos en publicaciones</div>';
@@ -895,6 +959,12 @@ window.renderChatConversations = function() {
   window.filterConversations();
 };
 
+function _convoCardStyle(hasUnread, waiting) {
+  if (hasUnread) return 'border-color:rgba(99,102,241,.35);background:rgba(99,102,241,.06);';
+  if (waiting) return 'border-color:rgba(245,158,11,.35);background:rgba(245,158,11,.06);';
+  return '';
+}
+
 function _renderConversationCards(pairs) {
   const container = document.getElementById('convListContainer');
   if (!container) return;
@@ -915,16 +985,15 @@ function _renderConversationCards(pairs) {
     // 🟡 "Visto y sin respuesta": sin mensajes sin leer y el último fue leído → en espera
     const last = p.msgs[0] || null;
     const waiting = !hasUnread && !!last && last.is_read === true;
-    const cardStyle = hasUnread
-      ? 'border-color:rgba(99,102,241,.35);background:rgba(99,102,241,.06);'
-      : waiting
-        ? 'border-color:rgba(245,158,11,.35);background:rgba(245,158,11,.06);'
-        : '';
+    const cardStyle = _convoCardStyle(hasUnread, waiting);
     const roleBadgeColors = { padre: 'badge-blue', maestra: 'badge-green', directora: 'badge-orange', asistente: 'badge-purple', admin: 'badge-yellow' };
     const rb1 = roleBadgeColors[r1] || 'badge-gray';
     const rb2 = roleBadgeColors[r2] || 'badge-gray';
     const nBadge1 = r1 ? `<span class="badge ${rb1}" style="font-size:7px;">${escH(r1)}</span>` : '';
     const nBadge2 = r2 ? `<span class="badge ${rb2}" style="font-size:7px;">${escH(r2)}</span>` : '';
+    const unreadBadge = hasUnread
+      ? `<span class="badge badge-red" style="font-size:8px;padding:2px 7px;"><i class="bi bi-envelope-fill" style="font-size:7px;"></i> ${p.unread} sin leer</span>`
+      : '';
 
     // Últimos 3 mensajes de la conversación (p.msgs viene en orden descendente)
     const history = p.msgs.slice(0, 3).map(mh => {
@@ -959,7 +1028,7 @@ function _renderConversationCards(pairs) {
         </div>
         <div class="convo-preview-wrap" style="padding:3px 0 0;">${history}</div>
         <div style="display:flex;gap:4px;margin-top:6px;flex-wrap:wrap;">
-          ${hasUnread ? `<span class="badge badge-red" style="font-size:8px;padding:2px 7px;"><i class="bi bi-envelope-fill" style="font-size:7px;"></i> ${p.unread} sin leer</span>` : ''}
+          ${unreadBadge}
           ${waiting ? '<span class="badge badge-yellow" style="font-size:8px;padding:2px 7px;"><i class="bi bi-check2-all" style="font-size:7px;"></i> Visto · espera respuesta</span>' : ''}
           ${p.msgs.some(m => findSensitiveHits(m.content).length > 0) ? '<span class="badge badge-yellow" style="font-size:8px;padding:2px 7px;"><i class="bi bi-exclamation-triangle-fill" style="font-size:7px;"></i> Sensible</span>' : ''}
           ${p.hasMedia ? '<span class="badge badge-purple" style="font-size:8px;padding:2px 7px;"><i class="bi bi-image" style="font-size:7px;"></i> Archivos</span>' : ''}
@@ -978,9 +1047,11 @@ window.renderChatMedia = function() {
   grid.innerHTML = mediaMsgs.slice(0, 100).map(m => {
     const dt = m.created_at ? new Date(m.created_at).toLocaleDateString('es-DO') : '';
     const author = m.sender_name || '—';
-    const isVid = _isVideoUrl(m.attachment_url);
+    const thumb = _isVideoUrl(m.attachment_url)
+      ? `<video src="${escH(m.attachment_url)}" style="width:100%;height:100%;object-fit:cover;" muted preload="metadata"></video>`
+      : `<img src="${escH(m.attachment_url)}" alt="" loading="lazy">`;
     return `<div class="gallery-item" onclick="openLightbox('${escH(m.attachment_url)}','${escH(author + ' · ' + dt)}')">
-      ${isVid ? `<video src="${escH(m.attachment_url)}" style="width:100%;height:100%;object-fit:cover;" muted preload="metadata"></video>` : `<img src="${escH(m.attachment_url)}" alt="" loading="lazy">`}
+      ${thumb}
       <div class="overlay"><div class="overlay-text">💬 ${escH(author)} · ${dt}</div></div>
     </div>`;
   }).join('') || '<div style="text-align:center;padding:40px;color:var(--muted);">Sin archivos multimedia en chat</div>';
@@ -1009,6 +1080,7 @@ async function loadAttendance() {
     const kpi = document.getElementById('kpi-attendance');
     if (kpi) kpi.textContent = todayCount;
   } catch (err) {
+    console.warn('[Karpus] loadAttendance: consulta principal fallida, se reintenta sin relaciones:', err?.message);
     try {
       const { data } = await supabase
         .from('attendance')
@@ -1016,35 +1088,86 @@ async function loadAttendance() {
         .order('date', { ascending: false })
         .limit(500);
       allAttend = data || [];
-    } catch (err2) { 
-      logError('panel_control', err2?.message || String(err2), err2?.stack || '', 'loadAttendance_fallback').catch(() => {});
-      allAttend = []; 
+    } catch (err2) {
+      console.error('[Karpus] loadAttendance_fallback:', err2?.message || String(err2));
+      await logError('panel_control', err2?.message || String(err2), err2?.stack || '', 'loadAttendance_fallback').catch((logErr) => {
+        console.warn('[Karpus] No se pudo registrar loadAttendance_fallback:', logErr?.message);
+      });
+      allAttend = [];
     }
   }
 }
 
 // ── Dashboard ─────────────────────────────────────────────────────────────────
+// Inicio del rango temporal activo (Hoy / 7 días / Mes / Año)
+function _dashRangeStart(range) {
+  const now = new Date();
+  if (range === 'today') return new Date().setHours(0, 0, 0, 0);
+  if (range === '7d')    return Date.now() - 7 * 24 * 3600 * 1000;
+  if (range === 'month') return new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+  return new Date(now.getFullYear(), 0, 1).getTime(); // year
+}
+
+function _setKpiText(id, value) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = value;
+}
+
+// ✅ HEALTHCHECK: Estado del Ciclo de Pagos (con captura de error amigable)
+async function _renderPaymentHealthWidget() {
+  const widget = document.getElementById('paymentHealthWidget');
+  if (!widget) return;
+
+  const { data: health, error: healthErr } = await supabase.rpc('check_payment_cycle_health');
+  const isMissing = !!healthErr && (
+    /could not find the function|schema cache|404/i.test(healthErr.message || '') ||
+    (healthErr.code || '') === '42883'
+  );
+  const isOk = !isMissing && !healthErr && health?.status === 'ok';
+
+  let msg, badge;
+  if (isMissing) {
+    msg = 'Función check_payment_cycle_health no instalada. Ejecuta el SQL de migración para activar el monitoreo.';
+    badge = '<span class="badge badge-yellow">N/D</span>';
+  } else if (healthErr) {
+    msg = 'No se pudo verificar el ciclo de pagos: ' + (healthErr.message || 'error desconocido');
+    badge = '<span class="badge badge-red">ERROR</span>';
+  } else {
+    msg = health?.message || (isOk ? 'Ciclo de pagos operando normalmente' : 'Revisar estado del ciclo');
+    badge = `<span class="badge ${isOk ? 'badge-green' : 'badge-red'}">${isOk ? 'OK' : 'ERROR'}</span>`;
+  }
+
+  // Preservar las clases base del KPI (antes se pisaban con clases inexistentes)
+  widget.className = 'kpi ' + (isOk ? 'k-blue' : 'k-red');
+  const showRepair = !isOk && !isMissing;
+  const margin = showRepair ? '12px' : '0';
+  const repairBtn = showRepair
+    ? `<button onclick="App.runEmergencyCycle()" class="btn btn-danger" style="width:100%;justify-content:center;font-size:10px;padding:8px;">Reparar Ahora</button>`
+    : '';
+  widget.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+      <div class="kpi-lbl">Salud del Ciclo</div>
+      ${badge}
+    </div>
+    <p style="font-size:11px;color:var(--muted);margin-bottom:${margin};">${escH(msg)}</p>
+    ${repairBtn}
+  `;
+}
+
 async function renderDashboard() {
   try {
-    const now = new Date();
-    // ❖ Filtro temporal: Hoy / 7 días / Mes / Año
-    const rangeStart = _dashRange === 'today' ? new Date().setHours(0,0,0,0)
-      : _dashRange === '7d' ? Date.now() - 7 * 24 * 3600 * 1000
-      : _dashRange === 'month' ? new Date(now.getFullYear(), now.getMonth(), 1).getTime()
-      : new Date(now.getFullYear(), 0, 1).getTime(); // year
+    const rangeStart = _dashRangeStart(_dashRange);
     const rangePays = allPayments.filter(p => {
       const t = new Date(p.created_at).getTime();
       return Number.isFinite(t) && t >= rangeStart;
     });
     const RANGE_LABELS = { today: 'hoy', '7d': '7 días', month: 'mes', year: 'año' };
     const rl = RANGE_LABELS[_dashRange] || 'mes';
-    const kpiPayments = document.getElementById('kpi-payments');
-    if (kpiPayments) kpiPayments.textContent = rangePays.length;
+    _setKpiText('kpi-payments', rangePays.length);
     const revenue = rangePays
       .filter(p => ['paid','pagado','confirmado','approved'].includes((p.status||'').toLowerCase()))
       .reduce((s, p) => s + Number(p.amount || 0), 0);
-    const kpiRevenue = document.getElementById('kpi-revenue');
-    if (kpiRevenue) kpiRevenue.textContent = fmtMoney(revenue).replace('RD$', '');
+    _setKpiText('kpi-revenue', fmtMoney(revenue).replace('RD$', ''));
     const lblPay = document.querySelector('#kpi-payments + .kpi-lbl');
     const lblRev = document.querySelector('#kpi-revenue + .kpi-lbl');
     if (lblPay) lblPay.textContent = `Pagos (${rl})`;
@@ -1052,62 +1175,28 @@ async function renderDashboard() {
 
     // Control total en el dashboard: pagos en revisión + problemas abiertos
     const reviewCount = allPayments.filter(p => (p.status || '').toLowerCase() === 'review').length;
-    const kpiReview = document.getElementById('kpi-review');
-    if (kpiReview) kpiReview.textContent = reviewCount;
-    const kpiProblemas = document.getElementById('kpi-problemas');
-    if (kpiProblemas && _problemasData) kpiProblemas.textContent = _problemasData.total;
+    _setKpiText('kpi-review', reviewCount);
+    if (_problemasData) _setKpiText('kpi-problemas', _problemasData.total);
     if (!_problemasData && !_loadProb) {
       _loadProb = true;
-      loadProblemasData().then(() => {
-        const el = document.getElementById('kpi-problemas');
-        if (el) el.textContent = (_problemasData?.total ?? '—');
-      });
+      loadProblemasData().then(() => _setKpiText('kpi-problemas', _problemasData?.total ?? '—'));
     }
     // Sincronizar botones del selector de rango
     document.querySelectorAll('.dash-range').forEach(b => b.classList.toggle('active', b.dataset.range === _dashRange));
     detectFraud();
     maybeSendAutoAlert();
-    const kpiAlerts = document.getElementById('kpi-alerts');
-    if (kpiAlerts) kpiAlerts.textContent = fraudEvents.length;
-    const badgeFraud = document.getElementById('badge-fraud');
-    if (badgeFraud) badgeFraud.textContent = fraudEvents.length;
-    
-    // ✅ HEALTHCHECK: Estado del Ciclo de Pagos (con captura de error amigable)
-    const { data: health, error: healthErr } = await supabase.rpc('check_payment_cycle_health');
-    const healthWidget = document.getElementById('paymentHealthWidget');
-    if (healthWidget) {
-      const isMissing = healthErr && (
-        /could not find the function|schema cache|404/i.test(healthErr.message || '') ||
-        (healthErr.code || '') === '42883'
-      );
-      const isOk = !isMissing && !healthErr && health?.status === 'ok';
-      // Preservar las clases base del KPI (antes se pisaban con clases inexistentes)
-      healthWidget.className = 'kpi ' + (isOk ? 'k-blue' : 'k-red');
-      let msg, badge;
-      if (isMissing) {
-        msg = 'Función check_payment_cycle_health no instalada. Ejecuta el SQL de migración para activar el monitoreo.';
-        badge = '<span class="badge badge-yellow">N/D</span>';
-      } else if (healthErr) {
-        msg = 'No se pudo verificar el ciclo de pagos: ' + (healthErr.message || 'error desconocido');
-        badge = '<span class="badge badge-red">ERROR</span>';
-      } else {
-        msg = health?.message || (isOk ? 'Ciclo de pagos operando normalmente' : 'Revisar estado del ciclo');
-        badge = `<span class="badge ${isOk ? 'badge-green' : 'badge-red'}">${isOk ? 'OK' : 'ERROR'}</span>`;
-      }
-      healthWidget.innerHTML = `
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-          <div class="kpi-lbl">Salud del Ciclo</div>
-          ${badge}
-        </div>
-        <p style="font-size:11px;color:var(--muted);margin-bottom:${!isOk && !isMissing ? '12px' : '0'};">${escH(msg)}</p>
-        ${!isOk && !isMissing ? `<button onclick="App.runEmergencyCycle()" class="btn btn-danger" style="width:100%;justify-content:center;font-size:10px;padding:8px;">Reparar Ahora</button>` : ''}
-      `;
-    }
+    _setKpiText('kpi-alerts', fraudEvents.length);
+    _setKpiText('badge-fraud', fraudEvents.length);
+
+    await _renderPaymentHealthWidget();
 
     renderRecentAudit();
     renderFraudAlertsList();
     renderCharts();
-  } catch (_) {}
+  } catch (dashErr) {
+    // El dashboard es informativo: un fallo puntual no debe romper el resto del panel.
+    console.warn('[Karpus] renderDashboard:', dashErr?.message);
+  }
 }
 
 window.App = window.App || {};
@@ -1124,7 +1213,9 @@ window.App.resetState = async function() {
   try {
     // Invalidar caché local del perfil para forzar revalidación contra DB
     if (currentUser?.id) localStorage.removeItem('karpus_ctrl_profile_' + currentUser.id);
-  } catch (_) {}
+  } catch (storageErr) {
+    console.warn('[Karpus] resetState: no se pudo limpiar la caché local:', storageErr?.message);
+  }
   await refreshAll();
   if (_sectionActive('auditoria'))  renderAuditTable(allAudit);
   if (_sectionActive('usuarios'))   renderUsers(allUsers);
@@ -1156,80 +1247,90 @@ function onChartReady(cb) {
   }, 250);
 }
 
+// Actividad real: logins por rol en los últimos 7 días (login_attempts vía RPC)
+function _renderActivityChart(ctx) {
+  if (!_loginStats) loadLoginStats().then(() => renderCharts());
+  const days7 = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(); d.setDate(d.getDate() - (6 - i));
+    return localYYYYMMDD(d);
+  });
+  const roleDefs = [
+    ['padre', 'Padres', '#6366f1'],
+    ['maestra', 'Maestras', '#22c55e'],
+    ['directora', 'Directoras', '#f97316'],
+    ['asistente', 'Asistentes', '#3b82f6'],
+  ];
+  const daily = (_loginSeries?.daily || []).reduce((acc, d) => {
+    const k = (d.day || '') + '|' + (d.rol || '');
+    acc[k] = (acc[k] || 0) + (d.count || 0);
+    return acc;
+  }, {});
+  const datasets = roleDefs.map(([role, label, color]) => ({
+    label,
+    backgroundColor: color,
+    borderRadius: 6,
+    barThickness: 12,
+    data: days7.map(d => daily[d + '|' + role] || 0)
+  }));
+  return new Chart(ctx, {
+    type: 'bar',
+    data: { labels: days7.map(d => d.slice(5)), datasets },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: '#94a3b8', font: { size: 10 }, usePointStyle: true } } }, scales: { x: { stacked: true, grid: { display: false }, ticks: { color: '#94a3b8', font: { size: 11 } } }, y: { stacked: true, beginAtZero: true, ticks: { precision: 0, color: '#94a3b8' }, grid: { color: 'rgba(255,255,255,0.05)' } } } }
+  });
+}
+
+function _renderRolesChart(ctx) {
+  const rc = { padre: 0, maestra: 0, directora: 0, asistente: 0, admin: 0 };
+  allUsers.forEach(u => { if (rc[u.role] !== undefined) rc[u.role]++; });
+  const totalRoles = Object.values(rc).reduce((s, v) => s + v, 0);
+  return new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: ['Padres','Maestras','Directoras','Asistentes','Admin'],
+      datasets: [{ data: [rc.padre, rc.maestra, rc.directora, rc.asistente, rc.admin], backgroundColor: ['#6366f1','#22c55e','#f97316','#3b82f6','#eab308'], borderWidth: 2, borderColor: '#ffffff' }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'bottom', labels: { color: '#94a3b8', font: { size: 10 }, padding: 15, usePointStyle: true } },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => {
+              const pct = totalRoles ? Math.round((ctx.parsed / totalRoles) * 100) : 0;
+              return ` ${ctx.label}: ${ctx.parsed} (${pct}%)`;
+            }
+          }
+        }
+      },
+      cutout: '70%'
+    }
+  });
+}
+
 function renderCharts() {
   // Guard: la librería se carga con defer y puede no estar lista → reintentar cuando llegue
   if (typeof Chart === 'undefined') { console.warn('[Karpus] Chart.js no disponible aún'); onChartReady(renderCharts); return; }
+
   const canvasActivity = document.getElementById('chartActivity');
-  if (canvasActivity) {
-    const actCtx = canvasActivity.getContext('2d');
-    if (actCtx) {
-      if (chartActivity) chartActivity.destroy();
-      try {
-        // Actividad real: logins por rol en los últimos 7 días (login_attempts vía RPC)
-        if (!_loginStats) loadLoginStats().then(() => renderCharts());
-        const days7 = Array.from({ length: 7 }, (_, i) => {
-          const d = new Date(); d.setDate(d.getDate() - (6 - i));
-          return localYYYYMMDD(d);
-        });
-        const roleDefs = [
-          ['padre', 'Padres', '#6366f1'],
-          ['maestra', 'Maestras', '#22c55e'],
-          ['directora', 'Directoras', '#f97316'],
-          ['asistente', 'Asistentes', '#3b82f6'],
-        ];
-        const daily = (_loginSeries?.daily || []).reduce((acc, d) => {
-          const k = (d.day || '') + '|' + (d.rol || '');
-          acc[k] = (acc[k] || 0) + (d.count || 0);
-          return acc;
-        }, {});
-        const datasets = roleDefs.map(([role, label, color]) => ({
-          label,
-          backgroundColor: color,
-          borderRadius: 6,
-          barThickness: 12,
-          data: days7.map(d => daily[d + '|' + role] || 0)
-        }));
-        chartActivity = new Chart(actCtx, {
-          type: 'bar',
-          data: { labels: days7.map(d => d.slice(5)), datasets },
-          options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: '#94a3b8', font: { size: 10 }, usePointStyle: true } } }, scales: { x: { stacked: true, grid: { display: false }, ticks: { color: '#94a3b8', font: { size: 11 } } }, y: { stacked: true, beginAtZero: true, ticks: { precision: 0, color: '#94a3b8' }, grid: { color: 'rgba(255,255,255,0.05)' } } } }
-        });
-      } catch (_) {}
+  const actCtx = canvasActivity?.getContext('2d');
+  if (actCtx) {
+    if (chartActivity) chartActivity.destroy();
+    try {
+      chartActivity = _renderActivityChart(actCtx);
+    } catch (chartErr) {
+      console.warn('[Karpus] Gráfico de actividad:', chartErr?.message);
     }
   }
+
   const canvasRoles = document.getElementById('chartRoles');
-  if (canvasRoles) {
-    const roleCtx = canvasRoles.getContext('2d');
-    if (roleCtx) {
-      if (chartRoles) chartRoles.destroy();
-      const rc = { padre: 0, maestra: 0, directora: 0, asistente: 0, admin: 0 };
-      allUsers.forEach(u => { if (rc[u.role] !== undefined) rc[u.role]++; });
-      const totalRoles = Object.values(rc).reduce((s, v) => s + v, 0);
-      try {
-        chartRoles = new Chart(roleCtx, {
-          type: 'doughnut',
-          data: {
-            labels: ['Padres','Maestras','Directoras','Asistentes','Admin'],
-            datasets: [{ data: [rc.padre, rc.maestra, rc.directora, rc.asistente, rc.admin], backgroundColor: ['#6366f1','#22c55e','#f97316','#3b82f6','#eab308'], borderWidth: 2, borderColor: '#ffffff' }]
-          },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-              legend: { position: 'bottom', labels: { color: '#94a3b8', font: { size: 10 }, padding: 15, usePointStyle: true } },
-              tooltip: {
-                callbacks: {
-                  label: (ctx) => {
-                    const pct = totalRoles ? Math.round((ctx.parsed / totalRoles) * 100) : 0;
-                    return ` ${ctx.label}: ${ctx.parsed} (${pct}%)`;
-                  }
-                }
-              }
-            },
-            cutout: '70%'
-          }
-        });
-      } catch (_) {}
+  const roleCtx = canvasRoles?.getContext('2d');
+  if (roleCtx) {
+    if (chartRoles) chartRoles.destroy();
+    try {
+      chartRoles = _renderRolesChart(roleCtx);
+    } catch (chartErr) {
+      console.warn('[Karpus] Gráfico de roles:', chartErr?.message);
     }
   }
 }
@@ -1834,10 +1935,9 @@ function renderEarliestArrivals(todayData) {
     container.innerHTML = '<div style="text-align:center;padding:32px;color:var(--muted);">Sin registros de entrada hoy</div>';
     return;
   }
-  const rankColors = ['#22c55e', '#4ade80', '#facc15', '#fb923c', '#ef4444'];
   container.innerHTML = withTime.slice(0, 15).map((t, i) => {
-    const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i+1}`;
-    const color = rankColors[Math.min(i, rankColors.length - 1)];
+    const medal = _rankMedal(i);
+    const color = _rankColor(i);
     const isLate = ['late','tarde'].includes((t.status||'').toLowerCase());
     return `<div style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid var(--border);">
       <div style="width:30px;height:30px;border-radius:50%;background:${color};display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:900;color:white;flex-shrink:0;">${medal}</div>
@@ -1889,7 +1989,7 @@ function renderFrequencyStats() {
     } else {
       container.innerHTML = sorted.slice(0, 15).map((s, i) => {
         const pct = Math.round((s.total / totalDays) * 100);
-        const barColor = pct > 30 ? '#ef4444' : pct > 15 ? '#f59e0b' : '#3b82f6';
+        const barColor = _attendanceBarColor(pct);
         return `<div style="display:flex;align-items:center;gap:12px;padding:10px 12px;border-bottom:1px solid var(--border);">
           <div style="width:30px;height:30px;border-radius:50%;background:${barColor};display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;color:white;flex-shrink:0;">#${i+1}</div>
           <div style="flex:1;min-width:0;">
@@ -1921,9 +2021,8 @@ function renderFrequencyStats() {
       container2.innerHTML = '<div style="text-align:center;padding:32px;color:var(--muted);">Sin datos de llegada</div>';
     } else {
       container2.innerHTML = withAvg.slice(0, 15).map((s, i) => {
-        const rankColors = ['#22c55e', '#4ade80', '#facc15', '#fb923c', '#ef4444'];
-        const color = rankColors[Math.min(i, rankColors.length - 1)];
-        const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i+1}`;
+        const color = _rankColor(i);
+        const medal = _rankMedal(i);
         return `<div style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid var(--border);">
           <div style="width:30px;height:30px;border-radius:50%;background:${color};display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:900;color:white;flex-shrink:0;">${medal}</div>
           <div style="flex:1;min-width:0;">
@@ -1977,12 +2076,11 @@ window.renderTeacherEfficiency = function() {
   const best = ranked[0].avgMinutes;
   const worst = ranked[ranked.length - 1].avgMinutes;
   const range = worst - best || 1;
-  const rankColors = ['#22c55e', '#4ade80', '#facc15', '#fb923c', '#ef4444'];
 
   container.innerHTML = ranked.map((t, i) => {
     const pct = Math.max(10, Math.round(100 - ((t.avgMinutes - best) / range) * 90));
-    const color = rankColors[Math.min(i, rankColors.length - 1)];
-    const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i + 1}`;
+    const color = _rankColor(i);
+    const medal = _rankMedal(i);
     return `<div class="eff-row">
       <div class="eff-rank" style="background:${color};">${medal}</div>
       <div style="flex:1;min-width:0;">
@@ -2007,7 +2105,7 @@ window.renderTeacherEfficiency = function() {
             datasets: [{
               label: 'Hora promedio entrada',
               data: ranked.map(t => t.avgMinutes),
-              backgroundColor: ranked.map((_, i) => rankColors[Math.min(i, rankColors.length - 1)] + 'cc'),
+              backgroundColor: ranked.map((_, i) => _rankColor(i) + 'cc'),
               borderRadius: 8,
               barThickness: 24
             }]
@@ -2201,7 +2299,10 @@ async function loadLoginStats() {
       if (b) b.textContent = stats.totals?.logins_today ?? 0;
       return;
     }
-  } catch (_) {}
+  } catch (rpcErr) {
+    // Si la migración 21 no está aplicada se cae al fallback de auditoría de abajo.
+    console.warn('[Karpus] loadLoginStats: RPC no disponible, se usará auditoría:', rpcErr?.message);
+  }
   _loginLoading = false;
 
   // Fallback: si la migración 21 aún no se ejecutó, derivar de auditoría
@@ -2379,6 +2480,13 @@ async function loadRevisionData() {
   _renderRevisionBadges();
 }
 
+// Color del badge según los días que el pago lleva en revisión
+function _revisionBadgeClass(dias) {
+  if (dias >= 3) return 'badge-red';
+  if (dias >= 1) return 'badge-yellow';
+  return 'badge-blue';
+}
+
 window.renderRevision = function() {
   const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
   const d = _revisionData || { total: 0, monto: 0, conPrueba: 0, sinPrueba: 0, items: [] };
@@ -2388,7 +2496,12 @@ window.renderRevision = function() {
   set('rev-sin', d.sinPrueba);
   const tbody = document.getElementById('revBody');
   if (!tbody) return;
-  tbody.innerHTML = d.items.length ? d.items.map(p => `
+  tbody.innerHTML = d.items.length ? d.items.map(p => {
+    const proofUrl = p.proof_url || p.evidence_url;
+    const proofCell = proofUrl
+      ? `<a href="${escH(proofUrl)}" target="_blank" rel="noopener" class="btn btn-ghost" style="padding:4px 8px;font-size:10px;"><i class="bi bi-eye"></i> Ver</a>`
+      : '<span style="color:var(--muted);font-size:11px;">—</span>';
+    return `
       <tr>
         <td style="font-weight:800;">${escH(p.student_name)}</td>
         <td style="font-size:11px;color:var(--muted);">${escH(p.aula)}</td>
@@ -2396,11 +2509,12 @@ window.renderRevision = function() {
         <td style="font-weight:900;color:#f59e0b;">${fmtMoney(p.amount)}</td>
         <td style="font-size:11px;">${escH(p.method || '—')}</td>
         <td>${p.prueba ? '<span class="badge badge-green"><i class="bi bi-check-circle-fill"></i> Sí</span>' : '<span class="badge badge-red"><i class="bi bi-x-circle-fill"></i> No</span>'}</td>
-        <td><span class="badge ${p.dias >= 3 ? 'badge-red' : p.dias >= 1 ? 'badge-yellow' : 'badge-blue'}">${p.dias} día${p.dias === 1 ? '' : 's'}</span></td>
+        <td><span class="badge ${_revisionBadgeClass(p.dias)}">${p.dias} día${p.dias === 1 ? '' : 's'}</span></td>
         <td style="font-size:11px;color:var(--muted);">${p.created_at ? new Date(p.created_at).toLocaleDateString('es-DO') : '—'}</td>
-        <td>${(p.proof_url || p.evidence_url) ? `<a href="${escH(p.proof_url || p.evidence_url)}" target="_blank" rel="noopener" class="btn btn-ghost" style="padding:4px 8px;font-size:10px;"><i class="bi bi-eye"></i> Ver</a>` : '<span style="color:var(--muted);font-size:11px;">—</span>'}</td>
+        <td>${proofCell}</td>
       </tr>
-    `).join('') : '<tr><td colspan="9" style="text-align:center;padding:26px;color:var(--muted);">🎉 No hay pagos en revisión.</td></tr>';
+    `;
+  }).join('') : '<tr><td colspan="9" style="text-align:center;padding:26px;color:var(--muted);">🎉 No hay pagos en revisión.</td></tr>';
 };
 
 // ── Problemas e incidencias (incidents + reports + inquiries) ────────────────
@@ -2942,6 +3056,9 @@ function _overrideUserCard(userId, ov) {
   const email = u?.email || userId;
   const activeKeys = Object.keys(ov || {});
   const expanded = ffExpandedUser === userId;
+  const rulesBadge = activeKeys.length
+    ? `<span class="badge badge-purple" style="margin-left:4px;">${activeKeys.length} regla${activeKeys.length > 1 ? 's' : ''}</span>`
+    : '';
   let detail = '';
   if (expanded) {
     detail = `<div style="margin-top:10px;display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:6px;">
@@ -2962,7 +3079,7 @@ function _overrideUserCard(userId, ov) {
     <div style="display:flex;align-items:center;gap:10px;">
       <button onclick="ffToggleExpand('${userId}')" style="background:none;border:none;cursor:pointer;font-size:13px;color:#a5b4fc;padding:0;width:16px;">${expanded ? '▾' : '▸'}</button>
       <div style="min-width:0;flex:1;">
-        <div style="font-size:12px;font-weight:800;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escH(name)} ${activeKeys.length ? `<span class="badge badge-purple" style="margin-left:4px;">${activeKeys.length} regla${activeKeys.length > 1 ? 's' : ''}</span>` : ''}</div>
+        <div style="font-size:12px;font-weight:800;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escH(name)} ${rulesBadge}</div>
         <div style="font-size:10px;color:var(--muted);">${escH(email)}</div>
       </div>
       <button class="btn btn-danger" style="padding:4px 10px;font-size:10px;" onclick="ffRemoveOverride('${userId}')"><i class="bi bi-trash"></i></button>
@@ -3035,7 +3152,49 @@ function _suspMsg(text, ok) {
   if (el) { el.textContent = text; el.style.color = ok ? '#4ade80' : '#f87171'; }
 }
 
+async function _fetchSuspensionInfo() {
+  try {
+    const { data, error } = await Promise.race([
+      supabase.rpc('get_business_suspension_info'),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 4000))
+    ]);
+    if (!error && data && typeof data === 'object') {
+      return { suspended: data.status === 'suspended', info: data };
+    }
+    console.warn('[Karpus] get_business_suspension_info sin datos:', error?.message);
+  } catch (suspErr) {
+    // Timeout o RPC ausente (migración no aplicada): se asume servicio activo.
+    console.warn('[Karpus] get_business_suspension_info falló:', suspErr?.message);
+  }
+  return { suspended: false, info: null };
+}
+
+function _suspensionDetailText(suspended, info) {
+  if (!suspended) return 'El sistema funciona con normalidad. Todos los usuarios pueden acceder.';
+  if (info?.suspended_at) {
+    const d = new Date(info.suspended_at);
+    return 'Desactivado el ' + d.toLocaleString('es-DO', { dateStyle: 'short', timeStyle: 'short' });
+  }
+  return 'Servicio bloqueado para todos los usuarios.';
+}
+
+function _renderSuspensionBanner(banner, bannerR, suspended, info) {
+  if (!banner) return;
+  if (!suspended) {
+    banner.classList.add('hidden');
+    return;
+  }
+  banner.classList.remove('hidden');
+  if (!bannerR) return;
+  bannerR.textContent = info?.suspension_reason
+    ? 'Motivo: ' + info.suspension_reason + ' — todos los usuarios bloqueados.'
+    : 'Todos los usuarios están bloqueados hasta reactivar el servicio.';
+}
+
 window.refreshSuspensionStatus = async function() {
+  const { suspended, info } = await _fetchSuspensionInfo();
+  window._businessSuspended = suspended;
+
   const pill    = document.getElementById('suspStatusPill');
   const detail  = document.getElementById('suspStatusDetail');
   const toggle  = document.getElementById('suspToggleBtn');
@@ -3046,47 +3205,18 @@ window.refreshSuspensionStatus = async function() {
   const banner  = document.getElementById('suspBanner');
   const bannerR = document.getElementById('suspBannerReason');
 
-  let suspended = false;
-  let info = null;
-  try {
-    const { data, error } = await Promise.race([
-      supabase.rpc('get_business_suspension_info'),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 4000))
-    ]);
-    if (!error && data && typeof data === 'object') { info = data; suspended = data.status === 'suspended'; }
-  } catch (_) {}
-
-  window._businessSuspended = suspended;
-
   if (pill) {
     pill.className = 'badge ' + (suspended ? 'badge-red' : 'badge-green');
     pill.innerHTML = '<i class="bi bi-circle-fill" style="font-size:7px;"></i> ' + (suspended ? 'Suspendido' : 'Activo');
   }
-  if (detail) {
-    if (!suspended) {
-      detail.textContent = 'El sistema funciona con normalidad. Todos los usuarios pueden acceder.';
-    } else if (info?.suspended_at) {
-      const d = new Date(info.suspended_at);
-      detail.textContent = 'Desactivado el ' + d.toLocaleString('es-DO', { dateStyle: 'short', timeStyle: 'short' });
-    } else {
-      detail.textContent = 'Servicio bloqueado para todos los usuarios.';
-    }
-  }
+  if (detail) detail.textContent = _suspensionDetailText(suspended, info);
   if (toggle) { toggle.title = suspended ? 'Reactivar el servicio para todos los usuarios' : 'Bloquear el acceso de todos los usuarios'; }
   if (tLabel) tLabel.textContent = suspended ? 'Reactivar servicio' : 'Suspender servicio';
   if (icon) icon.className = 'bi ' + (suspended ? 'bi-toggle-on' : 'bi-toggle-off');
   if (reason) { reason.value = info?.suspension_reason || ''; }
   if (reasonW) reasonW.classList.toggle('hidden', !suspended);
 
-  if (banner) {
-    if (suspended) {
-      banner.classList.remove('hidden');
-      if (bannerR && info?.suspension_reason) bannerR.textContent = 'Motivo: ' + info.suspension_reason + ' — todos los usuarios bloqueados.';
-      else if (bannerR) bannerR.textContent = 'Todos los usuarios están bloqueados hasta reactivar el servicio.';
-    } else {
-      banner.classList.add('hidden');
-    }
-  }
+  _renderSuspensionBanner(banner, bannerR, suspended, info);
 };
 
 let _suspWatchdog = null;
@@ -3096,12 +3226,14 @@ function startPanelSuspensionWatchdog() {
     try {
       const { data, error } = await supabase.rpc('is_business_suspended');
       const suspended = !error && data === true;
-      if (suspended && !window._businessSuspended) {
-        await refreshSuspensionStatus();
-      } else if (!suspended && window._businessSuspended) {
+      // Refresca la UI solo cuando el estado difiere del que ya se está mostrando
+      if (suspended !== window._businessSuspended) {
         await refreshSuspensionStatus();
       }
-    } catch (_) {}
+    } catch (watchErr) {
+      // Sondeo best-effort: se reintenta en el siguiente ciclo de 90s.
+      console.warn('[Karpus] Watchdog de suspensión:', watchErr?.message);
+    }
   }, 90000);
 }
 
@@ -3310,24 +3442,28 @@ window.addEventListener('resize', () => {
 window.addEventListener('pagehide', () => {
   if (_clockInterval) { clearInterval(_clockInterval); _clockInterval = null; }
   if (_sessionInterval) { clearInterval(_sessionInterval); _sessionInterval = null; }
-  try { supabase.removeAllChannels(); } catch (_) {}
+  // La limpieza es "best effort": si Supabase ya está cerrado, no hay nada que recuperar.
+  try { supabase.removeAllChannels(); } catch (chanErr) { console.warn('[Karpus] pagehide: canales no cerrados:', chanErr?.message); }
   _realtimeChannel = null;
 });
 
 // ── Logout con limpieza total: suscripciones realtime, intervalos y caché local ──
 window.doLogout = async function() {
+  // 1. Cancelar todas las suscripciones realtime
+  // 2. Detener intervalos activos (reloj + refresco de sesión)
+  // 3. Limpiar caché local del panel (perfiles cacheados)
+  // La limpieza nunca debe impedir el cierre de sesión: se registra y se continúa.
   try {
-    // 1. Cancelar todas las suscripciones realtime
-    try { supabase.removeAllChannels(); } catch (_) {}
+    try { supabase.removeAllChannels(); } catch (chanErr) { console.warn('[Karpus] doLogout: canales no cerrados:', chanErr?.message); }
     _realtimeChannel = null;
-    // 2. Detener intervalos activos (reloj + refresco de sesión)
     if (_clockInterval)   { clearInterval(_clockInterval);   _clockInterval = null; }
     if (_sessionInterval) { clearInterval(_sessionInterval); _sessionInterval = null; }
-    // 3. Limpiar caché local del panel (perfiles cacheados)
     Object.keys(localStorage)
       .filter(k => k.startsWith('karpus_ctrl_'))
       .forEach(k => localStorage.removeItem(k));
-  } catch (_) {}
+  } catch (cleanupErr) {
+    console.warn('[Karpus] doLogout: limpieza local incompleta:', cleanupErr?.message);
+  }
   await supabase.auth.signOut();
   window.location.href = 'login.html';
 };
@@ -3531,6 +3667,26 @@ function escH(str) {
   return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+// Medalla de los primeros tres puestos; el resto se numera (#4, #5, ...)
+function _rankMedal(index) {
+  if (index === 0) return '🥇';
+  if (index === 1) return '🥈';
+  if (index === 2) return '🥉';
+  return `#${index + 1}`;
+}
+
+const _RANK_COLORS = ['#22c55e', '#4ade80', '#facc15', '#fb923c', '#ef4444'];
+function _rankColor(index) {
+  return _RANK_COLORS[Math.min(index, _RANK_COLORS.length - 1)];
+}
+
+// Color de la barra de asistencia según el porcentaje
+function _attendanceBarColor(pct) {
+  if (pct > 30) return '#ef4444';
+  if (pct > 15) return '#f59e0b';
+  return '#3b82f6';
+}
+
 function fmtMoney(n) {
   return 'RD$' + Number(n || 0).toLocaleString('es-DO', { maximumFractionDigits: 2 });
 }
@@ -3542,18 +3698,18 @@ function fmtMoney(n) {
 // ═══════════════════════════════════════════════════════════════════════════
 
 // ── Palabras clave sensibles (atención prioritaria) ────────────────────────
-const SENSITIVE_KEYWORDS = [
+const SENSITIVE_KEYWORDS = new Set([
   'mora','pago','queja','reclamo','salud','enfermo','enfermedad','fiebre','alergia','medicamento',
   'accidente','golpe','sangre','lesion','bullying','acoso','maltrato','violencia','pelea','amenaza',
   'denuncia','urgencia','emergencia','socorro','desaparecido'
-];
+]);
 
 function findSensitiveHits(text) {
-  const t = ' ' + String(text || '').toLowerCase() + ' ';
+  const raw = String(text || '');
   const hits = [];
   SENSITIVE_KEYWORDS.forEach(k => {
-    const w = new RegExp('\\b' + k + '\\b', 'i');
-    if (w.test(String(text || ''))) hits.push(k);
+    const w = new RegExp(String.raw`\b${k}\b`, 'i');
+    if (w.test(raw)) hits.push(k);
   });
   return [...new Set(hits)];
 }
@@ -3562,8 +3718,8 @@ function renderSensitiveText(text) {
   let html = escH(String(text || ''));
   const words = [...new Set((String(text || '').toLowerCase().match(/[a-záéíóúñü0-9]+/g) || []))];
   words.forEach(w => {
-    if (SENSITIVE_KEYWORDS.includes(w)) {
-      const re = new RegExp('\\b(' + w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')\\b', 'gi');
+    if (SENSITIVE_KEYWORDS.has(w)) {
+      const re = new RegExp(String.raw`\b(${w.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`)})\b`, 'gi');
       html = html.replace(re, '<mark style="background:rgba(239,68,68,.22);color:#fca5a5;border-radius:4px;padding:0 2px;">$1</mark>');
     }
   });
@@ -3650,43 +3806,47 @@ function _applyChatFilter() {
   if (!visible.length) {
     tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--muted);">Sin mensajes que coincidan con el filtro</td></tr>';
   } else {
-    tbody.innerHTML = visible.map(m => {
-      const senderName   = _senderLabel(m);
-      const receiverName = _receiverLabel(m);
-      const hasMedia = m.attachment_url ? ` <span class="badge badge-purple" style="font-size:8px;">📷</span>` : '';
-      const sense = findSensitiveHits(m.content);
-      const senseBadge = sense.length ? `<span class="badge badge-red" style="font-size:8px;" title="${escH(sense.join(', '))}">⚠ ${escH(sense.slice(0, 2).join('/'))}</span>` : '';
-      const fecha = m.created_at
-        ? new Date(m.created_at).toLocaleString('es-DO', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
-        : '—';
-      return `<tr>
-        <td style="font-size:11px;color:var(--muted);white-space:nowrap;">${fecha}</td>
-        <td style="font-weight:800;font-size:12px;white-space:nowrap;">${escH(senderName)}</td>
-        <td style="font-weight:700;font-size:12px;color:var(--muted);white-space:nowrap;">→ ${escH(receiverName)}</td>
-        <td style="min-width:240px;max-width:340px;font-size:12px;color:var(--text);white-space:normal;word-break:break-word;">${renderSensitiveText(m.content)}${hasMedia}</td>
-        <td style="white-space:nowrap;">${m.is_read === false ? '<span class="badge badge-yellow">Sin leer</span>' : '<span class="badge badge-gray">Leído</span>'}${senseBadge}</td>
-      </tr>`;
-    }).join('');
+    tbody.innerHTML = visible.map(_chatRowHTML).join('');
   }
 
-  // Strip resumen del inspector
+  _renderChatInspectorStrip();
+}
+
+function _chatRowHTML(m) {
+  const senderName   = _senderLabel(m);
+  const receiverName = _receiverLabel(m);
+  const hasMedia = m.attachment_url ? ` <span class="badge badge-purple" style="font-size:8px;">📷</span>` : '';
+  const sense = findSensitiveHits(m.content);
+  const senseBadge = sense.length ? `<span class="badge badge-red" style="font-size:8px;" title="${escH(sense.join(', '))}">⚠ ${escH(sense.slice(0, 2).join('/'))}</span>` : '';
+  const fecha = m.created_at
+    ? new Date(m.created_at).toLocaleString('es-DO', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+    : '—';
+  return `<tr>
+    <td style="font-size:11px;color:var(--muted);white-space:nowrap;">${fecha}</td>
+    <td style="font-weight:800;font-size:12px;white-space:nowrap;">${escH(senderName)}</td>
+    <td style="font-weight:700;font-size:12px;color:var(--muted);white-space:nowrap;">→ ${escH(receiverName)}</td>
+    <td style="min-width:240px;max-width:340px;font-size:12px;color:var(--text);white-space:normal;word-break:break-word;">${renderSensitiveText(m.content)}${hasMedia}</td>
+    <td style="white-space:nowrap;">${m.is_read === false ? '<span class="badge badge-yellow">Sin leer</span>' : '<span class="badge badge-gray">Leído</span>'}${senseBadge}</td>
+  </tr>`;
+}
+
+function _renderChatInspectorStrip() {
   const strip = document.getElementById('chatInspectorStrip');
-  if (strip) {
-    const unread = allChatMsgs.filter(m => m.is_read === false).length;
-    const sens   = allChatMsgs.filter(m => !!findSensitiveHits(m.content).length).length;
-    const med    = allChatMsgs.filter(m => m.attachment_url).length;
-    if (unread || sens || med) {
-      strip.style.display = 'flex';
-      strip.innerHTML = [
-        unread ? `<span class="badge badge-yellow" style="font-size:9px;">🔴 ${unread} sin leer</span>` : '',
-        sens ? `<span class="badge badge-red" style="font-size:9px;">⚠️ ${sens} con palabras sensibles</span>` : '',
-        med ? `<span class="badge badge-purple" style="font-size:9px;">📷 ${med} con archivos</span>` : ''
-      ].filter(Boolean).join('');
-    } else {
-      strip.style.display = 'none';
-    }
+  if (!strip) return;
+  const unread = allChatMsgs.filter(m => m.is_read === false).length;
+  const sens   = allChatMsgs.filter(m => !!findSensitiveHits(m.content).length).length;
+  const med    = allChatMsgs.filter(m => m.attachment_url).length;
+  if (!unread && !sens && !med) {
+    strip.style.display = 'none';
+    return;
   }
-};
+  strip.style.display = 'flex';
+  strip.innerHTML = [
+    unread ? `<span class="badge badge-yellow" style="font-size:9px;">🔴 ${unread} sin leer</span>` : '',
+    sens ? `<span class="badge badge-red" style="font-size:9px;">⚠️ ${sens} con palabras sensibles</span>` : '',
+    med ? `<span class="badge badge-purple" style="font-size:9px;">📷 ${med} con archivos</span>` : ''
+  ].filter(Boolean).join('');
+}
 
 function _downloadCSV(csv, name) {
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -3751,7 +3911,9 @@ window.viewThread = function(user1, user2) {
       </div>
     </div>`;
   }).join('');
-  openCtrlModal(`Hilo: ${escH(name1)} ${role1 ? `<span class="badge badge-gray" style="font-size:8px;">${role1}</span>` : ''} ↔ ${escH(name2)} ${role2 ? `<span class="badge badge-gray" style="font-size:8px;">${role2}</span>` : ''} <span style="color:var(--muted);font-size:11px;">(${msgs.length})</span>`,
+  const roleBadge1 = role1 ? `<span class="badge badge-gray" style="font-size:8px;">${role1}</span>` : '';
+  const roleBadge2 = role2 ? `<span class="badge badge-gray" style="font-size:8px;">${role2}</span>` : '';
+  openCtrlModal(`Hilo: ${escH(name1)} ${roleBadge1} ↔ ${escH(name2)} ${roleBadge2} <span style="color:var(--muted);font-size:11px;">(${msgs.length})</span>`,
     `<div style="max-height:54vh;overflow-y:auto;padding:4px;">${bubbles}</div>
      <div style="margin-top:12px;display:flex;justify-content:flex-end;">
        <button class="btn btn-primary" onclick="exportThreadCSV('${user1}','${user2}')" style="font-size:11px;"><i class="bi bi-download"></i> Exportar hilo CSV</button>
@@ -3822,29 +3984,52 @@ async function _loadWallFeedPage() {
       if (inner) inner.insertAdjacentHTML('beforebegin', '<div class="feed-end" style="text-align:center;padding:16px;color:var(--muted);font-size:11px;font-weight:800;">—— Fin del feed 🎉 ——</div>');
       _feedObserver?.disconnect();
       if (status) status.textContent = '— Todo cargado';
-    } else {
-      if (status) status.textContent = `— ${_feedState.page * _feedState.limit} publicaciones`;
+    } else if (status) {
+      status.textContent = `— ${_feedState.page * _feedState.limit} publicaciones`;
     }
-  } catch (_) {
+  } catch (feedErr) {
+    console.warn('[Karpus] _loadWallFeedPage:', feedErr?.message);
     if (status) status.textContent = 'Error cargando feed';
   } finally {
     _feedState.loading = false;
   }
 }
 
+// Etiqueta del autor según su rol en la publicación
+const _FEED_ROLE_LABELS = { directora: 'Directora', asistente: 'Asistente' };
+const _FEED_ROLE_COLORS = { directora: '#f97316', asistente: '#8b5cf6' };
+const _FEED_ROLE_DEFAULT = { label: 'Maestra', color: '#22c55e' };
+
+function _feedAuthorRole(authorRole) {
+  return _FEED_ROLE_LABELS[authorRole] || _FEED_ROLE_DEFAULT.label;
+}
+
+function _feedAuthorColor(authorRole) {
+  return _FEED_ROLE_COLORS[authorRole] || _FEED_ROLE_DEFAULT.color;
+}
+
+function _feedMediaHTML(media, poster, author, dt) {
+  if (!media) return '';
+  if (_isVideoUrl(media)) {
+    return `<video src="${escH(media)}" ${poster} controls preload="metadata" style="width:100%;max-height:300px;object-fit:cover;border-radius:12px;margin-top:10px;"></video>`;
+  }
+  const caption = escH(author + ' · ' + dt);
+  const open = `openLightbox('${escH(media)}','${caption}')`;
+  return `<img src="${escH(media)}" loading="lazy" onclick="${open}" style="width:100%;max-height:300px;object-fit:cover;border-radius:12px;margin-top:10px;cursor:zoom-in;">`;
+}
+
 function _feedCardHTML(p) {
   const room = allClassrooms.find(c => c.id === p.classroom_id);
   const dt = p.created_at ? new Date(p.created_at).toLocaleString('es-DO', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
   const author = p.teacher_name || 'Docente';
-  const role = p.author_role === 'directora' ? 'Directora' : p.author_role === 'asistente' ? 'Asistente' : 'Maestra';
+  const role = _feedAuthorRole(p.author_role);
   const initials = (author[0] || '?').toUpperCase();
-  const color = p.author_role === 'directora' ? '#f97316' : p.author_role === 'asistente' ? '#8b5cf6' : '#22c55e';
+  const color = _feedAuthorColor(p.author_role);
   const txt = [p.title, p.content].filter(Boolean).join(' — ');
   const media = _getWallMediaUrl(p);
   const poster = p.thumbnail_url ? `poster="${escH(p.thumbnail_url)}"` : '';
-  const mediaHTML = media ? (_isVideoUrl(media)
-    ? `<video src="${escH(media)}" ${poster} controls preload="metadata" style="width:100%;max-height:300px;object-fit:cover;border-radius:12px;margin-top:10px;"></video>`
-    : `<img src="${escH(media)}" loading="lazy" onclick="openLightbox('${escH(media)}','${escH(author + ' · ' + dt)}')" style="width:100%;max-height:300px;object-fit:cover;border-radius:12px;margin-top:10px;cursor:zoom-in;">`) : '';
+  const mediaHTML = _feedMediaHTML(media, poster, author, dt);
+  const txtHTML = txt ? `<div style="font-size:13px;color:var(--text);line-height:1.5;">${renderSensitiveText(txt)}</div>` : '';
   return `<div class="feed-card" style="background:var(--surface2);border:1px solid var(--border);border-radius:16px;padding:14px;margin-bottom:12px;box-shadow:0 4px 18px rgba(0,0,0,.18);">
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
       <div style="width:40px;height:40px;border-radius:50%;background:${color};display:flex;align-items:center;justify-content:center;font-weight:900;color:#fff;font-size:16px;flex-shrink:0;">${initials}</div>
@@ -3853,7 +4038,7 @@ function _feedCardHTML(p) {
         <div style="font-size:10px;color:var(--muted);">${escH(room?.name || 'Aula General')} · ${dt}${p.is_pinned ? ' · <span class="badge badge-yellow" style="font-size:7px;"><i class="bi bi-pin-angle-fill"></i> Fijado</span>' : ''}</div>
       </div>
     </div>
-    ${txt ? `<div style="font-size:13px;color:var(--text);line-height:1.5;">${renderSensitiveText(txt)}</div>` : ''}
+    ${txtHTML}
     ${mediaHTML}
     <div style="display:flex;gap:6px;margin-top:12px;flex-wrap:wrap;">
       <button class="btn btn-ghost" style="font-size:10px;padding:5px 10px;" onclick="openPostReactions(${p.id})"><i class="bi bi-heart-fill" style="color:#fb923c;"></i> ${Number(p.likes_count || 0)}</button>
@@ -3885,7 +4070,8 @@ window.openPostReactions = async function(postId) {
     }).join('');
     openCtrlModal(`<i class="bi bi-heart-fill" style="color:#fb923c;"></i> Reacciones de la publicación`,
       rows ? `<div style="max-height:46vh;overflow-y:auto;">${rows}</div>` : '<p style="text-align:center;color:var(--muted);padding:24px;">Aún no hay reacciones.</p>', { width: 440 });
-  } catch (_) {
+  } catch (reactErr) {
+    console.warn('[Karpus] openPostReactions:', reactErr?.message);
     showToast('No se pudieron cargar las reacciones.', 'error');
   }
 };
@@ -3906,7 +4092,7 @@ window.togglePostComments = async function(postId) {
       const name = c.user_name || pr?.name || (c.user_id ? String(c.user_id).slice(0, 8) : '—');
       const role = pr?.role || '';
       const time = c.created_at ? new Date(c.created_at).toLocaleString('es-DO', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
-      const roleBadge = role === 'padre' ? 'badge-blue' : role === 'maestra' ? 'badge-green' : role === 'directora' ? 'badge-orange' : 'badge-gray';
+      const roleBadge = _commentRoleBadge(role);
       return `<div style="display:flex;gap:9px;padding:8px 6px;border-bottom:1px solid var(--border);">
         <div style="min-width:0;flex:1;">
           <div style="font-size:10px;font-weight:900;color:var(--muted);">${escH(name)} <span class="badge ${roleBadge}" style="font-size:7px;">${escH(role)}</span> · ${time}</div>
@@ -3918,10 +4104,16 @@ window.togglePostComments = async function(postId) {
       ? `<div style="background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:12px;padding:8px 10px;">${list}</div>`
       : '<p style="font-size:10px;color:var(--muted);font-style:italic;text-align:center;">Sin comentarios.</p>';
     cont.dataset.open = '1';
-  } catch (_) {
+  } catch (cmtErr) {
+    console.warn('[Karpus] togglePostComments:', cmtErr?.message);
     cont.innerHTML = '<p style="font-size:10px;color:#f87171;text-align:center;">Error al cargar comentarios.</p>';
   }
 };
+
+const _COMMENT_ROLE_BADGES = { padre: 'badge-blue', maestra: 'badge-green', directora: 'badge-orange' };
+function _commentRoleBadge(role) {
+  return _COMMENT_ROLE_BADGES[role] || 'badge-gray';
+}
 
 // ── Visor JSON de payloads de auditoría ─────────────────────────────────────
 window.viewAuditPayload = function(i) {

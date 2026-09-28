@@ -2,6 +2,7 @@ import { supabase } from '../shared/supabase.js';
 import { QueryCache } from '../shared/query-cache.js';
 import { safeHandle } from '../shared/db-utils.js';
 import { autoMarkAbsentStudents } from '../shared/absent-service.js';
+import { computePaymentStats } from '../shared/payment-service.js';
 
 const TABLES = {
   PROFILES: 'profiles',
@@ -122,29 +123,30 @@ export const DirectorApi = {
     } catch (e) { return logError('getDashboardKPIs', e); }
   },
 
+  /**
+   * 📊 KPIs de la Gestión Financiera. El cálculo vive en
+   * shared/payment-service.js (computePaymentStats) para que directora y
+   * asistente no diverjan; aquí solo se traen las filas.
+   */
   async getPaymentStats(filterMonth, filterYear) {
     try {
       const now   = new Date();
       const year  = filterYear  ? String(filterYear)  : String(now.getFullYear());
       const month = filterMonth ? String(filterMonth).padStart(2, '0') : String(now.getMonth() + 1).padStart(2, '0');
-      const monthKey   = `${year}-${month}`;
-      const rangeStart = `${year}-${month}-01`;
-      const lastDay    = new Date(parseInt(year), parseInt(month), 0).getDate();
-      const rangeEnd   = `${year}-${month}-${String(lastDay).padStart(2, '0')}`;
 
-      const [paidData, pendingData, overdueData, reviewData] = await Promise.all([
-        supabase.from('payments').select('amount').eq('status', 'paid').gte('created_at', rangeStart).lte('created_at', rangeEnd + 'T23:59:59'),
-        supabase.from('payments').select('id', { count: 'exact', head: true }).eq('status', 'pending').eq('month_paid', monthKey),
-        supabase.from('payments').select('id', { count: 'exact', head: true }).eq('status', 'overdue').eq('month_paid', monthKey),
-        supabase.from('payments').select('id', { count: 'exact', head: true }).eq('status', 'review').eq('month_paid', monthKey)
-      ]);
+      const { data: rows, error } = await supabase
+        .from('payments')
+        .select('id, student_id, amount, status, due_date, month_paid, paid_date, created_at, evidence_url')
+        .is('deleted_at', null)          // la migración 10 anula pagos; no contarlos
+        .gte('created_at', `${year}-01-01`)
+        .lte('created_at', `${year}-12-31T23:59:59`)
+        .limit(3000);
+      if (error) throw error;
 
-      const income    = (paidData.data || []).reduce((s, p) => s + Number(p.amount || 0), 0);
-      const pending   = pendingData.count  || 0;
-      const overdue   = overdueData.count  || 0;
-      const toApprove = reviewData.count   || 0;
-
-      return { data: { incomeMonth: income, pending, overdue, toApprove }, error: null };
+      const c = computePaymentStats(rows, year, month);
+      return { data: { incomeMonth: c.income, pending: c.pending, overdue: c.overdue, toApprove: c.review,
+                       pendingStudents: c.pendingStudents, overdueStudents: c.overdueStudents, reviewStudents: c.reviewStudents },
+               error: null };
     } catch (e) { return logError('getPaymentStats', e); }
   },
 
@@ -375,8 +377,8 @@ export const DirectorApi = {
       await supabase.from(TABLES.CLASSROOMS).update({ teacher_id: id }).eq('id', cid);
     }
 
-    const ALLOWED = ['name', 'phone', 'role', 'bio', 'notes', 'access_code', 'avatar_url', 'onesignal_player_id', 'is_active'];
-    const safeData = Object.fromEntries(Object.entries(profileData).filter(([k]) => ALLOWED.includes(k)));
+    const ALLOWED = new Set(['name', 'phone', 'role', 'bio', 'notes', 'access_code', 'avatar_url', 'onesignal_player_id', 'is_active']);
+    const safeData = Object.fromEntries(Object.entries(profileData).filter(([k]) => ALLOWED.has(k)));
     const result = await supabase.from(TABLES.PROFILES).update(safeData).eq('id', id);
     QueryCache.invalidate('dir_teachers');
     QueryCache.invalidate('classrooms_list');
