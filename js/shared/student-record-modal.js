@@ -84,10 +84,23 @@ export const StudentRecordModal = {
   _onSaved: null,
 
   async open({ mode = null, prereg = null, studentId = null, onSaved = null } = {}) {
+    this._resetState({ mode, prereg, studentId, onSaved });
+
+    await this._loadBase();
+    await this._hydrateForm(studentId);
+    this._sanitizeSelfSibling();
+    await this._preloadSiblings();
+    this._renderShell();
+  },
+
+  _resolveMode(mode, prereg, studentId) {
+    const resolved = mode || (prereg ? 'admit' : studentId ? 'edit' : 'create');
+    return resolved === 'new' ? 'create' : resolved;
+  },
+
+  _resetState({ mode, prereg, studentId, onSaved }) {
     this._onSaved = onSaved || null;
-    let resolved = mode || (prereg ? 'admit' : studentId ? 'edit' : 'create');
-    if (resolved === 'new') resolved = 'create';
-    this._mode = resolved;
+    this._mode = this._resolveMode(mode, prereg, studentId);
     this._prereg = prereg;
     this._student = null;
     this._parentId = null;
@@ -106,35 +119,35 @@ export const StudentRecordModal = {
     this._tab = 'info';
     this._saving = false;
     this._form = {};
+  },
 
-    await this._loadBase();
-    if (this._mode === 'edit') await this._loadStudent(studentId);
-    else if (this._mode === 'admit') this._fromPrereg();
-    else this._emptyForm();
+  async _hydrateForm(studentId) {
+    if (this._mode === 'edit') return this._loadStudent(studentId);
+    if (this._mode === 'admit') return this._fromPrereg();
+    this._emptyForm();
+  },
 
-    // ✅ 3ª CURA DESPUÉS DE CARGAR: validar que no haya autovinculación.
-    // (Redundante con las curas en _loadStudent / _syncSiblingBidirectional, pero segura)
-    if (this._mode === 'edit' && this._student?.id != null) {
-      const sid = String(this._student.id);
-      const curSib = String(this._siblingId || this._form?.sibling_id || '').trim();
-      if (curSib && curSib === sid) {
-        this._siblingId = '';
-        if (this._form) {
-          this._form.sibling_id = '';
-          this._form.sibling_name = '';
-          this._form.has_siblings = false;
-        }
-      }
+  // ✅ 3ª CURA DESPUÉS DE CARGAR: validar que no haya autovinculación.
+  // (Redundante con las curas en _loadStudent / _syncSiblingBidirectional, pero segura)
+  _sanitizeSelfSibling() {
+    if (this._mode !== 'edit' || this._student?.id == null) return;
+    const sid = String(this._student.id);
+    const curSib = String(this._siblingId || this._form?.sibling_id || '').trim();
+    if (!curSib || curSib !== sid) return;
+    this._siblingId = '';
+    if (this._form) {
+      this._form.sibling_id = '';
+      this._form.sibling_name = '';
+      this._form.has_siblings = false;
     }
+  },
 
-    // Precargar candidatos de hermanos si la casilla ya está marcada
-    // (así el select aparece lleno al abrir el expediente en modo edición)
-    if (this._form?.has_siblings) {
-      await this._loadSiblingCandidates();
-      await this._loadSiblings();
-    }
-
-    this._renderShell();
+  // Precargar candidatos de hermanos si la casilla ya está marcada
+  // (así el select aparece lleno al abrir el expediente en modo edición)
+  async _preloadSiblings() {
+    if (!this._form?.has_siblings) return;
+    await this._loadSiblingCandidates();
+    await this._loadSiblings();
   },
 
   async _loadBase() {
@@ -1752,7 +1765,7 @@ export const StudentRecordModal = {
     }
   },
 
-  _pushMonthlyPreview(lines, notes, monthly, prolong, canBill, monthsLeft, today, net) {
+  _pushMonthlyPreview(lines, notes, { monthly, prolong, canBill, monthsLeft, today, net }) {
     if (monthly > 0) {
       if (canBill) {
         lines.push({ label: 'Mensualidad ' + this._previewMonthLabel(today), amount: net(monthly) });
@@ -1789,7 +1802,7 @@ export const StudentRecordModal = {
       }
     } else {
       // Plan mensual: NO se adelanta el año completo. Cada mes se genera el día 25.
-      this._pushMonthlyPreview(lines, notes, monthly, prolong, canBill, monthsLeft, today, net);
+      this._pushMonthlyPreview(lines, notes, { monthly, prolong, canBill, monthsLeft, today, net });
     }
 
     const total = lines.reduce((s, l) => s + l.amount, 0);

@@ -25,6 +25,8 @@ const logError = (context, err) => {
   return { data: null, error: err.message || err };
 };
 
+const ALLOWED_TEACHER_FIELDS = new Set(['name', 'phone', 'role', 'bio', 'notes', 'access_code', 'avatar_url', 'onesignal_player_id', 'is_active']);
+
 export const DirectorApi = {
   async getPeriods() {
     try {
@@ -377,8 +379,7 @@ export const DirectorApi = {
       await supabase.from(TABLES.CLASSROOMS).update({ teacher_id: id }).eq('id', cid);
     }
 
-    const ALLOWED = new Set(['name', 'phone', 'role', 'bio', 'notes', 'access_code', 'avatar_url', 'onesignal_player_id', 'is_active']);
-    const safeData = Object.fromEntries(Object.entries(profileData).filter(([k]) => ALLOWED.has(k)));
+    const safeData = Object.fromEntries(Object.entries(profileData).filter(([k]) => ALLOWED_TEACHER_FIELDS.has(k)));
     const result = await supabase.from(TABLES.PROFILES).update(safeData).eq('id', id);
     QueryCache.invalidate('dir_teachers');
     QueryCache.invalidate('classrooms_list');

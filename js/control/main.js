@@ -11,7 +11,7 @@ window._karpusInitializing = true;
 
 // Función global para cerrar sesión desde onclick inline
 window._signOutAndRedirect = async () => {
-  try { await supabase.auth.signOut(); } catch (_) {}
+  try { await supabase.auth.signOut(); } catch (_) { /* sign-out errors are non-critical */ }
   window.location.href = 'login.html';
 };
 
@@ -93,7 +93,7 @@ function loadPrefs() {
   try { return JSON.parse(localStorage.getItem(PREFS_KEY) || '{}') || {}; } catch (_) { return {}; }
 }
 function savePrefs(patch) {
-  try { localStorage.setItem(PREFS_KEY, JSON.stringify({ ...loadPrefs(), ...patch })); } catch (_) {}
+  try { localStorage.setItem(PREFS_KEY, JSON.stringify({ ...loadPrefs(), ...patch })); } catch (_) { /* localStorage may be full or unavailable */ }
 }
 
 // ── Filtros con debounce (300ms) ─────────────────────────────────────────────
@@ -553,21 +553,28 @@ window.goTo = async function(id) {
 
   await _lazyLoadSection(id);
 
-  if (id === 'dashboard')   renderDashboard();
-  if (id === 'auditoria')   renderAuditTable(allAudit);
-  if (id === 'fraude')      renderFraud();
-  if (id === 'usuarios')    renderUsers(allUsers);
-  if (id === 'muro')        { renderWall(); window.renderWallFeed?.(); }
-  if (id === 'chat')        renderChat();
-  if (id === 'pagos')       { renderPayments(); renderRevision(); }
-  if (id === 'asistencia')  renderAttendance();
-  if (id === 'analytics')   { renderTeacherEfficiency(); renderLoginAnalytics(); renderTrafficAnalytics(); renderActivity(); }
-  if (id === 'problemas')   renderProblemas();
-  if (id === 'donaciones')  renderDonaciones();
-  if (id === 'monitoreo')   { renderBruteForce(); loadSecurityStats(); loadPaymentAudit(); renderErrors(); }
-  if (id === 'modulos')     initModulesUI();
-  if (id === 'configuracion') { checkEdgeFunctionsHealth(); window.loadBackupStatus?.(); }
+  _renderSection(id);
 };
+
+function _renderSection(id) {
+  const dispatch = {
+    dashboard:    () => renderDashboard(),
+    auditoria:    () => renderAuditTable(allAudit),
+    fraude:       () => renderFraud(),
+    usuarios:     () => renderUsers(allUsers),
+    muro:         () => { renderWall(); window.renderWallFeed?.(); },
+    chat:         () => renderChat(),
+    pagos:        () => { renderPayments(); renderRevision(); },
+    asistencia:   () => renderAttendance(),
+    analytics:    () => { renderTeacherEfficiency(); renderLoginAnalytics(); renderTrafficAnalytics(); renderActivity(); },
+    problemas:    () => renderProblemas(),
+    donaciones:   () => renderDonaciones(),
+    monitoreo:    () => { renderBruteForce(); loadSecurityStats(); loadPaymentAudit(); renderErrors(); },
+    modulos:      () => initModulesUI(),
+    configuracion:() => { checkEdgeFunctionsHealth(); window.loadBackupStatus?.(); },
+  };
+  dispatch[id]?.();
+}
 
 // ── Refresh ───────────────────────────────────────────────────────────────────
 window.refreshAll = async function() {
@@ -580,6 +587,8 @@ window.refreshAll = async function() {
     ]);
     renderDashboard();
   } catch (err) {
+    // Promise.allSettled absorbs individual rejections; this catch handles unexpected sync errors.
+    console.warn('[Karpus] refreshAll error:', err?.message);
   }
 };
 
@@ -751,6 +760,9 @@ function renderWall() {
     const txt = [p.title, p.content].filter(Boolean).join(' — ');
     const media = _getWallMediaUrl(p);
     const mediaBadge = media ? '<span class="badge badge-purple" style="font-size:8px;margin-left:4px;">📷</span>' : '';
+    const statusBadge = p.is_pinned
+      ? '<span class="badge badge-yellow"><i class="bi bi-pin-angle-fill"></i> Fijado</span>'
+      : '<span class="badge badge-green">Publicado</span>';
     return `<tr>
       <td style="font-size:11px;color:var(--muted);white-space:nowrap;">${dt}</td>
       <td style="font-weight:800;">${escH(p.teacher_name || '—')}</td>
@@ -759,7 +771,7 @@ function renderWall() {
       <td style="color:#fb923c;font-weight:900;">${Number(p.likes_count || 0)}</td>
       <td style="color:#60a5fa;font-weight:900;">${Number(p.comments_count || 0)}</td>
       <td style="color:var(--muted);">${Number(p.views_count || 0)}</td>
-      <td>${p.is_pinned ? '<span class="badge badge-yellow"><i class="bi bi-pin-angle-fill"></i> Fijado</span>' : '<span class="badge badge-green">Publicado</span>'}</td>
+      <td>${statusBadge}</td>
     </tr>`;
   }).join('');
 }
@@ -1007,6 +1019,10 @@ function _renderConversationCards(pairs) {
         </div>`;
     }).join('');
 
+    const countBg    = hasUnread ? 'rgba(99,102,241,.18)' : 'rgba(255,255,255,.05)';
+    const countColor = hasUnread ? 'var(--accent)' : 'var(--muted)';
+    const countLabel = hasUnread ? p.unread + ' sin leer' : p.count;
+
     return `<div class="convo-card" onclick="viewThread('${p.user1}','${p.user2}')" style="cursor:pointer;align-items:flex-start;${cardStyle}">
       <!-- Avatars -->
       <div style="position:relative;flex-shrink:0;">
@@ -1023,7 +1039,7 @@ function _renderConversationCards(pairs) {
           </div>
           <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
             <span style="font-size:10px;color:var(--muted);white-space:nowrap;">${escH(p.msgs.length)} msg</span>
-            <div class="convo-count" style="background:${hasUnread ? 'rgba(99,102,241,.18)' : 'rgba(255,255,255,.05)'};color:${hasUnread ? 'var(--accent)' : 'var(--muted)'};">${hasUnread ? p.unread + ' sin leer' : p.count}</div>
+            <div class="convo-count" style="background:${countBg};color:${countColor};">${countLabel}</div>
           </div>
         </div>
         <div class="convo-preview-wrap" style="padding:3px 0 0;">${history}</div>
@@ -1239,7 +1255,7 @@ function onChartReady(cb) {
     if (typeof window.Chart !== 'undefined') {
       clearInterval(_chartWaiter); _chartWaiter = null;
       const queue = _chartWaiters; _chartWaiters = [];
-      queue.forEach(f => { try { f(); } catch (_) {} });
+      queue.forEach(f => { try { f(); } catch (_) { /* individual chart callbacks are best-effort */ } });
     } else if (tries > 40) { // ~10s máximo, luego desistir en silencio
       clearInterval(_chartWaiter); _chartWaiter = null;
       _chartWaiters = [];
@@ -1795,7 +1811,7 @@ function renderPayments() {
         data: { labels, datasets: [{ label: 'Ingresos RD$', data: values, backgroundColor: 'rgba(34,197,94,.7)', borderRadius: 8 }] },
         options: { responsive: true, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#64748b' }, grid: { color: 'rgba(255,255,255,.04)' } }, y: { ticks: { color: '#64748b' }, grid: { color: 'rgba(255,255,255,.04)' } } } }
       });
-    } catch (_) {}
+    } catch (_) { /* Chart.js errors are non-critical — canvas may not be ready */ }
   };
   if (typeof Chart !== 'undefined') drawPaymentsChart();
   else onChartReady(drawPaymentsChart);
@@ -3565,10 +3581,9 @@ window.loadBackupStatus = async function() {
     if (el) el.textContent = data?.created_at
       ? new Date(data.created_at).toLocaleString('es-DO')
       : 'Sin respaldos registrados';
-  } catch (_) {}
-};
-
-window.runBackupNow = async function() {
+  } catch (_) {
+    // loadBackupStatus is informational only — a failure here is non-critical.
+  } = async function() {
   const btn = document.getElementById('btnRunBackup');
   const res = document.getElementById('backupResult');
   if (btn) { btn.disabled = true; btn.textContent = 'Ejecutando...'; }
@@ -3577,8 +3592,9 @@ window.runBackupNow = async function() {
     const { data, error } = await supabase.rpc('run_daily_backup');
     if (error) {
       if (res) { res.textContent = '❌ ' + (error.message || 'Error al ejecutar el respaldo'); res.style.color = '#f87171'; }
-    } else {
-      if (res) { res.textContent = '✅ ' + (data?.message || 'Respaldo solicitado'); res.style.color = '#22c55e'; }
+    } else if (res) {
+      res.textContent = '✅ ' + (data?.message || 'Respaldo solicitado');
+      res.style.color = '#22c55e';
       window.loadBackupStatus();
     }
   } catch (e) {
@@ -3618,7 +3634,9 @@ window.loadSecurityStats = async function() {
         cronEl.className = 'badge badge-yellow';
       }
     }
-  } catch (_) {}
+  } catch (_) {
+    // loadSecurityStats is informational — silently ignore errors.
+  }
 };
 
 // ── Payment Audit ─────────────────────────────────────────────────────────────
@@ -3902,9 +3920,13 @@ window.viewThread = function(user1, user2) {
     const time = m.created_at ? new Date(m.created_at).toLocaleString('es-DO', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
     const read = m.is_read === false ? '<span style="font-size:9px;color:#fbbf24;font-weight:800;">● sin leer</span>' : '';
     const med = m.attachment_url ? `<div style="margin-top:6px;"><img src="${escH(m.attachment_url)}" style="max-width:180px;border-radius:10px;"></div>` : '';
-    return `<div style="display:flex;${is1 ? 'justify-content:flex-start' : 'justify-content:flex-end'};margin-bottom:10px;">
-      <div style="max-width:82%;background:${is1 ? 'rgba(99,102,241,.12)' : 'rgba(34,197,94,.14)'};border:1px solid ${is1 ? 'rgba(99,102,241,.25)' : 'rgba(34,197,94,.25)'};border-radius:14px;padding:9px 12px;">
-        <div style="font-size:10px;font-weight:900;color:${is1 ? '#a5b4fc' : '#86efac'};margin-bottom:3px;">${escH(who)} ${time}</div>
+    const flexDir    = is1 ? 'justify-content:flex-start' : 'justify-content:flex-end';
+    const bubbleBg   = is1 ? 'rgba(99,102,241,.12)' : 'rgba(34,197,94,.14)';
+    const bubbleBord = is1 ? 'rgba(99,102,241,.25)' : 'rgba(34,197,94,.25)';
+    const nameColor  = is1 ? '#a5b4fc' : '#86efac';
+    return `<div style="display:flex;${flexDir};margin-bottom:10px;">
+      <div style="max-width:82%;background:${bubbleBg};border:1px solid ${bubbleBord};border-radius:14px;padding:9px 12px;">
+        <div style="font-size:10px;font-weight:900;color:${nameColor};margin-bottom:3px;">${escH(who)} ${time}</div>
         <div style="font-size:13px;color:var(--text);word-break:break-word;">${renderSensitiveText(m.content)}</div>
         ${med}
         <div style="margin-top:4px;">${read}</div>

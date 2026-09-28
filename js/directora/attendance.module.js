@@ -219,11 +219,13 @@ export const AttendanceModule = {
       absent = d.filter(r => ['absent','ausente'].includes(norm(r.status))).length;
     }
 
+    const rateFromTotal = total > 0 ? Math.round((present / total) * 100) : 0;
     const rate = this._activeStudentCount > 0
       ? Math.round((presentOrLate / this._activeStudentCount) * 100)
-      : (total > 0 ? Math.round((present / total) * 100) : 0);
+      : rateFromTotal;
 
-    Helpers.setTxt('attKpiTotal',   this._mode === 'day' && this._activeStudentCount > 0 ? this._activeStudentCount : total);
+    const kpiTotal = this._mode === 'day' && this._activeStudentCount > 0 ? this._activeStudentCount : total;
+    Helpers.setTxt('attKpiTotal',   kpiTotal);
     Helpers.setTxt('attKpiPresent', presentOrLate);
     Helpers.setTxt('attKpiAbsent',  absent);
     Helpers.setTxt('attKpiLate',    late);
