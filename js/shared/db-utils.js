@@ -76,10 +76,15 @@ export function safeHandle(err, context = 'General') {
  * @param {number}   ms       — timeout en ms (default 8000)
  */
 export function withTimeout(queryFn, ms = 8000) {
-  const timeout = new Promise((_, reject) =>
-    setTimeout(() => reject(new Error(`Query timeout (${ms}ms)`)), ms)
-  );
-  return Promise.race([queryFn(), timeout]);
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`Query timeout (${ms}ms)`)), ms);
+  });
+  // Promise.resolve().then() hace la invocación perezosa y captura throws síncronos.
+  // finally() limpia el timer: sin esto cada query dejaba un setTimeout colgado
+  // durante ms, y con scroll infinito se acumulaban cientos de timers vivos.
+  return Promise.race([Promise.resolve().then(queryFn), timeout])
+    .finally(() => clearTimeout(timer));
 }
 
 // ── Reintentos ante fallos de red transitorios ────────────────────────────────

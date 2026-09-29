@@ -311,11 +311,11 @@ export const ImageLoader = {
   },
 
   /**
-   * Genera thumbnails de un archivo de video usando canvas.
-   * @param {File|Blob} videoFile — archivo de video
-   * @param {number} count — cuántos thumbnails generar
-   * @returns {Promise<Blob|null>} — thumbnails [blobPrincipal, ...multiples] o []
-   */
+    * Genera thumbnails de un archivo de video usando canvas.
+    * @param {File|Blob} videoFile — archivo de video
+    * @param {number} count — cuántos thumbnails generar
+    * @returns {Promise<{blobs: Blob[], duration: number}>} — [poster, ...multiples] y duración
+    */
   async _generateVideoThumbnails(videoFile, count = 5) {
     const list = [];
     const video = document.createElement('video');
@@ -323,6 +323,7 @@ export const ImageLoader = {
     video.playsInline = true;
     video.preload = 'auto';
     const url = URL.createObjectURL(videoFile);
+    let duration = 0;
 
     try {
       await new Promise((resolve, reject) => {
@@ -330,12 +331,13 @@ export const ImageLoader = {
         video.onerror = reject;
         video.src = url;
       });
-      const duration = video.duration || 30;
+      duration = Math.round((video.duration || 0) * 100) / 100;
+      const dur = duration || 30;
       // Principal: 20% del video o 10s (reutiliza el criterio actual)
       const times = [];
-      times.push(Math.max(0.1, Math.min(10, duration * 0.2)));
+      times.push(Math.max(0.1, Math.min(10, dur * 0.2)));
       for (let i = 0; i < count; i++) {
-        times.push(Math.max(0.5, (duration / (count + 1)) * (i + 1)));
+        times.push(Math.max(0.5, (dur / (count + 1)) * (i + 1)));
       }
 
       for (const t of times) {
@@ -360,7 +362,7 @@ export const ImageLoader = {
     } finally {
       URL.revokeObjectURL(url);
     }
-    return list;
+    return { blobs: list, duration };
   },
 
   /**
@@ -369,7 +371,7 @@ export const ImageLoader = {
    *
    * @param {File} file — video a subir
    * @param {object} opts — { onProgress }
-   * @returns {Promise<{publicUrl, thumbnailUrl, thumbnailUrls}>}
+   * @returns {Promise<{publicUrl, thumbnailUrl, thumbnailUrls, duration}>}
    */
   async uploadVideoWithThumbnails(file, opts = {}) {
     const { supabase } = await import('./supabase.js');
@@ -380,7 +382,7 @@ export const ImageLoader = {
     if (!isVideo) {
       const publicUrl = await this.uploadToStorage(file, 'karpus-uploads',
         `posts/${Date.now()}.webp`, { maxWidth: 1200, quality: 0.8 });
-      return { publicUrl, thumbnailUrl: null, thumbnailUrls: [] };
+      return { publicUrl, thumbnailUrl: null, thumbnailUrls: [], duration: 0 };
     }
 
     const ext = (file.name || 'video.mp4').split('.').pop();
@@ -399,10 +401,14 @@ export const ImageLoader = {
     // Generar portada + thumbnails múltiples
     let thumbnailUrl = null;
     let thumbnailUrls = [];
+    let duration = 0;
     try {
-      const thumbs = await this._generateVideoThumbnails(file, 5);
-      if (thumbs.length > 1) thumbnailUrl = await this._uploadThumb(thumbs[0], 'poster');
-      const multi = thumbs.slice(1);
+      const { blobs, duration: dur } = await this._generateVideoThumbnails(file, 5);
+      duration = dur;
+      // Con >=1 frame ya hay poster. Antes exigía >1, y un video muy corto
+      // (que solo produce el frame principal) se quedaba sin portada.
+      if (blobs.length >= 1) thumbnailUrl = await this._uploadThumb(blobs[0], 'poster');
+      const multi = blobs.slice(1);
       thumbnailUrls = (await Promise.allSettled(
         multi.map((t, i) => this._uploadThumb(t, `t${i}`))
       )).map(r => r.status === 'fulfilled' ? r.value : null).filter(Boolean);
@@ -410,7 +416,7 @@ export const ImageLoader = {
       console.warn('[ImageLoader] Thumbnail generation failed:', e);
     }
 
-    return { publicUrl, thumbnailUrl, thumbnailUrls };
+    return { publicUrl, thumbnailUrl, thumbnailUrls, duration };
   },
 
   async _uploadThumb(blob, label) {

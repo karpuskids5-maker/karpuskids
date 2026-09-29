@@ -1394,6 +1394,7 @@ async function submitNewPost() {
     let mediaType = null;
     let thumbnailUrl = null;
     let thumbnailUrls = [];
+    let videoDuration = 0;
 
     if (file) {
       const isVideo = file.type.startsWith('video/');
@@ -1405,6 +1406,7 @@ async function submitNewPost() {
         mediaUrl = result.publicUrl;
         thumbnailUrl = result.thumbnailUrl;
         thumbnailUrls = result.thumbnailUrls;
+        videoDuration = result.duration || 0;
       } else {
         mediaUrl = await ImageLoader.uploadToStorage(file, 'karpus-uploads', path, {
           maxWidth: 1200,
@@ -1428,6 +1430,7 @@ async function submitNewPost() {
       media_type: mediaType,
       thumbnail_url: thumbnailUrl || null,
       thumbnail_urls: (thumbnailUrls && thumbnailUrls.length ? thumbnailUrls : null),
+      duration: videoDuration || null,
       teacher_id: user.id,
       classroom_id: classroom.id,
       ...(taggedSids.length ? { tagged_students: taggedSids } : {})

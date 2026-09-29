@@ -52,7 +52,9 @@ Deno.serve(async (req) => {
     let query = admin
       .from('posts')
       .select(`
-        id, content, media_url, media_type, image_url, created_at, classroom_id, teacher_id,
+        id, content, media_url, media_type, image_url, images,
+        thumbnail_url, thumbnail_urls, duration,
+        created_at, classroom_id, teacher_id,
         teacher_name, teacher_avatar,
         teacher:profiles!posts_teacher_id_fkey(name, avatar_url, role),
         likes(id, user_id),

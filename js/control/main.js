@@ -704,11 +704,59 @@ async function loadClassrooms() {
 }
 
 // ── Muro Escolar ─────────────────────────────────────────────────────────────
+/** mm:ss — para el badge de duración de los videos. Vacío si no hay dato. */
+function _fmtDuration(sec) {
+  if (!sec || sec <= 0) return '';
+  const m = Math.floor(sec / 60);
+  const s = Math.round(sec % 60);
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
+/**
+ * Reproduce en hover las miniaturas de video de las galerías del panel.
+ * Los <video> llegan con data-src (sin src) para no descargar N videos de
+ * golpe: el byte range solo se pide al pasar el mouse por encima.
+ * Delegado en el contenedor para no colgar un listener por tarjeta.
+ */
+function _setupGalleryVideoHover(container) {
+  if (!container || container.dataset.hoverReady === '1') return;
+  container.dataset.hoverReady = '1';
+  if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+  if (window.matchMedia?.('(hover: none)').matches) return;
+
+  container.addEventListener('mouseover', e => {
+    const v = e.target?.closest?.('video[data-src]');
+    if (!v || v.dataset.playing === '1') return;
+    v.dataset.playing = '1';
+    if (!v.getAttribute('src')) v.setAttribute('src', v.dataset.src);
+    v.play().catch(() => {});
+  });
+
+  container.addEventListener('mouseout', e => {
+    const v = e.target?.closest?.('video[data-src]');
+    if (!v || v.dataset.playing !== '1') return;
+    v.dataset.playing = '';
+    // Si el usuario ya le quitó el mute, no lo frenamos.
+    if (!v.muted) return;
+    try { v.currentTime = 0; } catch (_) { /* aún sin metadatos */ }
+    v.pause();
+  });
+}
+
+/** Etiqueta ▶ + duración sobre la miniatura de un video. */
+function _videoTileBadge(duration) {
+  const dur = _fmtDuration(duration);
+  return `<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;">
+      <span style="width:38px;height:38px;border-radius:50%;background:rgba(255,138,0,.9);color:#fff;display:flex;align-items:center;justify-content:center;font-size:15px;box-shadow:0 4px 14px rgba(0,0,0,.35);">▶</span>
+      ${dur ? `<span style="position:absolute;bottom:6px;right:6px;background:rgba(0,0,0,.7);color:#fff;font-size:9px;font-weight:900;padding:2px 6px;border-radius:6px;">${dur}</span>` : ''}
+    </div>`;
+}
+
 async function loadWallPosts() {
   try {
     const { data, error } = await supabase
       .from('posts')
-      .select('id, title, content, teacher_name, classroom_id, likes_count, comments_count, views_count, is_pinned, status, media_type, media_url, image_url, images, created_at')
+      .select('id, title, content, teacher_name, classroom_id, likes_count, comments_count, views_count, is_pinned, status, media_type, media_url, image_url, images, thumbnail_url, duration, created_at')
       .order('created_at', { ascending: false })
       .limit(200);
     if (error) throw error;
@@ -717,7 +765,7 @@ async function loadWallPosts() {
     try {
       const { data } = await supabase
         .from('posts')
-        .select('id, content, teacher_name, classroom_id, likes_count, comments_count, created_at')
+        .select('id, content, teacher_name, classroom_id, likes_count, comments_count, media_type, media_url, thumbnail_url, created_at')
         .order('created_at', { ascending: false })
         .limit(200);
       allWallPosts = data || [];
@@ -789,13 +837,15 @@ window.renderWallGallery = function() {
     const content = [p.title, p.content].filter(Boolean).join(' — ');
     const posterAttr = p.thumbnail_url ? `poster="${escH(p.thumbnail_url)}"` : '';
     const mediaTag = isVid
-      ? `<video src="${escH(url)}" ${posterAttr} style="width:100%;height:100%;object-fit:cover;" muted preload="metadata"></video>`
+      ? `<video data-src="${escH(url)}" ${posterAttr} loop muted playsinline preload="none" style="width:100%;height:100%;object-fit:cover;"></video>`
       : `<img src="${escH(url)}" alt="" loading="lazy">`;
     return `<div class="gallery-item" onclick="openLightbox('${escH(url)}','${escH(author + ' — ' + dt)}')">
       ${mediaTag}
+      ${isVid ? _videoTileBadge(p.duration) : ''}
       <div class="overlay"><div class="overlay-text">📷 ${escH(author)} · ${dt}</div></div>
     </div>`;
   }).join('') || '<div style="text-align:center;padding:40px;color:var(--muted);">Sin fotos ni videos</div>';
+  _setupGalleryVideoHover(grid);
   const countEl = document.getElementById('galleryCount');
   if (countEl) countEl.textContent = allWallPosts.filter(p => _getWallMediaUrl(p)).length + ' multimedia';
 };
@@ -806,7 +856,7 @@ window.renderWallMedia = function() {
   const allMedia = [];
   allWallPosts.forEach(p => {
     const url = _getWallMediaUrl(p);
-    if (url) allMedia.push({ url, author: p.teacher_name || '—', date: p.created_at, likes: p.likes_count || 0, comments: p.comments_count || 0, poster: p.thumbnail_url || null });
+    if (url) allMedia.push({ url, author: p.teacher_name || '—', date: p.created_at, likes: p.likes_count || 0, comments: p.comments_count || 0, poster: p.thumbnail_url || null, duration: p.duration || 0 });
     if (p.images && Array.isArray(p.images)) {
       p.images.slice(1).forEach(u => {
         if (u && u !== url) allMedia.push({ url: u, author: p.teacher_name || '—', date: p.created_at, likes: p.likes_count || 0, comments: p.comments_count || 0, poster: null });
@@ -818,13 +868,15 @@ window.renderWallMedia = function() {
     const isVid = _isVideoUrl(m.url);
     const posterAttr = m.poster ? `poster="${escH(m.poster)}"` : '';
     const mediaTag = isVid
-      ? `<video src="${escH(m.url)}" ${posterAttr} style="width:100%;height:100%;object-fit:cover;" muted preload="metadata"></video>`
+      ? `<video data-src="${escH(m.url)}" ${posterAttr} loop muted playsinline preload="none" style="width:100%;height:100%;object-fit:cover;"></video>`
       : `<img src="${escH(m.url)}" alt="" loading="lazy">`;
     return `<div class="gallery-item" onclick="openLightbox('${escH(m.url)}','${escH(m.author + ' · ' + dt + ' · ❤' + m.likes)}')">
       ${mediaTag}
+      ${isVid ? _videoTileBadge(m.duration) : ''}
       <div class="overlay"><div class="overlay-text">📷 ${escH(m.author)} · ${dt}</div></div>
     </div>`;
   }).join('') || '<div style="text-align:center;padding:40px;color:var(--muted);">Sin fotos ni videos en publicaciones</div>';
+  _setupGalleryVideoHover(grid);
   const countEl = document.getElementById('mediaCount');
   if (countEl) countEl.textContent = allMedia.length + ' archivos multimedia';
 };
@@ -1063,14 +1115,17 @@ window.renderChatMedia = function() {
   grid.innerHTML = mediaMsgs.slice(0, 100).map(m => {
     const dt = m.created_at ? new Date(m.created_at).toLocaleDateString('es-DO') : '';
     const author = m.sender_name || '—';
-    const thumb = _isVideoUrl(m.attachment_url)
-      ? `<video src="${escH(m.attachment_url)}" style="width:100%;height:100%;object-fit:cover;" muted preload="metadata"></video>`
+    const isVid = _isVideoUrl(m.attachment_url);
+    const thumb = isVid
+      ? `<video data-src="${escH(m.attachment_url)}" loop muted playsinline preload="none" style="width:100%;height:100%;object-fit:cover;"></video>`
       : `<img src="${escH(m.attachment_url)}" alt="" loading="lazy">`;
     return `<div class="gallery-item" onclick="openLightbox('${escH(m.attachment_url)}','${escH(author + ' · ' + dt)}')">
       ${thumb}
+      ${isVid ? _videoTileBadge(0) : ''}
       <div class="overlay"><div class="overlay-text">💬 ${escH(author)} · ${dt}</div></div>
     </div>`;
   }).join('') || '<div style="text-align:center;padding:40px;color:var(--muted);">Sin archivos multimedia en chat</div>';
+  _setupGalleryVideoHover(grid);
   const countEl = document.getElementById('chatMediaCount');
   if (countEl) countEl.textContent = mediaMsgs.length + ' archivos';
 };
@@ -3583,7 +3638,10 @@ window.loadBackupStatus = async function() {
       : 'Sin respaldos registrados';
   } catch (_) {
     // loadBackupStatus is informational only — a failure here is non-critical.
-  } = async function() {
+  }
+};
+
+window.runBackupNow = async function() {
   const btn = document.getElementById('btnRunBackup');
   const res = document.getElementById('backupResult');
   if (btn) { btn.disabled = true; btn.textContent = 'Ejecutando...'; }
@@ -3993,7 +4051,7 @@ async function _loadWallFeedPage() {
     const to   = from + _feedState.limit - 1;
     const { data, error } = await supabase
       .from('posts')
-      .select('id, title, content, teacher_name, author_role, classroom_id, likes_count, comments_count, views_count, is_pinned, status, media_type, media_url, image_url, images, created_at')
+      .select('id, title, content, teacher_name, author_role, classroom_id, likes_count, comments_count, views_count, is_pinned, status, media_type, media_url, image_url, images, thumbnail_url, duration, created_at')
       .order('created_at', { ascending: false })
       .range(from, to);
     if (error) throw error;
@@ -4033,7 +4091,11 @@ function _feedAuthorColor(authorRole) {
 function _feedMediaHTML(media, poster, author, dt) {
   if (!media) return '';
   if (_isVideoUrl(media)) {
-    return `<video src="${escH(media)}" ${poster} controls preload="metadata" style="width:100%;max-height:300px;object-fit:cover;border-radius:12px;margin-top:10px;"></video>`;
+    // poster: el <video> muestra el frame hasta que el usuario le da play.
+    // preload="metadata" descarga solo la cabecera, no el archivo completo.
+    return `<div style="position:relative;margin-top:10px;border-radius:12px;overflow:hidden;">
+      <video src="${escH(media)}" ${poster} controls playsinline preload="metadata" style="width:100%;max-height:300px;object-fit:cover;display:block;"></video>
+    </div>`;
   }
   const caption = escH(author + ' · ' + dt);
   const open = `openLightbox('${escH(media)}','${caption}')`;

@@ -382,19 +382,32 @@ async function submitNewPost() {
   try {
     let mediaUrl = null;
     let mediaType = null;
+    let thumbnailUrl = null;
+    let thumbnailUrls = [];
+    let duration = 0;
 
     if (file) {
-      const ext = file.type.startsWith('video') ? file.name.split('.').pop() : 'webp';
-      const path = `posts/${Date.now()}_${Math.random().toString(36).substr(2,9)}.${ext}`;
-      
-      const publicUrl = await ImageLoader.uploadToStorage(
-        file,
-        'classroom_media',
-        path,
-        { maxWidth: 1200, maxHeight: 1200, quality: 0.82, maxSizeKB: 400 }
-      );
-      mediaUrl = publicUrl;
-      mediaType = file.type.startsWith('video') ? 'video' : 'image';
+      const isVideo = file.type.startsWith('video/');
+      if (isVideo) {
+        // Sube el video Y extrae portada + thumbnails: sin esto el post
+        // nacía sin poster y el muro pintaba un recuadro negro.
+        const up = await ImageLoader.uploadVideoWithThumbnails(file, { onProgress: null });
+        mediaUrl = up.publicUrl;
+        thumbnailUrl = up.thumbnailUrl;
+        thumbnailUrls = up.thumbnailUrls || [];
+        duration = up.duration || 0;
+        mediaType = 'video';
+      } else {
+        const ext = 'webp';
+        const path = `posts/${Date.now()}_${Math.random().toString(36).substr(2,9)}.${ext}`;
+        mediaUrl = await ImageLoader.uploadToStorage(
+          file,
+          'classroom_media',
+          path,
+          { maxWidth: 1200, maxHeight: 1200, quality: 0.82, maxSizeKB: 400 }
+        );
+        mediaType = 'image';
+      }
     }
 
     const user = AppState.get('user');
@@ -405,6 +418,9 @@ async function submitNewPost() {
       content:      content,
       media_url:    mediaUrl,
       media_type:   mediaType,
+      thumbnail_url: thumbnailUrl,
+      thumbnail_urls: thumbnailUrls.length ? thumbnailUrls : null,
+      duration:     duration || null,
       classroom_id: classroomSelect?.value || null
     };
 

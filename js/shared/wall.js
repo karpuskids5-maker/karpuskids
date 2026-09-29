@@ -58,6 +58,11 @@ const MAX_IMAGE_SIZE_MB = 5;           // MB
 const MAX_IMAGE_WIDTH = 1920;          // px
 const SIGNED_URL_EXPIRY_SEC = 3600;    // 1 hora
 const MAX_PINNED_POSTS = 2;
+// La query del muro hace 4 embeds (likes, comments(count), classroom, teacher) sobre
+// PostgREST; 10 s se quedaba corto en paneles con muchos posts y sesión abierta,
+// provocando "Query timeout" y dejando el muro en blanco. 25 s mantiene la UI
+// responsiva sin falsos negativos.
+const POSTS_QUERY_TIMEOUT_MS = 25_000;
 const MAX_ALBUM_PHOTOS = 5;
 
 // Relación de aspecto vertical del Muro (propuesta.md L110).
@@ -396,6 +401,12 @@ const WallModule = {
       .wall-video-wrapper:hover .wall-play-btn{transform:translate(-50%,-50%) scale(1.12);background:rgba(255,138,0,1)}
       .wall-video-duration{position:absolute;bottom:8px;right:10px;background:rgba(0,0,0,0.65);color:white;font-size:9px;font-weight:900;padding:2px 7px;border-radius:8px;backdrop-filter:blur(4px);z-index:3}
       .wall-video-poster{transition:transform 0.35s ease,filter 0.35s ease}
+      .wall-video-poster-overlay{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:2;pointer-events:none;background:#0f172a;transition:opacity 0.3s ease}
+      .wall-video-wrapper.is-hovering .wall-play-btn{opacity:0;transform:translate(-50%,-50%) scale(0.6)}
+      .wall-video-wrapper.is-loading .wall-play-btn{opacity:0}
+      @keyframes wall-spin{to{transform:rotate(360deg)}}
+      .wall-video-loading{position:absolute;top:50%;left:50%;width:34px;height:34px;margin:-17px 0 0 -17px;border:3px solid rgba(255,255,255,0.25);border-top-color:#fff;border-radius:50%;animation:wall-spin 0.8s linear infinite;z-index:3;pointer-events:none}
+      .wall-video-badge-hd{position:absolute;top:10px;left:10px;z-index:3;background:rgba(15,23,42,0.55);backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,0.3);color:#fff;font-size:9px;font-weight:900;padding:2px 6px;border-radius:6px;letter-spacing:0.05em}
       .wall-audio-toggle{position:absolute;top:10px;right:10px;z-index:4;width:34px;height:34px;border-radius:9999px;background:rgba(15,23,42,0.55);backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,0.3);color:#fff;display:flex;align-items:center;justify-content:center;font-size:15px;cursor:pointer;transition:all 0.2s;-webkit-tap-highlight-color:transparent;box-shadow:0 2px 10px rgba(0,0,0,0.3)}
       .wall-audio-toggle:active{transform:scale(0.88)}
       @keyframes wall-heart-burst{0%{transform:translate(-50%,-50%) scale(0.4);opacity:0}25%{transform:translate(-50%,-50%) scale(1.2);opacity:1}60%{transform:translate(-50%,-50%) scale(1);opacity:1}100%{transform:translate(-50%,-160%) scale(1.7);opacity:0}}
@@ -586,14 +597,14 @@ const WallModule = {
       // Ejecuta una query; si falla 400 por likes.reaction_type o posts.thumbnail_urls
       // inexistentes en la BD, desactiva la columna y reintenta una vez.
       const runWithEmbedFallback = async (build) => {
-        let res = await withTimeout(() => build(buildEmbedSelect()), 10_000);
+        let res = await withTimeout(() => build(buildEmbedSelect()), POSTS_QUERY_TIMEOUT_MS);
         if (res?.error) {
           if (this._supportsReactionType !== false && _isMissingColumnError(res.error, 'reaction_type')) {
             this._supportsReactionType = false;
-            res = await withTimeout(() => build(buildEmbedSelect()), 10_000);
+            res = await withTimeout(() => build(buildEmbedSelect()), POSTS_QUERY_TIMEOUT_MS);
           } else if (this._supportsThumbStrip !== false && _isMissingColumnError(res.error, 'thumbnail_urls')) {
             this._supportsThumbStrip = false;
-            res = await withTimeout(() => build(buildEmbedSelect()), 10_000);
+            res = await withTimeout(() => build(buildEmbedSelect()), POSTS_QUERY_TIMEOUT_MS);
           }
         }
         return res;
@@ -612,8 +623,8 @@ const WallModule = {
           posts = mergeClassroomResults(classResult.data, generalResult.data, this._pageSize);
         } else {
           const [classFlat, generalFlat] = await Promise.all([
-            withTimeout(() => fetchClassroomPosts(buildFlatSelect(), orderOpts).range(from, to), 10_000),
-            withTimeout(() => fetchGeneralPosts(buildFlatSelect(), orderOpts).range(from, to), 10_000)
+            withTimeout(() => fetchClassroomPosts(buildFlatSelect(), orderOpts).range(from, to), POSTS_QUERY_TIMEOUT_MS),
+            withTimeout(() => fetchGeneralPosts(buildFlatSelect(), orderOpts).range(from, to), POSTS_QUERY_TIMEOUT_MS)
           ]);
           if (classFlat.error && generalFlat.error) throw classFlat.error;
           const merged = mergeClassroomResults(classFlat.data, generalFlat.data, this._pageSize);
@@ -635,7 +646,7 @@ const WallModule = {
           let fallback = supabase.from('posts').select(buildFlatSelect())
             .order('created_at', { ascending: false }).range(from, to);
           fallback = buildPostFilter(fallback);
-          const retry = await withTimeout(() => fallback, 10_000);
+          const retry = await withTimeout(() => fallback, POSTS_QUERY_TIMEOUT_MS);
           if (retry.error) throw retry.error;
           posts = (retry.data || []).map(p => ({
             ...p, is_pinned: p.is_pinned || false, comments_enabled: p.comments_enabled !== false,
@@ -752,12 +763,12 @@ const WallModule = {
    * Reproducción automática inteligente (§8 de la propuesta):
    *  - Un wrapper con poster entra ≥65% al viewport  → monta y reproduce MUTED.
    *  - Un video ya montado cae <65%                  → se pausa.
-   *  - Redes lentas / disableAutoplay                → solo reproducción por interacción.
+   *  - Redes lentas / disableAutoplay / reduced-motion → solo por interacción.
    */
   _setupVideoAutoplay() {
     if (this._videoObserver) this._videoObserver.disconnect();
     const isSlow = this._detectSlowNetwork();
-    const autoplayEnabled = !this._options.disableAutoplay;
+    const autoplayEnabled = !this._options.disableAutoplay && !this._prefersReducedMotion();
     this._videoObserver = new IntersectionObserver(entries => {
       entries.forEach(e => {
         const t = e.target;
@@ -767,6 +778,8 @@ const WallModule = {
         if (t.classList.contains('wall-video-wrapper')) {
           if (t.dataset.mounted === '1' || t.dataset.userPaused === '1') return;
           if (!visible || isSlow || !autoplayEnabled) return;
+          // El puntero ya está encima: lo gestiona _showVideoPreview, no el observer.
+          if (t.dataset.hovered === '1') return;
           const postId = t.id.replace('video-wrapper-', '');
           const url = t.dataset.videoUrl;
           if (postId && url) {
@@ -786,6 +799,8 @@ const WallModule = {
           return;
         }
         if (t.dataset.userPaused === '1') return;
+        // Hover tiene prioridad: si el puntero está encima, no interferir.
+        if (t.dataset.hoverStarted === '1') return;
         if (t.paused || t.readyState < 2) t.play().catch(() => {});
       });
     }, { threshold: [0.2, 0.65] });
@@ -1116,12 +1131,13 @@ const WallModule = {
       return `
         <div class="wall-video-wrapper relative mb-4 shadow-inner" id="video-wrapper-${p.id}"
              data-video-url="${_sanitizeHTML(p.display_media_url)}"
-             data-thumb-count="${thumbUrls.length}"
+             data-thumb-count="${thumbUrls.length}"${thumbUrl ? ` data-poster="${_sanitizeHTML(thumbUrl)}"` : ''}
              onmouseenter="WallModule._showVideoPreview('${p.id}')"
              onmouseleave="WallModule._hideVideoPreview('${p.id}')"
              onclick="WallModule.playVideoCard('${p.id}','${_sanitizeHTML(p.display_media_url)}')"
-             style="background:#0f172a;" role="button" aria-label="Reproducir video">
-          ${thumbUrl ? `<img src="${_sanitizeHTML(thumbUrl)}" class="w-full h-full object-cover absolute inset-0 wall-video-poster" alt="Vista previa del video" loading="lazy">` : '<div class="wall-shimmer absolute inset-0" style="background:linear-gradient(90deg,#1e293b 25%,#334155 50%,#1e293b 75%);background-size:800px 100%;"></div>'}
+             style="background:#0f172a;" role="button" aria-label="Reproducir video" tabindex="0"
+             onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();WallModule.playVideoCard('${p.id}','${_sanitizeHTML(p.display_media_url)}')}">
+          ${thumbUrl ? `<img src="${_sanitizeHTML(thumbUrl)}" class="w-full h-full object-cover absolute inset-0 wall-video-poster" alt="Vista previa del video" loading="lazy" decoding="async">` : '<div class="wall-shimmer absolute inset-0" style="background:linear-gradient(90deg,#1e293b 25%,#334155 50%,#1e293b 75%);background-size:800px 100%;"></div>'}
           <div class="wall-thumb-strip" id="thumb-strip-${p.id}">${stripItems}</div>
           <div class="wall-play-btn">▶</div>
           <div class="wall-video-duration">${this._formatVideoDuration(p.duration || MAX_VIDEO_DURATION)}</div>
@@ -1132,9 +1148,12 @@ const WallModule = {
     const posterStyle = thumbUrl ? `background-image:url('${_sanitizeHTML(thumbUrl)}');background-size:cover;background-position:center;` : 'background:#0f172a;';
     return `
       <div class="wall-video-wrapper relative mb-4 shadow-inner" id="video-wrapper-${p.id}"
-           data-video-url="${_sanitizeHTML(p.display_media_url)}"
+           data-video-url="${_sanitizeHTML(p.display_media_url)}"${thumbUrl ? ` data-poster="${_sanitizeHTML(thumbUrl)}"` : ''}
+           onmouseenter="WallModule._showVideoPreview('${p.id}')"
+           onmouseleave="WallModule._hideVideoPreview('${p.id}')"
            onclick="WallModule.playVideoCard('${p.id}','${_sanitizeHTML(p.display_media_url)}')"
-           style="${posterStyle}" role="button" aria-label="Reproducir video">
+           style="${posterStyle}" role="button" aria-label="Reproducir video" tabindex="0"
+           onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();WallModule.playVideoCard('${p.id}','${_sanitizeHTML(p.display_media_url)}')}">
         ${!thumbUrl ? `<div class="wall-shimmer absolute inset-0" style="background:linear-gradient(90deg,#1e293b 25%,#334155 50%,#1e293b 75%);background-size:800px 100%;"></div>` : ''}
         <div class="wall-play-btn">▶</div>
         <div class="wall-video-duration">${this._formatVideoDuration(p.duration || MAX_VIDEO_DURATION)}</div>
@@ -1241,52 +1260,131 @@ const WallModule = {
     return `${m}:${String(s).padStart(2, '0')}`;
   },
 
+  /** El usuario pidió menos movimiento: nada de autoplay ni hover-preview. */
+  _prefersReducedMotion() {
+    try { return window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true; }
+    catch (_) { return false; }
+  },
+
+  /**
+   * ¿Tiene sentido montar y reproducir un video por hover?
+   * No en táctil (no hay hover real), red lenta, ni con reduced-motion.
+   */
+  _canHoverPreview() {
+    if (this._options.disableHoverPreview) return false;
+    if (this._prefersReducedMotion()) return false;
+    if (this._detectSlowNetwork()) return false;
+    const conn = navigator.connection?.effectiveType;
+    if (conn && ['slow-2g', 'slower-2g', '2g', '3g'].includes(conn)) return false;
+    // (hover:none) cubre móvil/tablet donde onmouseenter se dispara por el primer tap.
+    if (window.matchMedia?.('(hover: none)').matches === true) return false;
+    return true;
+  },
+
+  /**
+   * Hover sobre la tarjeta: reproducción muda + vista previa.
+   * Monta el <video> si hacía falta y lo reproduce; el poster sigue debajo
+   * hasta que hay primer frame decodificado (_mountVideo).
+   */
   _showVideoPreview(postId) {
     const wrapper = document.getElementById(`video-wrapper-${postId}`);
+    if (!wrapper) return;
+    wrapper.classList.add('is-hovering');
+
+    // La tira de miniaturas solo existe en videos con >=3 thumbnails
     const strip = document.getElementById(`thumb-strip-${postId}`);
-    if (!wrapper || !strip) return;
-    strip.classList.add('active');
-    const poster = wrapper.querySelector('.wall-video-poster');
+    if (strip) strip.classList.add('active');
+
+    const poster = wrapper.querySelector('.wall-video-poster:not(.wall-video-poster-overlay)');
     if (poster) { poster.style.transform = 'scale(1.06)'; poster.style.filter = 'brightness(0.75)'; }
+
+    if (!this._canHoverPreview() || wrapper.dataset.hovered === '1') return;
+    wrapper.dataset.hovered = '1';
+
+    const url = wrapper.dataset.videoUrl;
+    if (!url) return;
+
+    const existing = wrapper.querySelector('video.wall-custom-video');
+    if (existing) {
+      // Ya montado: el usuario pausó o le quitó el mute a mano → no intervenimos.
+      if (existing.dataset.userPaused === '1' || !existing.muted) return;
+      existing.dataset.hoverStarted = '1';
+      existing.play().catch(() => {});
+      return;
+    }
+
+    const vid = this._mountVideo(postId, url, { muted: true, autoplay: false });
+    if (!vid) return;
+    vid.dataset.hoverStarted = '1';
+    vid.play().catch(() => {});
+    if (this._videoObserver) {
+      this._videoObserver.unobserve(wrapper);
+      this._videoObserver.observe(vid);
+    }
   },
 
   _hideVideoPreview(postId) {
     const wrapper = document.getElementById(`video-wrapper-${postId}`);
+    if (!wrapper) return;
+    wrapper.classList.remove('is-hovering');
+    wrapper.dataset.hovered = '';
+
     const strip = document.getElementById(`thumb-strip-${postId}`);
-    if (!wrapper || !strip) return;
-    strip.classList.remove('active');
-    const poster = wrapper.querySelector('.wall-video-poster');
+    if (strip) strip.classList.remove('active');
+
+    const poster = wrapper.querySelector('.wall-video-poster:not(.wall-video-poster-overlay)');
     if (poster) { poster.style.transform = ''; poster.style.filter = ''; }
+
+    const vid = wrapper.querySelector('video.wall-custom-video');
+    if (!vid || vid.dataset.hoverStarted !== '1') return;
+    delete vid.dataset.hoverStarted;
+    // Respetar siempre la decisión del usuario: si pausó o activó sonido, no tocar.
+    if (vid.dataset.userPaused === '1' || !vid.muted) return;
+    try { vid.currentTime = 0; } catch (_) { /* aún sin metadatos */ }
+    vid.dataset._hoverPause = '1';   // no la queremos como pausa del usuario
+    vid.pause();
   },
 
   /** Monta el reproductor dentro del wrapper. muted + loop por defecto. */
-  _mountVideo(postId, url, { muted = true, autoplay = false } = {}) {
+  _mountVideo(postId, url, { muted = true, autoplay = false, poster = null } = {}) {
     const wrapper = document.getElementById(`video-wrapper-${postId}`);
     if (!wrapper || !url) return null;
     const existing = wrapper.querySelector('video.wall-custom-video');
     if (existing) return existing;
 
+    // El poster vive en data-poster porque innerHTML borra el <img> original.
+    const posterUrl = poster || wrapper.dataset.poster || null;
+
     wrapper.onclick = null;
     wrapper.dataset.mounted = '1';
     wrapper.style.backgroundImage = '';
     wrapper.style.background = '#000';
+    wrapper.classList.add('is-loading');
     const preload = autoplay ? 'auto' : 'metadata';
     wrapper.innerHTML = `
       <video id="wall-vid-${postId}" class="wall-custom-video w-full" controls playsinline loop ${muted ? 'muted' : ''} preload="${preload}"
+             ${posterUrl ? `poster="${_sanitizeHTML(posterUrl)}"` : ''}
              style="display:block;"
              onended="document.getElementById('wall-replay-${postId}')?.classList.remove('hidden')"
              onerror="WallModule._onVideoError('${postId}')">
         <source src="${_sanitizeHTML(url)}" type="video/mp4">
       </video>
+      <div class="wall-video-loading" id="wall-vspin-${postId}"></div>
       <button id="wall-replay-${postId}" onclick="WallModule._replayVideo('${postId}')"
         class="hidden absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-14 h-14 bg-orange-500/90 rounded-full text-white flex items-center justify-center text-2xl" aria-label="Repetir video">🔁</button>
       <button id="wall-audio-toggle-${postId}"
-        class="wall-audio-toggle absolute top-2.5 right-2.5" aria-label="Activar sonido">🔇</button>`;
+        class="wall-audio-toggle absolute top-2.5 right-2.5" aria-label="Activar sonido">🔇</button>
+      ${posterUrl ? `<img src="${_sanitizeHTML(posterUrl)}" class="wall-video-poster wall-video-poster-overlay" alt="" aria-hidden="true" decoding="async">` : ''}`;
 
     const vid = document.getElementById(`wall-vid-${postId}`);
     if (!vid) return null;
     vid.dataset.postId = postId;
     vid.dataset.userPaused = '0';
+
+    // El poster (atributo + overlay) se retira solo cuando hay primer frame
+    // decodificado. Antes de eso el usuario SIEMPRE ve una imagen, nunca un
+    // rectángulo negro mientras carga el video.
+    this._revealOnFirstFrame(vid, posterUrl);
 
     const audioBtn = document.getElementById(`wall-audio-toggle-${postId}`);
     if (audioBtn) audioBtn.onclick = (e) => { e.stopPropagation(); this._toggleAudio(postId); };
@@ -1294,7 +1392,10 @@ const WallModule = {
     vid.addEventListener('play', () => this._onVideoPlay(postId));
     vid.addEventListener('volumechange', () => this._onVolumeChange(postId));
     vid.addEventListener('pause', () => {
+      // Pausas que NO vienen del usuario (observer de scroll o fin de hover)
+      // no deben marcar userPaused, o el video quedaría bloqueado para siempre.
       if (vid.dataset._observerPause === '1') { delete vid.dataset._observerPause; return; }
+      if (vid.dataset._hoverPause === '1') { delete vid.dataset._hoverPause; return; }
       vid.dataset.userPaused = '1';
     });
     vid.addEventListener('play', () => { delete vid.dataset.userPaused; });
@@ -1306,8 +1407,34 @@ const WallModule = {
     return vid;
   },
 
+  /**
+   * Quita el overlay de poster y el spinner en cuanto hay primer frame
+   * decodificado (readyState >= 2). Si loadeddata nunca llega (codec no
+   * soportado, red cortada), el timeout de seguridad lo retira igual para no
+   * dejar el poster congelado sobre un video que ya está playing.
+   */
+  _revealOnFirstFrame(vid, posterUrl) {
+    const postId = vid.dataset.postId;
+    const done = () => {
+      const w = document.getElementById(`video-wrapper-${postId}`);
+      w?.classList.remove('is-loading');
+      document.getElementById(`wall-vspin-${postId}`)?.remove();
+      const overlay = w?.querySelector('.wall-video-poster-overlay');
+      if (overlay) {
+        overlay.style.opacity = '0';
+        setTimeout(() => overlay.remove(), 320);
+      }
+    };
+    if (vid.readyState >= 2) { done(); return; }
+    vid.addEventListener('loadeddata', done, { once: true });
+    // El atributo poster ya pinta el frame si el video aún no arrancó.
+    if (!posterUrl) { vid.addEventListener('canplay', done, { once: true }); }
+    setTimeout(done, 8000);
+  },
+
   /** Click explícito del usuario → monta y reproduce (compatible con onclick inline) */
   playVideoCard(postId, url) {
+    // El click es intención explícita: siempre mudo, el audio es opt-in con 🔊.
     this._mountVideo(postId, url, { muted: true, autoplay: true });
   },
 
@@ -2406,8 +2533,18 @@ const WallModule = {
   },
 
   async _uploadVideoFile(file, onProgress) {
-    const path = `wall/${_uuid()}.mp4`;
-    // Generar thumbnail
+    // El video va a classroom_media (bucket de medios del aula, límite 25 MB)
+    // y el thumbnail a posts, igual que ImageLoader.uploadVideoWithThumbnails.
+    const ext = (file.name || 'video.mp4').split('.').pop()?.toLowerCase() || 'mp4';
+    const path = `wall/${_uuid()}.${ext}`;
+
+    // 1) SUBIR EL ARCHIVO. Antes solo se generaba la URL pública sin subir nada:
+    //    el post quedaba apuntando a un objeto inexistente (video 404).
+    await uploadWithRetry('classroom_media', path, file, file.type || 'video/mp4', onProgress);
+    const { data: urlData } = supabase.storage.from('classroom_media').getPublicUrl(path);
+    const mediaUrl = urlData.publicUrl;
+
+    // 2) Portada (best-effort: si falla, el post se publica igual sin poster)
     let thumbnailUrl = null;
     try {
       const thumb = await generateVideoThumbnail(file);
@@ -2420,8 +2557,7 @@ const WallModule = {
     } catch (e) {
       console.warn('[Wall] Thumbnail generation failed:', e);
     }
-    const { data: urlData } = supabase.storage.from('posts').getPublicUrl(path);
-    return { mediaUrl: urlData.publicUrl, mediaType: 'video', thumbnailUrl };
+    return { mediaUrl, mediaType: 'video', thumbnailUrl };
   },
 
   /** Subida en segundo plano con notificación al terminar */
