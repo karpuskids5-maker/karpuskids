@@ -854,12 +854,20 @@
             <h2 class="text-2xl font-black text-slate-800 tracking-tight">Gestión de Alumnos</h2>
             <p class="text-sm text-slate-400 font-medium">Administra la base de datos de estudiantes</p>
           </div>
-          <div class="flex items-center gap-3">
-            <div class="relative flex-1 md:w-80 group">
+          <div class="flex items-center gap-3 flex-wrap">
+            <div class="relative flex-1 md:w-72 group">
               <i data-lucide="search" class="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-teal-500 transition-colors"></i>
               <input type="text" id="searchStudentInput" placeholder="Buscar por nombre o matrícula..."
                 class="w-full pl-12 pr-4 py-3 bg-white border-2 border-slate-100 rounded-2xl text-sm font-bold text-slate-700 outline-none focus:border-teal-400 focus:ring-4 focus:ring-teal-50 transition-all shadow-sm">
             </div>
+            <select id="filterStudentClassroom" class="px-4 py-3 bg-white border-2 border-slate-100 rounded-2xl text-xs font-bold text-slate-700 outline-none focus:border-teal-400 focus:ring-4 focus:ring-teal-50 transition-all shadow-sm">
+              <option value="all">Todas las Aulas</option>
+            </select>
+            <select id="filterStudentStatus" class="px-4 py-3 bg-white border-2 border-slate-100 rounded-2xl text-xs font-bold text-slate-700 outline-none focus:border-teal-400 focus:ring-4 focus:ring-teal-50 transition-all shadow-sm">
+              <option value="all">Todos los Estados</option>
+              <option value="active">Activos</option>
+              <option value="inactive">Inactivos</option>
+            </select>
             <button id="btnCarnetsAssistant" onclick="App.carnets.openModal()" class="px-4 py-3 bg-green-50 text-green-700 border border-green-200 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-green-100 transition-all active:scale-95 flex items-center gap-2 shrink-0">
               <i data-lucide="badge-check" class="w-4 h-4"></i> Carnets
             </button>
@@ -934,8 +942,25 @@
           </select>
         </div>
 
-        <div id="preregList" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-          <!-- Cards inyectadas por JS -->
+        <div class="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse kk-table-cards">
+              <thead class="bg-slate-50 border-b border-slate-100 sticky top-0 z-10">
+                <tr>
+                  <th class="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-[0.15em]">Estudiante / Matrícula</th>
+                  <th class="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-[0.15em]">Tutores</th>
+                  <th class="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-[0.15em]">Contacto</th>
+                  <th class="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-[0.15em]">Nivel / Horario</th>
+                  <th class="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-[0.15em]">Fecha</th>
+                  <th class="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-[0.15em]">Estado</th>
+                  <th class="px-4 py-3 text-right text-[10px] font-black text-slate-400 uppercase tracking-[0.15em]">Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="preregList" class="divide-y divide-slate-50">
+                <!-- JS -->
+              </tbody>
+            </table>
+          </div>
         </div>
       </section>
 

@@ -19,9 +19,23 @@ export const StudentsModule = {
     this._bindClassroomFilter();
     this._bindStatusFilter();
     this._bindSearch();
+    await this._loadClassroomsForFilter();
     this._applyPersistedFilters();
     await this.loadStudents();
     document.getElementById('btnAddStudent')?.addEventListener('click', () => this.openModal());
+  },
+
+  async _loadClassroomsForFilter() {
+    const sel = document.getElementById('filterStudentClassroom');
+    if (!sel || sel.children.length > 1) return;
+    try {
+      const { data } = await supabase.from('classrooms').select('id, name').order('name');
+      if (data) {
+        let html = '<option value="all">Todas las Aulas</option>';
+        data.forEach(c => { html += `<option value="${c.id}">${Helpers.escapeHTML(c.name)}</option>`; });
+        sel.innerHTML = html;
+      }
+    } catch (_) {}
   },
 
   _persistFilters() {
