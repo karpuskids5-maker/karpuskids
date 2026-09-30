@@ -6,6 +6,7 @@ import { emitEvent, sendPush } from '../shared/supabase.js';
 export const AttendanceModule = {
   _studentId: null,
   _attendance: [],
+  _requests: [],
 
   async init(studentId) {
     // Usar el studentId pasado como parámetro — no buscar en auth
@@ -201,17 +202,26 @@ export const AttendanceModule = {
       const lastDay   = new Date(year, month, 0).getDate();
       const endDate   = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
 
-      const { data, error } = await supabase
-        .from('attendance')
-        .select('id, student_id, date, status, check_in, check_out, absence_reason')
-        .eq('student_id', this._studentId)
-        .gte('date', startDate)
-        .lte('date', endDate)
-        .order('date', { ascending: true });
+      const [attRes, reqRes] = await Promise.all([
+        supabase
+          .from('attendance')
+          .select('id, student_id, date, status, check_in, check_out, absence_reason')
+          .eq('student_id', this._studentId)
+          .gte('date', startDate)
+          .lte('date', endDate)
+          .order('date', { ascending: true }),
+        supabase
+          .from('attendance_requests')
+          .select('id, date, reason, note, status')
+          .eq('student_id', this._studentId)
+          .gte('date', startDate)
+          .lte('date', endDate)
+      ]);
 
-      if (error) throw error;
+      if (attRes.error) throw attRes.error;
 
-      this._attendance = data || [];
+      this._attendance = attRes.data || [];
+      this._requests   = reqRes.data || [];
 
       // KPIs — Normalizar estados para conteo robusto y asegurar que sean números
       const present = this._attendance.filter(a => ['present', 'presente'].includes(a.status?.toLowerCase())).length;
@@ -222,6 +232,7 @@ export const AttendanceModule = {
       if (statsLate)    statsLate.textContent    = late;
       if (statsAbsent)  statsAbsent.textContent  = absent;
 
+      this.renderTodayBanner();
       this.renderCalendar(year, month);
       this.renderList(this._attendance);
 
@@ -232,23 +243,94 @@ export const AttendanceModule = {
     }
   },
 
+  renderTodayBanner() {
+    const todayStr = new Date().toISOString().split('T')[0];
+    const todayAtt = this._attendance.find(a => a.date === todayStr);
+    const todayReq = this._requests.find(r => r.date === todayStr);
+
+    let bannerContainer = document.getElementById('todayAbsenceBannerContainer');
+    if (!bannerContainer) {
+      const attHeader = document.getElementById('sec-asistencia');
+      if (attHeader) {
+        bannerContainer = document.createElement('div');
+        bannerContainer.id = 'todayAbsenceBannerContainer';
+        bannerContainer.className = 'mb-6';
+        attHeader.prepend(bannerContainer);
+      }
+    }
+
+    if (!bannerContainer) return;
+
+    const isAbsent = todayAtt && ['absent', 'ausente'].includes(todayAtt.status?.toLowerCase());
+    if (!isAbsent && !todayReq) {
+      bannerContainer.innerHTML = '';
+      return;
+    }
+
+    const reason = todayReq?.reason || todayAtt?.absence_reason || 'Sin motivo reportado por los padres';
+    const note = todayReq?.note || '';
+    const isParentReported = Boolean(todayReq || (todayAtt?.absence_reason && !todayAtt.absence_reason.includes('Automática')));
+
+    const bgClass   = isParentReported ? 'bg-blue-50 border-blue-200 text-blue-900' : 'bg-rose-50 border-rose-200 text-rose-900';
+    const badgeCls  = isParentReported ? 'bg-blue-600 text-white' : 'bg-rose-600 text-white';
+    const titleText = isParentReported ? 'Aviso de Ausencia Notificado por Padre' : 'Registro de Ausencia Automática del Día';
+
+    bannerContainer.innerHTML = `
+      <div class="p-5 rounded-3xl border ${bgClass} shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4 transition-all">
+        <div class="flex items-start gap-3">
+          <div class="w-10 h-10 rounded-2xl ${badgeCls} flex items-center justify-center shrink-0 text-lg font-black shadow-sm">
+            ${isParentReported ? '📋' : '⏰'}
+          </div>
+          <div>
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="text-xs font-black uppercase tracking-wider ${badgeCls} px-2.5 py-0.5 rounded-full">${titleText}</span>
+              <span class="text-xs font-bold text-slate-500">${new Date().toLocaleDateString('es-DO', { weekday: 'long', day: 'numeric', month: 'long' })}</span>
+            </div>
+            <p class="text-sm font-black mt-1">Motivo: <span class="underline decoration-blue-300">${Helpers.escapeHTML(reason)}</span>${note ? ' — ' + Helpers.escapeHTML(note) : ''}</p>
+            <p class="text-xs text-slate-500 font-medium mt-0.5">
+              ${isParentReported ? 'Esta ausencia fue enviada por el padre/tutor y aparece resaltada en azul en el calendario.' : 'Regla de estancia: registrado automáticamente al superar la hora de entrada de hoy sin confirmación de asistencia.'}
+            </p>
+          </div>
+        </div>
+        <button onclick="document.getElementById('modalAbsence').classList.remove('hidden');document.getElementById('modalAbsence').classList.add('flex');" class="px-4 py-2 rounded-xl ${badgeCls} text-xs font-black hover:opacity-90 transition-opacity shrink-0">
+          ${isParentReported ? 'Editar / Justificar' : 'Enviar Justificación'}
+        </button>
+      </div>`;
+  },
+
   renderCalendar(year, month) {
     const container = document.getElementById('calendarGrid');
     if (!container) return;
 
-    // Actualizar nombre del mes en el filtro si es necesario o en un header
     const daysInMonth = new Date(year, month, 0).getDate();
     const firstDay    = new Date(year, month - 1, 1).getDay();
 
-    // Parsear fecha del string "YYYY-MM-DD" directamente — evita problemas de timezone
     const attMap = new Map();
     this._attendance.forEach(a => {
       if (!a.date || typeof a.date !== 'string') return;
       const parts = a.date.split('-');
-      if (parts.length < 3) return; // guard against malformed dates
+      if (parts.length < 3) return;
       const day = parseInt(parts[2], 10);
       if (isNaN(day) || day < 1 || day > 31) return;
-      attMap.set(day, a.status?.toLowerCase());
+
+      const hasReq = this._requests.some(r => r.date === a.date);
+      const isParentReported = hasReq || (a.absence_reason && !a.absence_reason.includes('Automática'));
+      attMap.set(day, {
+        status: a.status?.toLowerCase(),
+        isParentReported
+      });
+    });
+
+    // Agregar solicitudes que aún no están en la tabla de attendance
+    this._requests.forEach(r => {
+      if (!r.date || typeof r.date !== 'string') return;
+      const parts = r.date.split('-');
+      if (parts.length < 3) return;
+      const day = parseInt(parts[2], 10);
+      if (isNaN(day) || day < 1 || day > 31) return;
+      if (!attMap.has(day)) {
+        attMap.set(day, { status: 'absent', isParentReported: true });
+      }
     });
 
     const today     = new Date();
@@ -258,20 +340,22 @@ export const AttendanceModule = {
 
     let html = '';
 
-    // Celdas vacías al inicio del mes
     for (let i = 0; i < firstDay; i++) {
       html += '<div class="aspect-square"></div>';
     }
 
-    // Días del mes
     for (let d = 1; d <= daysInMonth; d++) {
-      const status  = attMap.get(d);
+      const info    = attMap.get(d);
+      const status  = info?.status;
+      const isParentReported = info?.isParentReported;
       const isToday = d === todayDay && month === todayMon && year === todayYear;
 
       let cls = 'aspect-square flex flex-col items-center justify-center rounded-2xl text-xs font-black transition-all ';
 
       if (status === 'present' || status === 'presente') {
         cls += 'bg-green-500 text-white shadow-lg shadow-green-100 scale-105 z-10';
+      } else if ((status === 'absent' || status === 'ausente') && isParentReported) {
+        cls += 'bg-blue-500 text-white shadow-lg shadow-blue-100 scale-105 z-10';
       } else if (status === 'absent' || status === 'ausente') {
         cls += 'bg-rose-500 text-white shadow-lg shadow-rose-100';
       } else if (status === 'late' || status === 'tarde') {
@@ -283,8 +367,9 @@ export const AttendanceModule = {
       if (isToday && !status) cls += ' ring-2 ring-emerald-400 ring-offset-2';
 
       html += `
-        <div class="${cls}">
+        <div class="${cls}" title="${isParentReported ? 'Ausencia notificada por padre' : (status ? 'Asistencia ' + status : '')}">
           <span>${d}</span>
+          ${(status === 'absent' || status === 'ausente') && isParentReported ? '<div class="w-1.5 h-1.5 bg-white rounded-full mt-0.5"></div>' : ''}
           ${status === 'present' || status === 'presente' ? '<div class="w-1 h-1 bg-white rounded-full mt-0.5"></div>' : ''}
         </div>`;
     }
@@ -313,18 +398,26 @@ export const AttendanceModule = {
     const statusMap = {
       present:  { label: 'Presente', cls: 'bg-emerald-100 text-emerald-700' },
       presente: { label: 'Presente', cls: 'bg-emerald-100 text-emerald-700' },
-      absent:   { label: 'Ausente',  cls: 'bg-rose-100 text-rose-700' },
-      ausente:  { label: 'Ausente',  cls: 'bg-rose-100 text-rose-700' },
+      absent:   { label: 'Ausente (Sin aviso)', cls: 'bg-rose-100 text-rose-700' },
+      ausente:  { label: 'Ausente (Sin aviso)', cls: 'bg-rose-100 text-rose-700' },
       late:     { label: 'Tarde',    cls: 'bg-amber-100 text-amber-700' },
       tarde:    { label: 'Tarde',    cls: 'bg-amber-100 text-amber-700' }
     };
 
     container.innerHTML = data.map(a => {
       const statusKey = a.status?.toLowerCase();
-      const st  = statusMap[statusKey] || { label: a.status, cls: 'bg-slate-100 text-slate-600' };
-      const isAbsent = statusKey === 'absent' || statusKey === 'ausente';
-      const reasonHtml = (isAbsent && a.absence_reason)
-        ? '<p class="text-[10px] font-bold text-rose-500 mt-1 flex items-start gap-1"><span>📝</span><span>' + Helpers.escapeHTML(a.absence_reason) + '</span></p>'
+      const isAbsent  = statusKey === 'absent' || statusKey === 'ausente';
+      const req       = this._requests.find(r => r.date === a.date);
+      const isParentReported = Boolean(req || (a.absence_reason && !a.absence_reason.includes('Automática')));
+
+      let st = statusMap[statusKey] || { label: a.status, cls: 'bg-slate-100 text-slate-600' };
+      if (isAbsent && isParentReported) {
+        st = { label: 'Notificado por Padre', cls: 'bg-blue-100 text-blue-700' };
+      }
+
+      const reasonStr = req?.reason || a.absence_reason || '';
+      const reasonHtml = (isAbsent && reasonStr)
+        ? '<p class="text-[10px] font-bold ' + (isParentReported ? 'text-blue-600' : 'text-rose-500') + ' mt-1 flex items-start gap-1"><span>📝</span><span>' + Helpers.escapeHTML(reasonStr) + '</span></p>'
         : (isAbsent ? '<p class="text-[10px] font-bold text-slate-400 mt-1">Sin motivo registrado</p>' : '');
       const day = parseInt(a.date.split('-')[2], 10);
       return (

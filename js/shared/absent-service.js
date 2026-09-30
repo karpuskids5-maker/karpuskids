@@ -117,12 +117,16 @@ async function jsMarkAbsentFallback() {
 
   for (const s of studentsList) {
     const row = attMap.get(s.id);
+    const req = reqMap.get(s.id);
+    const reason = req?.reason ? (req.reason + (req.note ? `: ${req.note}` : '')) : 'Ausencia Automática — Excedió hora límite de entrada';
+
     if (!row) {
       toInsert.push({
         student_id: s.id,
         classroom_id: s.classroom_id,
         date,
         status: 'absent',
+        absence_reason: reason,
         school_year_id: yearId && Number(yearId) > 0 ? Number(yearId) : null
       });
     } else if (!row.status || !FINAL_STATUSES.has(String(row.status).toLowerCase())) {
@@ -131,8 +135,6 @@ async function jsMarkAbsentFallback() {
       continue; // ya tiene estado final (present/late/retirado/absent)
     }
 
-    const req = reqMap.get(s.id);
-    const reason = req?.reason ?? null;
     const note = req?.note ?? null;
     if (s.parent_id && !parentSet.has(s.parent_id)) {
       parentSet.add(s.parent_id);

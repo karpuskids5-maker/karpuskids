@@ -102,7 +102,7 @@ export const AttendanceModule = {
       const today = Helpers.getYYYYMMDD();
       let q = supabase
         .from('attendance')
-        .select('id, date, status, check_in, check_out, student_id, student:student_id(id, name, avatar_url), classroom:classroom_id(id, name)')
+        .select('id, date, status, check_in, check_out, student_id, absence_reason, student:student_id(id, name, avatar_url), classroom:classroom_id(id, name)')
         .order('date', { ascending: false });
 
       if (this._mode === 'day') {
@@ -277,6 +277,17 @@ export const AttendanceModule = {
       const checkOut = r.check_out ? new Date(r.check_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
       const dateStr  = new Date(r.date + 'T00:00:00').toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' });
 
+      const isAbsent = norm(r.status) === 'absent' || norm(r.status) === 'ausente';
+      const reason = r.absence_reason || 'Sin motivo reportado por los padres';
+      const isParentReported = isAbsent && (Boolean(r.absence_reason) && !r.absence_reason.includes('Automática'));
+
+      let statusBadge = `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase ${s.cls}"><i data-lucide="${s.icon}" class="w-3 h-3"></i>${s.label}</span>`;
+      if (isAbsent && isParentReported) {
+        statusBadge = `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase bg-blue-100 text-blue-700 shadow-sm"><i data-lucide="file-text" class="w-3 h-3"></i>Notificado por Padre</span>`;
+      } else if (isAbsent) {
+        statusBadge = `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase bg-rose-100 text-rose-700"><i data-lucide="clock" class="w-3 h-3"></i>Ausencia Automática</span>`;
+      }
+
       return `<tr class="hover:bg-slate-50 border-b border-slate-100 transition-colors">
         <td class="px-5 py-3.5">
           <div class="flex items-center gap-3">
@@ -286,13 +297,12 @@ export const AttendanceModule = {
             <div>
               <div class="font-bold text-slate-800 text-sm">${Helpers.escapeHTML(r.student?.name || '—')}</div>
               <div class="text-[10px] text-slate-400 font-bold uppercase">${Helpers.escapeHTML(r.classroom?.name || '—')}</div>
+              ${isAbsent ? `<div class="text-[11px] font-bold ${isParentReported ? 'text-blue-600' : 'text-slate-500'} mt-1">📝 ${Helpers.escapeHTML(reason)}</div>` : ''}
             </div>
           </div>
         </td>
         <td class="px-5 py-3.5 text-center">
-          <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase ${s.cls}">
-            <i data-lucide="${s.icon}" class="w-3 h-3"></i>${s.label}
-          </span>
+          ${statusBadge}
         </td>
         <td class="px-5 py-3.5 text-center text-[11px] font-bold text-slate-600">${dateStr}</td>
         <td class="px-5 py-3.5 text-center text-[11px] font-bold text-slate-600">${checkIn}</td>
