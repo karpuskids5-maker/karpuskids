@@ -9,8 +9,14 @@ import { Helpers } from '/js/shared/helpers.js';
 import { getBirthdayInfo } from '/js/shared/birthday-utils.js';
 import { NotifyPermission } from '/js/shared/notify-permission.js';
 import { supabase } from '/js/shared/supabase.js';
+import { QualityEval } from './quality-eval.js';
 
 const SLIDE_INTERVAL = 6000;
+
+// Estado de la encuesta mensual. Se resuelve de forma asíncrona (el periodo
+// abierto viene de un RPC), así que el primer render ocurre sin ella y el
+// banner se repinta cuando la consulta responde.
+let _qualityStatus = null;
 const GRADIENTS = {
   exit_urgent:  'linear-gradient(135deg,#ef4444,#dc2626,#b91c1c)',
   exit_warning: 'linear-gradient(135deg,#fbbf24,#f59e0b,#d97706)',
@@ -26,6 +32,7 @@ const GRADIENTS = {
   schedule:     'linear-gradient(135deg,#34d399,#22c55e,#14b8a6)',
   new_post:     'linear-gradient(135deg,#f97316,#ea580c,#f59e0b)',
   school:       'linear-gradient(135deg,#8b5cf6,#7c3aed,#6d28d9)',
+  quality:      'linear-gradient(135deg,#6366f1,#4f46e5,#4338ca)',
 };
 
 const ANIMATIONS = {
@@ -44,6 +51,7 @@ const DynamicBanner = {
   _postCheckTimer: null,
   _lastPostCount: 0,
   _lastPostCheck: 0,
+  _onQualitySent: null,
 
   init() {
     this._container = document.getElementById('dynamicBanner');
@@ -57,6 +65,15 @@ const DynamicBanner = {
 
     if (this._postCheckTimer) clearInterval(this._postCheckTimer);
     this._postCheckTimer = setInterval(() => this._checkNewPosts(), 30000);
+
+    this._checkQualitySurvey();
+
+    if (this._onQualitySent) document.removeEventListener('quality-eval:sent', this._onQualitySent);
+    this._onQualitySent = () => {
+      _qualityStatus = null;
+      this._checkQualitySurvey();
+    };
+    document.addEventListener('quality-eval:sent', this._onQualitySent);
   },
 
   destroy() {
@@ -64,6 +81,29 @@ const DynamicBanner = {
     if (this._exitTimer) { clearInterval(this._exitTimer); this._exitTimer = null; }
     if (this._entryTimer) { clearInterval(this._entryTimer); this._entryTimer = null; }
     if (this._postCheckTimer) { clearInterval(this._postCheckTimer); this._postCheckTimer = null; }
+    if (this._onQualitySent) {
+      document.removeEventListener('quality-eval:sent', this._onQualitySent);
+      this._onQualitySent = null;
+    }
+    _qualityStatus = null;
+  },
+
+  /**
+   * La encuesta mensual depende del periodo abierto en Supabase, así que se
+   * resuelve fuera del render. Solo repinta si la slide va a aparecer.
+   */
+  async _checkQualitySurvey() {
+    let status = null;
+    try {
+      status = await QualityEval.status();
+    } catch {
+      return; // Sin encuesta disponible: el banner sigue igual.
+    }
+    const pending = !!(status && status.open && status.pending);
+    if (pending === !!( _qualityStatus && _qualityStatus.pending)) return;
+
+    _qualityStatus = status;
+    if (pending) this.refresh();
   },
 
   refresh() {
@@ -244,6 +284,29 @@ const DynamicBanner = {
         title: postCount === 1 ? 'Nueva publicación en el muro' : `${postCount} nuevas publicaciones`,
         msg: 'Tu aula tiene contenido nuevo. ¡Revisalo!',
         cta: { label: 'Ver muro', action: () => App.navigateTo('feed') },
+      });
+    }
+
+    // ── QUALITY SURVEY (mensual) ──
+    // Prioridad 7: por encima de saldo y muro, por debajo de cualquier
+    // recordatorio de entrada/salida o pago vencido. Es importante, pero no
+    // puede tapar un evento del día.
+    if (_qualityStatus && _qualityStatus.open && _qualityStatus.pending) {
+      const days = _qualityStatus.daysLeft;
+      const monthLabel = new Date(_qualityStatus.period.period_month)
+        .toLocaleDateString('es-DO', { month: 'long' });
+
+      slides.push({
+        id: 'quality',
+        priority: 7,
+        gradient: GRADIENTS.quality,
+        icon: '💬',
+        anim: ANIMATIONS.pulse,
+        title: `Evalúa el mes de ${monthLabel}`,
+        msg: days === 0
+          ? 'La encuesta cierra hoy. Tu opinión ayuda a mejorar el servicio.'
+          : `Tu opinión sobre la docente y el centro ayuda a mejorar. Cierra en ${days} día${days === 1 ? '' : 's'}.`,
+        cta: { label: 'Responder', action: () => QualityEval.open() },
       });
     }
 

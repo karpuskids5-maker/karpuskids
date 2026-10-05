@@ -102,7 +102,7 @@ export const AttendanceModule = {
       const today = Helpers.getYYYYMMDD();
       let q = supabase
         .from('attendance')
-        .select('id, date, status, check_in, check_out, student_id, student:student_id(id, name, avatar_url), classroom:classroom_id(id, name)')
+        .select('id, date, status, check_in, check_out, absence_reason, student_id, student:student_id(id, name, avatar_url), classroom:classroom_id(id, name)')
         .order('date', { ascending: false });
 
       if (this._mode === 'day') {
@@ -242,7 +242,7 @@ export const AttendanceModule = {
 
     const rows = this._filtered();
     if (!rows.length) {
-      tbody.innerHTML = '<tr><td colspan="5" class="text-center py-14"><div class="flex flex-col items-center gap-2 text-slate-400"><i data-lucide="calendar-x" class="w-8 h-8"></i><p class="font-bold text-sm">Sin registros para este filtro</p></div></td></tr>';
+      tbody.innerHTML = '<tr><td colspan="6" class="text-center py-14"><div class="flex flex-col items-center gap-2 text-slate-400"><i data-lucide="calendar-x" class="w-8 h-8"></i><p class="font-bold text-sm">Sin registros para este filtro</p></div></td></tr>';
       if (window.lucide) lucide.createIcons();
       return;
     }
@@ -265,6 +265,7 @@ export const AttendanceModule = {
       head.innerHTML = `<tr class="bg-slate-50 border-b border-slate-100">
         <th class="px-5 py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-wider">Estudiante</th>
         <th class="px-5 py-3 text-center text-[10px] font-black text-slate-400 uppercase tracking-wider">Estado</th>
+        <th class="px-5 py-3 text-center text-[10px] font-black text-slate-400 uppercase tracking-wider">Motivo</th>
         <th class="px-5 py-3 text-center text-[10px] font-black text-slate-400 uppercase tracking-wider">Fecha</th>
         <th class="px-5 py-3 text-center text-[10px] font-black text-slate-400 uppercase tracking-wider">Entrada</th>
         <th class="px-5 py-3 text-center text-[10px] font-black text-slate-400 uppercase tracking-wider">Salida</th>
@@ -276,6 +277,32 @@ export const AttendanceModule = {
       const checkIn  = r.check_in  ? new Date(r.check_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
       const checkOut = r.check_out ? new Date(r.check_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
       const dateStr  = new Date(r.date + 'T00:00:00').toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' });
+
+      // Celda de motivo — solo visible para ausencias
+      const isAbsent = ['absent', 'ausente'].includes(norm(r.status));
+      let motivoCell = '<td class="px-5 py-3.5 text-center text-[11px] text-slate-400">—</td>';
+      if (isAbsent && r.absence_reason) {
+        const isAuto = /automát|automati|auto|excedió|hora límite/i.test(r.absence_reason);
+        if (isAuto) {
+          motivoCell = `<td class="px-5 py-3.5 text-center">
+            <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black bg-rose-100 text-rose-700">
+              <i data-lucide="clock" class="w-3 h-3"></i>Automática
+            </span>
+          </td>`;
+        } else {
+          motivoCell = `<td class="px-5 py-3.5 text-center">
+            <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black bg-blue-100 text-blue-700" title="${Helpers.escapeHTML(r.absence_reason)}">
+              <i data-lucide="file-text" class="w-3 h-3"></i>Notif. Padre
+            </span>
+          </td>`;
+        }
+      } else if (isAbsent) {
+        motivoCell = `<td class="px-5 py-3.5 text-center">
+          <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black bg-rose-100 text-rose-700">
+            <i data-lucide="clock" class="w-3 h-3"></i>Automática
+          </span>
+        </td>`;
+      }
 
       return `<tr class="hover:bg-slate-50 border-b border-slate-100 transition-colors">
         <td class="px-5 py-3.5">
@@ -294,6 +321,7 @@ export const AttendanceModule = {
             <i data-lucide="${s.icon}" class="w-3 h-3"></i>${s.label}
           </span>
         </td>
+        ${motivoCell}
         <td class="px-5 py-3.5 text-center text-[11px] font-bold text-slate-600">${dateStr}</td>
         <td class="px-5 py-3.5 text-center text-[11px] font-bold text-slate-600">${checkIn}</td>
         <td class="px-5 py-3.5 text-center text-[11px] font-bold text-slate-600">${checkOut}</td>
@@ -310,6 +338,7 @@ export const AttendanceModule = {
         <th class="px-5 py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-wider">Estudiante</th>
         <th class="px-5 py-3 text-center text-[10px] font-black text-slate-400 uppercase tracking-wider">Presentes</th>
         <th class="px-5 py-3 text-center text-[10px] font-black text-slate-400 uppercase tracking-wider">Ausencias / Tardanzas</th>
+        <th class="px-5 py-3 text-center text-[10px] font-black text-slate-400 uppercase tracking-wider">Motivo Ausencias</th>
         <th class="px-5 py-3 text-center text-[10px] font-black text-slate-400 uppercase tracking-wider">Asistencia %</th>
         <th class="px-5 py-3 text-center text-[10px] font-black text-slate-400 uppercase tracking-wider">Último registro</th>
       </tr>`;
@@ -322,26 +351,43 @@ export const AttendanceModule = {
           student:  r.student,
           classroom: r.classroom,
           present: 0, absent: 0, late: 0, total: 0,
+          absentNotified: 0, absentAuto: 0,
           lastDate: r.date
         });
       }
       const g = map.get(sid);
       const k = norm(r.status);
-      if (['present','presente'].includes(k))   g.present++;
-      else if (['absent','ausente'].includes(k)) g.absent++;
-      else if (['late','tarde'].includes(k))     g.late++;
+      if (['present','presente'].includes(k)) {
+        g.present++;
+      } else if (['absent','ausente'].includes(k)) {
+        g.absent++;
+        const isAuto = !r.absence_reason || /automát|automati|auto|excedió|hora límite/i.test(r.absence_reason);
+        if (isAuto) g.absentAuto++; else g.absentNotified++;
+      } else if (['late','tarde'].includes(k)) {
+        g.late++;
+      }
       g.total++;
       if (r.date > g.lastDate) g.lastDate = r.date;
     });
 
     const grouped = Array.from(map.values())
-      .sort((a, b) => b.present - a.present); // ordenar por más presentes
+      .sort((a, b) => b.present - a.present);
 
     tbody.innerHTML = grouped.map(g => {
       const ini  = g.student?.name?.charAt(0)?.toUpperCase() || '?';
       const rate = g.total > 0 ? Math.round((g.present / g.total) * 100) : 0;
       const barColor = rate >= 80 ? 'bg-emerald-500' : rate >= 60 ? 'bg-amber-500' : 'bg-rose-500';
       const lastStr  = g.lastDate ? new Date(g.lastDate + 'T00:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' }) : '—';
+
+      const notifiedBadge = g.absentNotified > 0
+        ? `<span class="text-[10px] font-black text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full flex items-center gap-1"><i data-lucide="file-text" class="w-2.5 h-2.5"></i>${g.absentNotified} padre</span>`
+        : '';
+      const autoBadge = g.absentAuto > 0
+        ? `<span class="text-[10px] font-black text-rose-600 bg-rose-50 px-2 py-0.5 rounded-full flex items-center gap-1"><i data-lucide="clock" class="w-2.5 h-2.5"></i>${g.absentAuto} auto</span>`
+        : '';
+      const motivoCell = g.absent > 0
+        ? `<div class="flex items-center justify-center gap-1.5 flex-wrap">${notifiedBadge}${autoBadge}</div>`
+        : '<span class="text-[10px] text-slate-300">—</span>';
 
       return `<tr class="hover:bg-slate-50 border-b border-slate-100 transition-colors">
         <td class="px-5 py-3.5">
@@ -366,6 +412,7 @@ export const AttendanceModule = {
             <span class="text-[10px] font-black text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">${g.late} tard</span>
           </div>
         </td>
+        <td class="px-5 py-3.5 text-center">${motivoCell}</td>
         <td class="px-5 py-3.5">
           <div class="flex items-center gap-2">
             <div class="flex-1 bg-slate-100 rounded-full h-1.5 overflow-hidden max-w-[80px]">
@@ -447,11 +494,12 @@ export const AttendanceModule = {
     const rows = this._filtered();
     if (!rows.length) return Helpers.toast('No hay datos para exportar', 'warning');
 
-    const headers = ['Estudiante', 'Aula', 'Estado', 'Fecha', 'Entrada', 'Salida'];
+    const headers = ['Estudiante', 'Aula', 'Estado', 'Motivo', 'Fecha', 'Entrada', 'Salida'];
     const lines = rows.map(r => [
       r.student?.name || '',
       r.classroom?.name || '',
       STATUS[norm(r.status)]?.label || r.status,
+      r.absence_reason || '',
       r.date,
       r.check_in  ? new Date(r.check_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '',
       r.check_out ? new Date(r.check_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''

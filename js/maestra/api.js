@@ -22,7 +22,7 @@ export const MaestraApi = {
   async getStudentsByClassroom(classroomId) {
     const { data, error } = await supabase
       .from(TABLES.STUDENTS)
-      .select('id, name, last_name, avatar_url, matricula, allergies, blood_type, p1_name, p1_phone, p1_email, parent_id, age, age_type')
+      .select('id, name, last_name, avatar_url, matricula, allergies, blood_type, p1_name, p1_phone, p1_email, p2_name, p2_phone, parent_id, age, age_type, medical_notes, medications, medical_conditions, authorized_pickup, emergency_protocol')
       .eq('classroom_id', classroomId)
       .eq('is_active', true)
       .order('name');

@@ -433,3 +433,514 @@ body.panel-padre-body section .bg-white {
   #calendarGrid { gap: 6px !important; }
   #calendarGrid > div { font-size: 11px; }
 }
+
+/* ============================================================
+   🚀 50 OPTIMIZACIONES PANEL PADRES - CSS PROFESIONAL
+   Visuales + Funcionales + UX
+   ============================================================ */
+
+/* ── 1. Foto de Perfil con Anillo de Estado Animado ──── */
+.avatar-ring-wrapper {
+  position: relative;
+  animation: avatarRingGlow 3s ease-in-out infinite;
+}
+@keyframes avatarRingGlow {
+  0%, 100% { filter: drop-shadow(0 0 0 rgba(16, 185, 129, 0)); }
+  50%      { filter: drop-shadow(0 0 8px rgba(16, 185, 129, 0.5)); }
+}
+.avatar-ring-wrapper.presente   { background: linear-gradient(135deg,#34d399,#10b981,#14b8a6) !important; }
+.avatar-ring-wrapper.retiro     { background: linear-gradient(135deg,#60a5fa,#3b82f6,#8b5cf6) !important; }
+.avatar-ring-wrapper.transito   { background: linear-gradient(135deg,#fbbf24,#f59e0b,#f97316) !important; }
+.avatar-ring-wrapper.ausente    { background: linear-gradient(135deg,#fca5a5,#ef4444,#f87171) !important; }
+
+/* Punto de estado del avatar con pulso */
+#avatarStatusDot {
+  position: absolute;
+}
+#avatarStatusDot.status-presente { background: #10b981; }
+#avatarStatusDot.status-retiro    { background: #3b82f6; }
+#avatarStatusDot.status-transito  { background: #f59e0b; }
+#avatarStatusDot.status-ausente   { background: #ef4444; }
+#avatarStatusDot::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: 9999px;
+  animation: statusPulse 2s ease-out infinite;
+  background: inherit;
+  opacity: 0.5;
+}
+@keyframes statusPulse {
+  0%   { transform: scale(1); opacity: 0.5; }
+  100% { transform: scale(2.2); opacity: 0; }
+}
+
+/* ── 2. Badges con Gradientes Fluorescentes + Pulso CSS ─ */
+.badge-fluorescent {
+  background: linear-gradient(135deg,#fbbf24,#f59e0b);
+  color: white;
+  font-weight: 900;
+  border-radius: 9999px;
+  padding: 2px 10px;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  box-shadow: 0 4px 14px rgba(245, 158, 11, 0.4);
+  animation: badgeFluoroPulse 2.5s ease-in-out infinite;
+}
+.badge-fluorescent.green  { background: linear-gradient(135deg,#34d399,#059669); box-shadow: 0 4px 14px rgba(5,150,105,0.4); }
+.badge-fluorescent.blue   { background: linear-gradient(135deg,#60a5fa,#2563eb); box-shadow: 0 4px 14px rgba(37,99,235,0.4); }
+.badge-fluorescent.red    { background: linear-gradient(135deg,#f87171,#dc2626); box-shadow: 0 4px 14px rgba(220,38,38,0.4); }
+.badge-fluorescent.pink   { background: linear-gradient(135deg,#f472b6,#db2777); box-shadow: 0 4px 14px rgba(219,39,119,0.4); }
+@keyframes badgeFluoroPulse {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-1px); filter: brightness(1.1); }
+}
+
+/* ── 3. Tarjetas Neumórficas de Rutina ──────────────── */
+.routine-card-neumorphic {
+  background: white;
+  border-radius: 20px;
+  box-shadow:
+    0 10px 25px -5px rgba(0, 0, 0, 0.05),
+    0 6px 10px -6px rgba(0, 0, 0, 0.03),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.02);
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.routine-card-neumorphic:hover {
+  transform: translateY(-3px);
+  box-shadow:
+    0 20px 40px -10px rgba(16, 185, 129, 0.15),
+    0 10px 20px -10px rgba(0, 0, 0, 0.08);
+  border-color: rgba(16, 185, 129, 0.25);
+}
+
+/* Iconos 3D para rutina */
+.routine-icon-3d {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  font-size: 22px;
+  background: linear-gradient(135deg, #f0fdf4, #dcfce7);
+  box-shadow:
+    inset 0 -3px 0 rgba(0, 0, 0, 0.05),
+    0 4px 10px rgba(16, 185, 129, 0.1);
+  transform-style: preserve-3d;
+  transition: transform 0.3s ease;
+}
+.routine-card-neumorphic:hover .routine-icon-3d {
+  transform: rotateY(10deg) rotateX(-5deg) scale(1.05);
+}
+
+/* ── 5. Timeline Vertical con Línea Guía Glow ────────── */
+.timeline-glow {
+  position: relative;
+  padding-left: 28px;
+}
+.timeline-glow::before {
+  content: '';
+  position: absolute;
+  left: 10px;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: linear-gradient(180deg, #10b981 0%, #0ea5e9 50%, #f59e0b 100%);
+  border-radius: 9999px;
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.4);
+}
+.timeline-item {
+  position: relative;
+  padding-bottom: 18px;
+}
+.timeline-item::before {
+  content: '';
+  position: absolute;
+  left: -22px;
+  top: 4px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: white;
+  border: 3px solid #10b981;
+  box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.12), 0 0 12px rgba(16, 185, 129, 0.25);
+  transition: all 0.3s ease;
+}
+.timeline-item.latest::before {
+  background: #10b981;
+  animation: timelineDotPulse 2s ease-in-out infinite;
+}
+@keyframes timelineDotPulse {
+  0%, 100% { box-shadow: 0 0 0 4px rgba(16,185,129,0.12), 0 0 12px rgba(16,185,129,0.25); }
+  50%      { box-shadow: 0 0 0 8px rgba(16,185,129,0.08), 0 0 20px rgba(16,185,129,0.4); }
+}
+
+/* ── 6. Galería Grid Masonry (Evidencias) ───────────── */
+.gallery-masonry {
+  column-count: 2;
+  column-gap: 10px;
+}
+@media (min-width: 640px) { .gallery-masonry { column-count: 3; } }
+@media (min-width: 1024px) { .gallery-masonry { column-count: 4; } }
+.gallery-masonry-item {
+  break-inside: avoid;
+  margin-bottom: 10px;
+  border-radius: 16px;
+  overflow: hidden;
+  position: relative;
+  cursor: zoom-in;
+  transition: transform 0.3s ease;
+}
+.gallery-masonry-item:hover { transform: scale(1.02); }
+.gallery-masonry-item img,
+.gallery-masonry-item video {
+  width: 100%;
+  display: block;
+  border-radius: 16px;
+}
+.gallery-masonry-item::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 16px;
+  background: linear-gradient(180deg, transparent 60%, rgba(0,0,0,0.3) 100%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+.gallery-masonry-item:hover::after { opacity: 1; }
+
+/* ── 7. Glassmorphism Profesional para Modales ──────── */
+.modal-glass > div {
+  background: rgba(255, 255, 255, 0.85) !important;
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(255, 255, 255, 0.6) inset;
+}
+.modal-glass.dark > div {
+  background: rgba(30, 41, 59, 0.82) !important;
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* ── 8. Dark Mode Automático (Prefers Color Scheme) ── */
+@media (prefers-color-scheme: dark) {
+  body.panel-padre-body:not(.force-light) {
+    --bg: #0f172a;
+    --card: #1e293b;
+    color: #e2e8f0;
+  }
+  body.panel-padre-body:not(.force-light) .bg-white {
+    background: var(--card) !important;
+    border-color: #334155 !important;
+    color: #e2e8f0;
+  }
+  body.panel-padre-body:not(.force-light) .text-slate-700,
+  body.panel-padre-body:not(.force-light) .text-slate-800 { color: #e2e8f0 !important; }
+  body.panel-padre-body:not(.force-light) .text-slate-500 { color: #94a3b8 !important; }
+  body.panel-padre-body:not(.force-light) .text-slate-400 { color: #64748b !important; }
+  body.panel-padre-body:not(.force-light) #layoutShell { background: var(--bg); }
+  body.panel-padre-body:not(.force-light) .bg-slate-50 {
+    background: #334155 !important;
+    border-color: #475569 !important;
+  }
+  body.panel-padre-body:not(.force-light) input,
+  body.panel-padre-body:not(.force-light) textarea,
+  body.panel-padre-body:not(.force-light) select {
+    background: #334155 !important;
+    border-color: #475569 !important;
+    color: #e2e8f0 !important;
+  }
+  body.panel-padre-body:not(.force-light) #initial-loading {
+    background: linear-gradient(135deg, #064e3b, #022c22) !important;
+  }
+  body.panel-padre-body:not(.force-light) .skeleton-shimmer {
+    background: linear-gradient(90deg, #1e293b 25%, #334155 50%, #1e293b 75%);
+    background-size: 200% 100%;
+  }
+  body.panel-padre-body:not(.force-light) #dailySummaryCard > div,
+  body.panel-padre-body:not(.force-light) #dashboardGrid > div {
+    background: var(--card) !important;
+    border-color: #334155 !important;
+  }
+  body.panel-padre-body:not(.force-light) .routine-card-neumorphic {
+    background: var(--card);
+    border-color: #334155;
+  }
+}
+
+/* ── 9. Micro-interacción Confetti + Corazón Explosión ─ */
+.heart-explode {
+  animation: heartPop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes heartPop {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.4); }
+  70%  { transform: scale(0.9); }
+  100% { transform: scale(1); }
+}
+
+/* ── 10. Bottom Navigation Bar Flotante Curvada ────── */
+@media (max-width: 767px) {
+  body.panel-padre-body #sidebar {
+    border-radius: 28px !important;
+    box-shadow:
+      0 -4px 20px rgba(0, 0, 0, 0.06),
+      0 10px 40px rgba(0, 0, 0, 0.08),
+      0 0 0 1px rgba(255, 255, 255, 0.8) inset !important;
+    border: 1px solid rgba(255, 255, 255, 0.9) !important;
+    background: rgba(34, 197, 94, 0.96) !important;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+  }
+}
+
+/* ── 11. Indicador Lectura Tareas Badge ─────────────── */
+.teacher-reviewed-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  background: linear-gradient(135deg, #dcfce7, #bbf7d0);
+  color: #047857;
+  border-radius: 9999px;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  border: 1px solid #86efac;
+}
+.teacher-reviewed-badge::before {
+  content: '✓';
+  display: inline-flex;
+  width: 14px;
+  height: 14px;
+  align-items: center;
+  justify-content: center;
+  background: #10b981;
+  color: white;
+  border-radius: 9999px;
+  font-size: 9px;
+}
+
+/* ── 12. Empty States Empáticos Ilustrados ──────────── */
+.empty-state-empathetic {
+  text-align: center;
+  padding: 48px 24px;
+  border-radius: 24px;
+  background: linear-gradient(135deg, #f0fdf4, #ecfeff);
+  border: 1px dashed #86efac;
+}
+.empty-state-empathetic .empty-emoji {
+  font-size: 64px;
+  display: block;
+  margin-bottom: 16px;
+  animation: emptyFloat 4s ease-in-out infinite;
+}
+@keyframes emptyFloat {
+  0%, 100% { transform: translateY(0) rotate(-2deg); }
+  50%      { transform: translateY(-8px) rotate(2deg); }
+}
+.empty-state-empathetic h4 {
+  font-weight: 900;
+  font-size: 18px;
+  color: #065f46;
+  margin-bottom: 6px;
+}
+.empty-state-empathetic p {
+  color: #047857;
+  font-weight: 600;
+  font-size: 13px;
+  max-width: 320px;
+  margin: 0 auto;
+  line-height: 1.5;
+}
+
+/* ── 13. Feedback Táctil: Toast Notifications Mejorados */
+.kk-toast {
+  position: fixed;
+  top: calc(env(safe-area-inset-top) + 16px);
+  left: 50%;
+  transform: translateX(-50%) translateY(-120%);
+  z-index: 99999;
+  padding: 12px 22px;
+  border-radius: 9999px;
+  font-weight: 800;
+  font-size: 13px;
+  color: white;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+  transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  pointer-events: none;
+  white-space: nowrap;
+}
+.kk-toast.show { transform: translateX(-50%) translateY(0); }
+.kk-toast.success { background: linear-gradient(135deg, #10b981, #059669); }
+.kk-toast.error   { background: linear-gradient(135deg, #ef4444, #dc2626); }
+.kk-toast.info    { background: linear-gradient(135deg, #3b82f6, #2563eb); }
+.kk-toast.warning { background: linear-gradient(135deg, #f59e0b, #d97706); }
+
+/* ── 14. Tarjetas Pagos por Estado (Color Code) ─────── */
+.payment-status-pending {
+  border-left: 5px solid #ef4444 !important;
+  background: linear-gradient(90deg, rgba(239,68,68,0.06), transparent) !important;
+}
+.payment-status-approved {
+  border-left: 5px solid #10b981 !important;
+  background: linear-gradient(90deg, rgba(16,185,129,0.06), transparent) !important;
+}
+.payment-status-review {
+  border-left: 5px solid #3b82f6 !important;
+  background: linear-gradient(90deg, rgba(59,130,246,0.06), transparent) !important;
+}
+
+/* ── 15. Scrollbar Personalizada Ultra-Fino ─────────── */
+.custom-scrollbar::-webkit-scrollbar,
+.panel-padre-body ::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-track,
+.panel-padre-body ::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb,
+.panel-padre-body ::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #86efac, #10b981);
+  border-radius: 9999px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover,
+.panel-padre-body ::-webkit-scrollbar-thumb:hover {
+  background: #10b981;
+}
+
+/* ── 16. Skeleton Loader Shimmer Alta Resolución ───── */
+.skeleton-premium {
+  background: linear-gradient(
+    90deg,
+    #f1f5f9 0%,
+    #f8fafc 40%,
+    #f1f5f9 80%
+  );
+  background-size: 300% 100%;
+  animation: skeletonShimmer 1.8s ease-in-out infinite;
+  border-radius: 12px;
+}
+@keyframes skeletonShimmer {
+  0%   { background-position: 300% 0; }
+  100% { background-position: -300% 0; }
+}
+
+/* ── 17. Ripple Effect (Respuesta Táctica Visual) ──── */
+.ripple-container {
+  position: relative;
+  overflow: hidden;
+}
+.ripple {
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.4);
+  transform: scale(0);
+  animation: rippleAnim 0.6s linear;
+  pointer-events: none;
+}
+@keyframes rippleAnim {
+  to { transform: scale(4); opacity: 0; }
+}
+
+/* ── 18. Tipografía Outfit: Contraste AA+ ──────────── */
+.panel-padre-body {
+  font-family: 'Outfit', 'Quicksand', 'Nunito', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+.panel-padre-body p,
+.panel-padre-body li,
+.panel-padre-body label,
+.panel-padre-body span,
+.panel-padre-body input,
+.panel-padre-body textarea,
+.panel-padre-body select {
+  font-size: 15px;
+  line-height: 1.55;
+}
+@media (max-width: 640px) {
+  .panel-padre-body p,
+  .panel-padre-body li,
+  .panel-padre-body label,
+  .panel-padre-body span,
+  .panel-padre-body input,
+  .panel-padre-body textarea,
+  .panel-padre-body select { font-size: 16px; } /* Mínimo 16px para iOS sin zoom */
+}
+
+/* ── 19. Filtros Chips Activos ─────────────────────── */
+.routine-filter-chip.active {
+  transform: scale(1.05);
+  box-shadow: 0 6px 16px rgba(0,0,0,0.12);
+}
+.routine-filter-chip {
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ── 20. Modal Confirmación Destructiva ────────────── */
+.destructive-modal {
+  border-top: 5px solid #ef4444 !important;
+}
+.destructive-modal h3 {
+  color: #dc2626 !important;
+}
+.destructive-modal .confirm-input {
+  background: #fef2f2 !important;
+  border: 2px dashed #fca5a5 !important;
+  color: #991b1b !important;
+  font-weight: 900 !important;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  text-align: center;
+}
+
+/* ── 21. Contraste Tipográfico Mínimo AA+ ──────────── */
+.panel-padre-body {
+  --tw-text-opacity: 1;
+}
+.panel-padre-body .text-xs { font-size: 12px; }
+.panel-padre-body .text-sm { font-size: 14px; }
+.panel-padre-body .text-base { font-size: 16px; }
+
+/* ── 22. Quick Amount Buttons ──────────────────────── */
+.quick-amount-btn {
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.quick-amount-btn.selected {
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  font-weight: 900 !important;
+}
+
+/* ── 23. Chip de Hermanos Activo ───────────────────── */
+.sibling-chip.active {
+  background: #10b981 !important;
+  color: white !important;
+  border-color: #059669 !important;
+  box-shadow: 0 6px 16px rgba(16,185,129,0.3);
+}
+
+/* ── 24. Fondo Gradiente Pastel Animado (Header) ───── */
+.hero-gradient-animated {
+  background: linear-gradient(-45deg, #d1fae5, #a7f3d0, #ccfbf1, #bae6fd);
+  background-size: 400% 400%;
+  animation: gradientShift 10s ease infinite;
+}
+@keyframes gradientShift {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}

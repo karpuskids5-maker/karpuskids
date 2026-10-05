@@ -32,7 +32,16 @@ export const PaymentsModule = {
     document.getElementById('searchPaymentStudent')?.addEventListener('input', (e) => {
       const q = e.target.value.toLowerCase().trim();
       const cached = AppState.get('paymentsData');
-      if (cached && q) { this._renderPaymentRows(cached.filter(p => p?.students?.name?.toLowerCase().includes(q))); }
+      if (cached && q) {
+        this._renderPaymentsList(document.getElementById('paymentsTableBody'), cached.filter(p => {
+          const stuName = (p?.students?.name || '').toLowerCase();
+          const parentName = (p?.students?.parents?.name || '').toLowerCase();
+          const concept = (p.concept || '').toLowerCase();
+          const bank = (p.bank || '').toLowerCase();
+          const ref = (p.reference || '').toLowerCase();
+          return stuName.includes(q) || parentName.includes(q) || concept.includes(q) || bank.includes(q) || ref.includes(q);
+        }), null, null);
+      }
       else { this.loadPayments(); }
     });
     document.getElementById('btnNewPayment')?.addEventListener('click',       () => this.openPaymentModal());
@@ -130,7 +139,7 @@ export const PaymentsModule = {
     const container = document.getElementById('paymentsTableBody');
     if (!container) return;
     container.innerHTML = '<tr><td colspan="8" class="text-center py-10"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-600 mx-auto mb-2"></div><p class="text-xs text-slate-400">Cargando pagos...</p></td></tr>';
-    this.loadStats();
+    void this.loadStats();
 
     try {
       const monthVal  = document.getElementById('filterPaymentMonth')?.value;
@@ -151,7 +160,7 @@ export const PaymentsModule = {
   async _fetchFilteredPayments(yearVal, monthVal, statusFilter, search) {
     let q = supabase
       .from('payments')
-      .select('id, student_id, amount, concept, status, due_date, created_at, paid_date, method, bank, reference, month_paid, evidence_url, proof_url, notes, original_amount, discount_pct, discount_amount, discount_reason, students:student_id(id, name, monthly_fee, classroom_id, classrooms:classroom_id(name))')
+      .select('id, student_id, amount, concept, status, due_date, created_at, paid_date, method, bank, reference, month_paid, evidence_url, proof_url, notes, original_amount, discount_pct, discount_amount, discount_reason, students:student_id(id, name, monthly_fee, classroom_id, parent_id, classrooms:classroom_id(name), parents:parent_id(name, phone))')
       .gte('created_at', yearVal + '-01-01T00:00:00')
       .lte('created_at', yearVal + '-12-31T23:59:59')
       .order('created_at', { ascending: false })
@@ -168,7 +177,16 @@ export const PaymentsModule = {
       list = this._filterByMonth(list, monthVal, yearVal);
     }
 
-    if (search) list = list.filter(p => (p?.students?.name || '').toLowerCase().includes(search));
+    if (search) {
+      list = list.filter(p => {
+        const stuName = (p?.students?.name || '').toLowerCase();
+        const parentName = (p?.students?.parents?.name || '').toLowerCase();
+        const concept = (p.concept || '').toLowerCase();
+        const bank = (p.bank || '').toLowerCase();
+        const ref = (p.reference || '').toLowerCase();
+        return stuName.includes(search) || parentName.includes(search) || concept.includes(search) || bank.includes(search) || ref.includes(search);
+      });
+    }
 
     return list;
   },
@@ -349,13 +367,62 @@ export const PaymentsModule = {
   _buildEvidenceCell(hasV, p) {
     if (hasV) {
       const url = p.evidence_url || p.proof_url;
-      return '<a href="' + url + '" target="_blank" class="group inline-flex flex-col items-center gap-1" title="Ver comprobante / foto del pago">' +
-               '<span class="w-10 h-10 rounded-lg overflow-hidden border border-slate-200 bg-slate-50 flex items-center justify-center">' +
-                 '<img src="' + url + '" alt="Comprobante" class="w-full h-full object-cover group-hover:scale-105 transition-transform">' +
+      const safeUrl = Helpers.escapeHTML(url);
+      const stuName = Helpers.escapeHTML(p?.students?.name || 'Comprobante');
+      return '<button onclick="App.payments._openVoucherLightbox(\'' + safeUrl.replace(/'/g, String.raw`\'`) + '\', \'' + stuName.replace(/'/g, String.raw`\'`) + '\')" class="group inline-flex flex-col items-center gap-1" title="Ver comprobante / foto del pago">' +
+               '<span class="w-10 h-10 rounded-lg overflow-hidden border border-slate-200 bg-slate-50 flex items-center justify-center shadow-sm group-hover:shadow-md transition-all group-hover:-translate-y-0.5">' +
+                 '<img src="' + safeUrl + '" alt="Comprobante" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300" loading="lazy">' +
                '</span>' +
-             '</a>';
+               '<span class="text-[9px] font-black text-slate-400 group-hover:text-teal-600 uppercase tracking-wider transition-colors">Ver</span>' +
+             '</button>';
     }
     return '<span class="text-slate-300 text-xs">—</span>';
+  },
+
+  _openVoucherLightbox(url, name) {
+    if (!url) return;
+    let overlay = document.getElementById('voucherLightboxOverlay');
+    if (!overlay) {
+      overlay = document.createElement('div');
+      overlay.id = 'voucherLightboxOverlay';
+      overlay.className = 'fixed inset-0 z-[9999] bg-slate-900/80 backdrop-blur-sm hidden items-center justify-center p-4 animate-in fade-in duration-200';
+      overlay.innerHTML =
+        '<div class="relative max-w-5xl w-full max-h-[90vh] flex flex-col bg-white rounded-3xl shadow-2xl overflow-hidden">' +
+          '<div class="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-teal-600 to-emerald-600 text-white">' +
+            '<div class="flex items-center gap-3">' +
+              '<div class="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center"><i data-lucide="file-image" class="w-5 h-5"></i></div>' +
+              '<div><h3 class="font-black text-base" id="voucherLightboxTitle">Comprobante</h3><p class="text-white/70 text-[10px] uppercase tracking-widest font-bold">Voucher de Pago</p></div>' +
+            '</div>' +
+            '<button onclick="document.getElementById(\'voucherLightboxOverlay\').classList.add(\'hidden\');document.getElementById(\'voucherLightboxOverlay\').classList.remove(\'flex\');" class="w-9 h-9 rounded-xl bg-white/15 hover:bg-white/25 flex items-center justify-center transition-all active:scale-90" title="Cerrar (ESC)">' +
+              '<i data-lucide="x" class="w-5 h-5"></i>' +
+            '</button>' +
+          '</div>' +
+          '<div class="flex-1 bg-slate-50 p-4 overflow-auto flex items-center justify-center" id="voucherLightboxBody">' +
+            '<img id="voucherLightboxImg" class="max-w-full max-h-[70vh] object-contain rounded-2xl shadow-xl" src="" alt="Voucher">' +
+          '</div>' +
+          '<div class="flex items-center justify-between px-6 py-3 bg-white border-t border-slate-100">' +
+            '<div class="text-[10px] font-black text-slate-400 uppercase tracking-wider">Haz clic fuera o pulsa ESC para cerrar</div>' +
+            '<div class="flex gap-2">' +
+              '<a id="voucherLightboxDownload" href="#" download target="_blank" class="inline-flex items-center gap-1.5 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-black text-[10px] uppercase tracking-wider transition-all active:scale-95">' +
+                '<i data-lucide="download" class="w-3.5 h-3.5"></i> Descargar' +
+              '</a>' +
+              '<a id="voucherLightboxNewTab" href="#" target="_blank" class="inline-flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-teal-600 to-emerald-600 text-white rounded-xl font-black text-[10px] uppercase tracking-wider transition-all active:scale-95 shadow-md shadow-teal-200">' +
+                '<i data-lucide="external-link" class="w-3.5 h-3.5"></i> Abrir' +
+              '</a>' +
+            '</div>' +
+          '</div>' +
+        '</div>';
+      overlay.addEventListener('click', (e) => { if (e.target === overlay) { overlay.classList.add('hidden'); overlay.classList.remove('flex'); } });
+      document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !overlay.classList.contains('hidden')) { overlay.classList.add('hidden'); overlay.classList.remove('flex'); } });
+      document.body.appendChild(overlay);
+    }
+    document.getElementById('voucherLightboxTitle').textContent = name || 'Comprobante';
+    document.getElementById('voucherLightboxImg').src = url;
+    document.getElementById('voucherLightboxDownload').href = url;
+    document.getElementById('voucherLightboxNewTab').href = url;
+    overlay.classList.remove('hidden');
+    overlay.classList.add('flex');
+    if (window.lucide) lucide.createIcons();
   },
 
   _buildActionsCell(id, isPending, statusKey, hasV) {
@@ -578,7 +645,19 @@ export const PaymentsModule = {
           <p class="text-white/80 font-bold text-sm mt-0.5">${student.name || 'Estudiante'} · $${amount}</p>
         </div>
       </div>
-      <div class="p-6 space-y-3 bg-slate-50/40">
+      <div class="p-6 space-y-4 bg-slate-50/40">
+        <p class="text-xs font-bold text-slate-500 uppercase tracking-wider">¿Generar recibo físico?</p>
+        <button id="ctaPrintReceipt" class="w-full flex items-center gap-3 p-4 bg-white rounded-2xl border-2 border-emerald-100 hover:border-emerald-300 hover:bg-emerald-50 transition-all active:scale-[0.98]">
+          <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white flex items-center justify-center flex-shrink-0 shadow-md shadow-emerald-200">
+            <i data-lucide="printer" class="w-5 h-5"></i>
+          </div>
+          <div class="flex-1 text-left">
+            <div class="font-black text-sm text-emerald-700 uppercase tracking-wider">Imprimir / Guardar PDF</div>
+            <div class="text-xs text-slate-400 font-bold mt-0.5">Recibo oficial con membrete · Formato carta</div>
+          </div>
+          <i data-lucide="chevron-right" class="w-5 h-5 text-emerald-400"></i>
+        </button>
+        <div class="h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent my-2"></div>
         <p class="text-xs font-bold text-slate-500 uppercase tracking-wider">¿Enviar recibo digital al tutor?</p>
         <div class="grid grid-cols-2 gap-3">
           <button id="ctaReceiptChat" class="flex flex-col items-center gap-2 p-4 bg-white rounded-2xl border-2 border-teal-100 hover:border-teal-300 hover:bg-teal-50 transition-all active:scale-95">
@@ -605,6 +684,10 @@ export const PaymentsModule = {
 
     const closeFn = () => { window.App.ui.closeModal?.(); };
     document.getElementById('ctaCloseApproval')?.addEventListener('click', closeFn);
+    document.getElementById('ctaPrintReceipt')?.addEventListener('click', () => {
+      closeFn();
+      this._printReceipt(paymentId);
+    });
     document.getElementById('ctaReceiptChat')?.addEventListener('click', () => {
       closeFn();
       this.sendDigitalReceipt(paymentId, 'chat');
@@ -613,6 +696,210 @@ export const PaymentsModule = {
       closeFn();
       this.sendDigitalReceipt(paymentId, 'whatsapp');
     });
+  },
+
+  _printReceipt(paymentId) {
+    const p = (AppState.get('paymentsData') || []).find(x => String(x.id) === String(paymentId));
+    if (!p) return Helpers.toast('Pago no encontrado', 'warning');
+    const student = p?.students || { name: '-', classrooms: { name: '-' }, parents: { name: '-', phone: '-' } };
+    const parent = student.parents || { name: '-', phone: '-' };
+    const amount = Number(p.amount || 0);
+    const orig = Number(p.original_amount || p.amount || 0);
+    const discPct = Number(p.discount_pct || 0);
+    const saved = Math.max(0, orig - amount);
+    const paidDate = p.paid_date ? new Date(p.paid_date).toLocaleDateString('es-DO', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) : new Date().toLocaleDateString('es-DO', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    const dueDate = p.due_date ? new Date(p.due_date + 'T00:00:00').toLocaleDateString('es-DO') : '-';
+    const shortId = String(p.id).slice(0, 8).toUpperCase();
+    const cy = new Date().getFullYear();
+
+    const esc = (s) => Helpers.escapeHTML(String(s ?? '-'));
+    const fmt = (n) => '$' + Number(n || 0).toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    const discountLabel = discPct > 0 ? `Descuento (${discPct}%)` : 'Descuento';
+    const html = `<!DOCTYPE html><html lang="es-DO"><head><meta charset="UTF-8"><title>Recibo #${shortId}</title>
+      <style>
+        *{box-sizing:border-box;margin:0;padding:0}
+        body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:#f8fafc;color:#0f172a;padding:24px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+        .page{max-width:720px;margin:0 auto;background:#fff;border-radius:16px;box-shadow:0 1px 3px rgba(0,0,0,0.06);overflow:hidden;border:1px solid #e2e8f0}
+        .hdr{background:linear-gradient(135deg,#0d9488 0%,#059669 100%);padding:32px;color:#fff;position:relative;overflow:hidden}
+        .hdr::after{content:"";position:absolute;right:-40px;top:-40px;width:200px;height:200px;border-radius:50%;background:rgba(255,255,255,0.08)}
+        .hdr::before{content:"";position:absolute;right:20px;bottom:-60px;width:140px;height:140px;border-radius:50%;background:rgba(255,255,255,0.06)}
+        .hdr-top{display:flex;align-items:center;justify-content:space-between;position:relative;z-index:1}
+        .brand{display:flex;align-items:center;gap:12px}
+        .brand-logo{width:48px;height:48px;border-radius:14px;background:rgba(255,255,255,0.2);display:flex;align-items:center;justify-content:center;font-weight:900;font-size:20px}
+        .brand-name{font-weight:900;font-size:22px;letter-spacing:-0.02em}
+        .brand-sub{font-size:11px;opacity:0.8;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;margin-top:2px}
+        .receipt-tag{background:rgba(255,255,255,0.18);backdrop-filter:blur(4px);padding:8px 14px;border-radius:10px;text-align:right}
+        .receipt-tag .l{font-size:9px;letter-spacing:0.15em;text-transform:uppercase;font-weight:800;opacity:0.85}
+        .receipt-tag .v{font-family:'Courier New',monospace;font-weight:900;font-size:14px;margin-top:2px}
+        .hdr-line{width:100%;height:2px;background:rgba(255,255,255,0.18);margin:24px 0 18px;border-radius:2px}
+        .hdr-msg{font-size:24px;font-weight:900;position:relative;z-index:1}
+        .hdr-sub{font-size:13px;opacity:0.9;margin-top:4px;position:relative;z-index:1;font-weight:600}
+        .body{padding:32px}
+        .grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:28px}
+        .box{background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px}
+        .box .tl{font-size:10px;font-weight:900;letter-spacing:0.12em;text-transform:uppercase;color:#64748b;margin-bottom:8px}
+        .box .tv{font-size:14px;font-weight:800;color:#0f172a;line-height:1.4}
+        .box .ts{font-size:12px;color:#475569;font-weight:600;margin-top:4px}
+        .table-wrap{border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;margin-bottom:24px}
+        table{width:100%;border-collapse:collapse;font-size:13px}
+        thead th{background:#f1f5f9;padding:14px 18px;text-align:left;font-size:10px;font-weight:900;letter-spacing:0.1em;text-transform:uppercase;color:#64748b;border-bottom:1px solid #e2e8f0}
+        tbody td{padding:16px 18px;border-bottom:1px solid #f1f5f9;color:#0f172a;font-weight:600}
+        tbody tr:last-child td{border-bottom:none}
+        tbody td.r{text-align:right}
+        tbody td.mono{font-family:'Courier New',monospace;font-weight:800}
+        .totals{display:flex;justify-content:flex-end;margin-bottom:28px}
+        .totals-inner{width:320px;border-top:2px solid #0d9488;padding-top:16px}
+        .t-row{display:flex;justify-content:space-between;padding:6px 0;font-size:13px;color:#475569;font-weight:600}
+        .t-row.sub{border-bottom:1px dashed #e2e8f0;padding-bottom:12px;margin-bottom:10px}
+        .t-row.grand{font-size:20px;font-weight:900;color:#0d9488;padding-top:12px}
+        .t-row .neg{color:#dc2626}
+        .t-row .pos{color:#059669}
+        .footer{display:grid;grid-template-columns:1fr 1fr;gap:24px;padding-top:24px;border-top:1px dashed #cbd5e1}
+        .sign{height:56px;border-bottom:1px solid #0f172a;margin-bottom:8px;display:flex;align-items:flex-end;justify-content:center;font-size:11px;color:#64748b;padding-bottom:6px;font-weight:600}
+        .sign-lbl{text-align:center;font-size:10px;font-weight:800;letter-spacing:0.1em;text-transform:uppercase;color:#475569}
+        .meta{margin-top:28px;padding:16px;background:#f0fdfa;border:1px solid #99f6e4;border-radius:12px;display:flex;justify-content:space-between;align-items:center}
+        .meta-l{font-size:11px;color:#0f766e;font-weight:700}
+        .meta-r{font-family:'Courier New',monospace;font-size:10px;color:#0f766e;font-weight:800}
+        @media print{body{padding:0;background:#fff}.page{box-shadow:none;border-radius:0;border:none}}
+      </style></head><body>
+      <div class="page">
+        <div class="hdr">
+          <div class="hdr-top">
+            <div class="brand">
+              <div class="brand-logo">K</div>
+              <div>
+                <div class="brand-name">Karpus Kids</div>
+                <div class="brand-sub">Centro Educativo Infantil</div>
+              </div>
+            </div>
+            <div class="receipt-tag">
+              <div class="l">Recibo N°</div>
+              <div class="v">${esc(shortId)}</div>
+            </div>
+          </div>
+          <div class="hdr-line"></div>
+          <div class="hdr-msg">Comprobante de Pago Oficial</div>
+          <div class="hdr-sub">Emitido el ${esc(paidDate)}</div>
+        </div>
+        <div class="body">
+          <div class="grid">
+            <div class="box">
+              <div class="tl">Estudiante</div>
+              <div class="tv">${esc(student.name)}</div>
+              <div class="ts">${esc(student.classrooms?.name || 'Sin aula')}</div>
+            </div>
+            <div class="box">
+              <div class="tl">Tutor / Padre</div>
+              <div class="tv">${esc(parent.name)}</div>
+              <div class="ts">📞 ${esc(parent.phone || 'Sin teléfono')}</div>
+            </div>
+            <div class="box">
+              <div class="tl">Concepto / Periodo</div>
+              <div class="tv">${esc(p.concept || 'Mensualidad')}</div>
+              <div class="ts">Mes: ${esc(p.month_paid || '—')}</div>
+            </div>
+            <div class="box">
+              <div class="tl">Método / Banco</div>
+              <div class="tv">${esc(p.method || '-')}</div>
+              <div class="ts">${esc([p.bank, p.reference].filter(Boolean).join(' · ') || 'Pago en efectivo')}</div>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Descripción</th><th style="width:140px" class="r">Monto</th></tr></thead>
+              <tbody>
+                <tr>
+                  <td><div style="font-weight:800">${esc(p.concept || 'Mensualidad')} — ${esc(student.name)}</div>
+                  <div style="font-size:11px;color:#64748b;margin-top:4px;font-weight:600">Fecha límite: ${esc(dueDate)}${p.discount_reason ? ' · Motivo descuento: ' + esc(p.discount_reason) : ''}</div></td>
+                  <td class="r mono">${fmt(orig)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="totals">
+            <div class="totals-inner">
+              <div class="t-row sub"><span>Subtotal</span><span class="mono">${fmt(orig)}</span></div>
+              ${saved > 0 ? `<div class="t-row"><span>${discountLabel}</span><span class="neg mono neg">- ${fmt(saved)}</span></div>` : ''}
+              <div class="t-row grand"><span>Total Pagado</span><span class="mono pos">${fmt(amount)}</span></div>
+            </div>
+          </div>
+          <div class="meta">
+            <div class="meta-l">✓ Este comprobante es válido como constancia oficial de pago.</div>
+            <div class="meta-r">KARPUS · REC ${shortId} · ${cy}</div>
+          </div>
+          <div class="footer">
+            <div><div class="sign">Firma del Recibidor</div><div class="sign-lbl">Personal Administrativo</div></div>
+            <div><div class="sign">Nota: Los pagos por transferencia quedan sujetos a verificación bancaria.</div></div>
+          </div>
+        </div>
+      </div>
+      <script>window.onload = function(){ setTimeout(() => { window.print(); }, 250); }</script>
+      </body></html>`;
+
+    try {
+      const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+      const blobUrl = URL.createObjectURL(blob);
+      const w = window.open(blobUrl, '_blank', 'width=820,height=960,scrollbars=yes');
+      if (!w) { URL.revokeObjectURL(blobUrl); Helpers.toast('Habilita las ventanas emergentes para imprimir', 'warning'); return; }
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
+      Helpers.toast('Recibo listo para imprimir', 'success');
+    } catch (error_) { Helpers.safeLog?.(error_); Helpers.toast('Error al generar recibo', 'error'); }
+  },
+
+  async _exportPaymentsCSV() {
+    const btn = document.getElementById('btnExportPaymentsCSV');
+    const origText = btn?.innerHTML;
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> Exportando...'; if (window.lucide) lucide.createIcons(); }
+    try {
+      const monthVal = document.getElementById('filterPaymentMonth')?.value;
+      const yearVal = document.getElementById('filterPaymentYear')?.value || String(new Date().getFullYear());
+      const statusFilter = document.getElementById('filterPaymentStatus')?.value || 'all';
+      const search = (document.getElementById('searchPaymentStudent')?.value || '').trim().toLowerCase();
+      const list = await this._fetchFilteredPayments(yearVal, monthVal, statusFilter, search);
+      if (!list.length) { Helpers.toast('No hay datos para exportar', 'warning'); return; }
+
+      const esc = (s) => {
+        const v = String(s ?? '');
+        return v.includes(',') || v.includes('"') || v.includes('\n') ? '"' + v.replace(/"/g, '""') + '"' : v;
+      };
+      const fmt = (n) => Number(n || 0).toFixed(2);
+      const dt = (d) => d ? new Date(d).toLocaleDateString('es-DO') : '';
+      const sts = (p) => ({ paid: 'Pagado', pending: 'Pendiente', review: 'En Revisión', overdue: 'Vencido', rejected: 'Rechazado' })[calcStatus(p)] || (p.status || '');
+
+      const head = ['Fecha Creación','Estudiante','Aula','Tutor','Teléfono Tutor','Concepto','Mes','Monto Original','Descuento %','Descuento RD$','Monto Final','Estado','Método','Banco','Referencia','Fecha Vence','Pagado el','Notas'];
+      const rows = list.map(p => [
+        dt(p.created_at),
+        p?.students?.name ?? '',
+        p?.students?.classrooms?.name ?? '',
+        p?.students?.parents?.name ?? '',
+        p?.students?.parents?.phone ?? '',
+        p.concept ?? '',
+        p.month_paid ?? '',
+        fmt(p.original_amount ?? p.amount),
+        fmt(p.discount_pct ?? 0),
+        fmt(p.discount_amount ?? 0),
+        fmt(p.amount ?? 0),
+        sts(p),
+        p.method ?? '',
+        p.bank ?? '',
+        p.reference ?? '',
+        dt(p.due_date),
+        dt(p.paid_date),
+        p.notes ?? ''
+      ]);
+      const csv = '\ufeff' + head.join(',') + '\n' + rows.map(r => r.map(esc).join(',')).join('\n');
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const from = yearVal + (monthVal ? '-' + String(monthVal).padStart(2, '0') : '');
+      a.href = url;
+      a.download = `pagos-karpus-${from}-${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      Helpers.toast(`Exportados ${list.length} registros`, 'success');
+    } catch (error_) { Helpers.safeLog?.(error_); Helpers.toast('Error al exportar: ' + (error_.message || ''), 'error'); }
+    finally { if (btn) { btn.disabled = false; btn.innerHTML = origText; if (window.lucide) lucide.createIcons(); } }
   },
 
   async _confirmApproval(id) {
@@ -638,11 +925,11 @@ export const PaymentsModule = {
       // Verificar que la aprobación SÍ persistió (el trigger fn_protect_paid_records
       // con `RETURN OLD` descartaba los UPDATE de pagos no aprobados sin error).
       const { data: chk } = await supabase.from('payments').select('status').eq('id', id).single();
-      if (!chk || chk.status !== 'paid') {
+      if (chk?.status !== 'paid') {
         Helpers.toast('No se pudo aprobar el pago. Verifica que el registro esté pendiente o en revisión (puede haber un duplicado del mismo mes) y reintenta.', 'error');
         this.closeModal();
         await this.loadPayments();
-        this.loadStats();
+        void this.loadStats();
         return;
       }
 
@@ -650,7 +937,7 @@ export const PaymentsModule = {
       Helpers.toast('Pago aprobado ✅', 'success');
       this.closeModal();
       await this.loadPayments();
-      this.loadStats();
+      void this.loadStats();
       setTimeout(() => this._showPostApprovalCTA(id), 300);
     } catch (error_) { Helpers.toast('Error al aprobar: ' + (error_.message || error_), 'error'); }
   },
@@ -806,7 +1093,7 @@ export const PaymentsModule = {
         Helpers.toast(isRemove ? 'Descuento eliminado' : 'Descuento aplicado ✅', 'success');
         this.closeModal();
         await this.loadPayments();
-        this.loadStats();
+        void this.loadStats();
       } catch (error_) {
         Helpers.toast('Error al aplicar descuento: ' + (error_.message || error_), 'error');
         if (btn) { btn.disabled = false; btn.textContent = 'Guardar Descuento'; }

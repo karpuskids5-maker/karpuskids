@@ -14,6 +14,7 @@ const STATUS_MAP = {
 
 export const DashboardModule = {
   _chart: null,
+  _attChart: null,
 
   async init() {
     const dateEl = document.getElementById('dashboardDate');
@@ -36,13 +37,16 @@ export const DashboardModule = {
     await Promise.all([
       this.loadStats(),
       this.loadRecentPayments(),
-      this._loadMiniChart()
+      this._loadMiniChart(),
+      this._loadAttendanceMiniChart(),
     ]);
   },
 
   async loadStats() {
       try {
         const today = new Date().toISOString().split('T')[0];
+        const todayStart = today + 'T00:00:00.000Z';
+        const todayEnd   = today + 'T23:59:59.999Z';
         const monthKey = new Date().getFullYear() + '-' + String(new Date().getMonth() + 1).padStart(2, '0');
 
         // Stale-while-revalidate: mostrar datos cacheados inmediatamente, revalidar en background
@@ -52,7 +56,7 @@ export const DashboardModule = {
             // Auto-detección de ausentes (misma regla: check_in_end + 2h)
             try { await autoMarkAbsentStudents(); } catch (_) {}
 
-            const [studentsRes, attendanceRes, paymentsRes, incomeRes] = await Promise.allSettled([
+            const [studentsRes, attendanceRes, paymentsRes, incomeRes, todayPaidRes, absentNotifiedRes, overdueRes] = await Promise.allSettled([
               supabase.from('students').select('*', { count: 'exact', head: true })
                 .eq('is_active', true).not('classroom_id', 'is', null),
               supabase.from('attendance').select('*', { count: 'exact', head: true })
@@ -60,19 +64,34 @@ export const DashboardModule = {
               supabase.from('payments').select('*', { count: 'exact', head: true })
                 .in('status', ['pending', 'review']),
               supabase.from('payments').select('amount')
-                .eq('status', 'paid').eq('month_paid', monthKey)
+                .eq('status', 'paid').eq('month_paid', monthKey),
+              supabase.from('payments').select('id, amount')
+                .eq('status', 'paid')
+                .gte('created_at', todayStart).lte('created_at', todayEnd),
+              supabase.from('attendance').select('*', { count: 'exact', head: true })
+                .eq('date', today).in('status', ['absent', 'ausente'])
+                .not('notes', 'is', null),
+              supabase.from('payments').select('*', { count: 'exact', head: true })
+                .eq('status', 'overdue'),
             ]);
             const get = (r) => r.status === 'fulfilled' ? r.value : {};
             const activeCount = get(studentsRes).count || 0;
             const presentCount = get(attendanceRes).count || 0;
             // Ausentes = estudiantes activos sin registro de presente/tarde hoy
             const absentCount = Math.max(0, activeCount - presentCount);
+            const todayPaid = get(todayPaidRes).data || [];
+            const todayPaidTotal = todayPaid.reduce((s,p)=>s+Number(p.amount||0), 0);
             return {
               studentsCount:   activeCount,
               attendanceCount: presentCount,
               absentCount:     absentCount,
               paymentsCount:   get(paymentsRes).count  || 0,
-              incomeTotal:     (get(incomeRes).data || []).reduce((s, p) => s + Number(p.amount || 0), 0)
+              incomeTotal:     (get(incomeRes).data || []).reduce((s, p) => s + Number(p.amount || 0), 0),
+              paymentsToday:   todayPaidTotal,
+              paymentsTodayCount: todayPaid.length,
+              absentNotified:  get(absentNotifiedRes).count || 0,
+              overdueCount:    get(overdueRes).count || 0,
+              noPunchCount:    Math.max(0, absentCount - (get(absentNotifiedRes).count || 0)),
             };
           },
           2 * 60_000,
@@ -87,55 +106,78 @@ export const DashboardModule = {
     }
 ,
 
-  _applyStats({ studentsCount, attendanceCount, absentCount, paymentsCount, incomeTotal }) {
+  _applyStats({ studentsCount, attendanceCount, absentCount, paymentsCount, incomeTotal, paymentsToday, paymentsTodayCount, absentNotified, overdueCount, noPunchCount }) {
     const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
     set('statStudents',   studentsCount);
     set('statAttendance', attendanceCount);
     set('statAbsent',     absentCount);
     set('statPayments',   paymentsCount);
     set('statIncome',     incomeTotal.toLocaleString('es-DO', { minimumFractionDigits: 2 }));
+    set('statPaymentsToday', 'RD$' + Number(paymentsToday || 0).toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+    set('statPaymentsTodayCount', `${paymentsTodayCount ?? 0} transaccion${paymentsTodayCount === 1 ? '':'es'}`);
+    set('statAbsentNotified', absentNotified ?? 0);
     set('welcomeName',    (AppState.get('profile')?.name || 'Asistente').split(' ')[0]);
-    this._renderUrgentAlerts(paymentsCount, attendanceCount);
+    this._renderUrgentAlerts({ paymentsReview: paymentsCount, present: attendanceCount, overdue: overdueCount || 0, noPunch: noPunchCount ?? 0 });
     this._renderStaffBirthdayBanner();
   },
 
-  _renderUrgentAlerts(paymentsReview, pendingAbsences) {
+  _renderUrgentAlerts({ paymentsReview, overdue, noPunch }) {
     const container = document.getElementById('urgentAlertsWidget');
     if (!container) return;
 
     const alerts = [];
     
-    if (paymentsReview > 0) {
+    if (noPunch > 0) {
       alerts.push({
-        title: `${paymentsReview} Pagos por validar`,
-        desc: 'Comprobantes pendientes de revisión bancaria.',
-        icon: 'credit-card',
-        color: 'rose',
-        section: 'pagos'
-      });
-    }
-
-    // Supongamos que reportes de ausencia son los estudiantes inactivos o algo similar por ahora
-    // En una implementación real, sería una tabla de 'absence_reports'
-    if (pendingAbsences > 0) {
-      alerts.push({
-        title: `Actividad de hoy`,
-        desc: `${pendingAbsences} estudiantes ya ingresaron a la estancia.`,
-        icon: 'users',
+        title: `${noPunch} estudiante${noPunch===1?'':'s'} sin registro de ponche`,
+        desc: 'No tienen asistencia registrada ni justificación presentada.',
+        icon: 'scan-face',
         color: 'amber',
         section: 'accesos'
       });
     }
 
+    if (overdue > 0) {
+      alerts.push({
+        title: `${overdue} pago${overdue===1?'':'s'} en mora`,
+        desc: 'Comprobantes vencidos requieren seguimiento inmediato.',
+        icon: 'alert-octagon',
+        color: 'rose',
+        section: 'pagos'
+      });
+    }
+
+    if (paymentsReview > 0) {
+      alerts.push({
+        title: `${paymentsReview} Pagos por validar`,
+        desc: 'Comprobantes pendientes de revisión bancaria.',
+        icon: 'credit-card',
+        color: 'violet',
+        section: 'pagos'
+      });
+    }
+
     if (alerts.length === 0) {
-      container.classList.add('hidden');
+      // Mostrar widget OK silencioso
+      container.classList.remove('hidden');
+      container.innerHTML = `
+        <div class="md:col-span-3 bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-100 p-4 rounded-2xl flex items-center gap-4">
+          <div class="w-10 h-10 rounded-xl bg-emerald-500 text-white flex items-center justify-center shrink-0 shadow-lg shadow-emerald-200 animate-pulse">
+            <i data-lucide="check" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h4 class="text-sm font-black text-emerald-900">Todo en orden</h4>
+            <p class="text-xs text-emerald-700/70 font-bold mt-0.5">Sin alertas urgentes. ¡Buen trabajo!</p>
+          </div>
+        </div>`;
+      if (window.lucide) lucide.createIcons();
       return;
     }
 
     container.classList.remove('hidden');
     container.innerHTML = alerts.map(a => `
       <div onclick="window.App.navigateTo('${a.section}')" class="bg-${a.color}-50 border border-${a.color}-100 p-4 rounded-2xl flex items-start gap-4 cursor-pointer hover:shadow-md transition-all group">
-        <div class="w-10 h-10 rounded-xl bg-${a.color}-500 text-white flex items-center justify-center shrink-0 shadow-lg shadow-${a.color}-200 group-hover:scale-110 transition-transform">
+        <div class="w-10 h-10 rounded-xl bg-${a.color}-500 text-white flex items-center justify-center shrink-0 shadow-lg shadow-${a.color}-200 group-hover:scale-110 transition-transform kk-pulse-ring">
           <i data-lucide="${a.icon}" class="w-5 h-5"></i>
         </div>
         <div>
@@ -236,6 +278,60 @@ export const DashboardModule = {
       });
     } catch (e) {
       // Error intentionally ignored (chart render failure is non-critical)
+    }
+  },
+
+  async _loadAttendanceMiniChart() {
+    const canvas = document.getElementById('attendanceMiniChart');
+    if (!canvas || !window.Chart) return;
+    try {
+      const days = [];
+      const labels = [];
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        days.push(d.toISOString().split('T')[0]);
+        labels.push(d.toLocaleDateString('es-DO', { weekday: 'short' }).substring(0,1).toUpperCase());
+      }
+      const { data, error } = await supabase
+        .from('attendance')
+        .select('date, status')
+        .gte('date', days[0])
+        .lte('date', days[6])
+        .in('status', ['present', 'presente', 'late', 'tarde']);
+      if (error) throw error;
+      const counts = new Array(7).fill(0);
+      (data || []).forEach(r => {
+        const idx = days.indexOf(r.date);
+        if (idx >= 0) counts[idx]++;
+      });
+      if (this._attChart) this._attChart.destroy();
+      Chart.defaults.font.family = 'Inter, ui-sans-serif, system-ui';
+      this._attChart = new Chart(canvas, {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [{
+            data: counts,
+            backgroundColor: 'rgba(255,255,255,0.9)',
+            borderRadius: 3,
+            borderSkipped: false,
+            barThickness: 5,
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          animation: { duration: 600 },
+          plugins: { legend: { display: false }, tooltip: { enabled: true, backgroundColor: 'rgba(15,23,42,0.92)', padding: 8, cornerRadius: 8, displayColors: false, callbacks: { title: () => 'Asistencia', label: (ctx) => `${ctx.parsed.y} presentes` } } },
+          scales: {
+            x: { display: false },
+            y: { display: false, beginAtZero: true, suggestedMax: Math.max(10, ...counts) },
+          }
+        }
+      });
+    } catch (e) {
+      Helpers.safeLog('warn', 'Attendance mini chart failed:', e?.message || e);
     }
   },
 

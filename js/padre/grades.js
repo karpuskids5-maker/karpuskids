@@ -1,4 +1,4 @@
-﻿import { supabase } from '../shared/supabase.js';
+import { supabase } from '../shared/supabase.js';
 import { AppState, TABLES } from './appState.js';
 import { Helpers, escapeHtml } from './helpers.js';
 import { fetchBoletin, downloadBoletinPDF } from '../shared/boletin-pdf.js';
@@ -264,6 +264,20 @@ export const GradesModule = {
       `;
 
       setTimeout(() => { if (window.lucide) lucide.createIcons(); }, 50);
+
+      // ✨ MEJORA: Guardar datos para el donut de progreso (mejora.md #44)
+      AppState.set('currentGrades', {
+        evidences: [
+          ...(averages || []).map(a => ({ score: Number(a.average || 0) })),
+          ...(grades || []).map(g => ({ score: Number(g.score || 0) })),
+        ],
+        averages,
+        grades,
+        report,
+        overallAvg
+      });
+      // Actualizar donut inmediatamente si la función existe (inyectada por main.js)
+      try { if (typeof window._updateAcademicProgressDonut === 'function') window._updateAcademicProgressDonut(AppState.get('currentGrades')); } catch (_) {}
 
       document.getElementById('btn-padre-boletin-pdf')?.addEventListener('click', async () => {
         try {

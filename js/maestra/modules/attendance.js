@@ -169,12 +169,13 @@ export async function initAttendance(options = {}) {
                 const statusMap = {
                   'present': { l: 'Presente', c: 'bg-emerald-100 text-emerald-700', i: 'check' },
                   'late':    { l: 'Tardanza', c: 'bg-amber-100 text-amber-700',   i: 'clock' },
+                  'excused': { l: 'Excusa',   c: 'bg-sky-100 text-sky-700',        i: 'shield-check' },
                   'absent':  { l: 'Ausente',  c: 'bg-rose-100 text-rose-700',     i: 'x' }
                 };
                 const st = statusMap[currentStatus] || { l: 'Sin marcar', c: 'bg-slate-100 text-slate-400', i: 'minus' };
 
                 return `
-                  <tr class="hover:bg-slate-50/50 transition-colors">
+                  <tr class="att-card hover:bg-slate-50/50 transition-colors" data-status="${currentStatus || ''}">
                     <td class="px-6 py-4">
                       <div class="flex items-center gap-3">
                         <div class="w-10 h-10 rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center font-black text-sm border-2 border-white shadow-sm overflow-hidden">
@@ -196,6 +197,9 @@ export async function initAttendance(options = {}) {
                         <button id="btn-${s.id}-late" onclick="App.registerAttendance('${s.id}', 'late')" class="w-9 h-9 rounded-xl flex items-center justify-center transition-all ${currentStatus === 'late' ? 'bg-amber-500 text-white shadow-lg' : 'bg-amber-50 text-amber-600 hover:bg-amber-100'}" title="Tardanza">
                           <i data-lucide="clock" class="w-4 h-4"></i>
                         </button>
+                        <button id="btn-${s.id}-excused" onclick="App.registerAttendance('${s.id}', 'excused')" class="w-9 h-9 rounded-xl flex items-center justify-center transition-all ${currentStatus === 'excused' ? 'bg-sky-500 text-white shadow-lg' : 'bg-sky-50 text-sky-600 hover:bg-sky-100'}" title="Excusa justificada">
+                          <i data-lucide="shield-check" class="w-4 h-4"></i>
+                        </button>
                         <button id="btn-${s.id}-absent" onclick="App.registerAttendance('${s.id}', 'absent')" class="w-9 h-9 rounded-xl flex items-center justify-center transition-all ${currentStatus === 'absent' ? 'bg-rose-500 text-white shadow-lg' : 'bg-rose-50 text-rose-600 hover:bg-rose-100'}" title="Falta">
                           <i data-lucide="user-x" class="w-4 h-4"></i>
                         </button>
@@ -208,22 +212,35 @@ export async function initAttendance(options = {}) {
           </table>
         </div>
 
-        <!-- 📱 VISTA TARJETAS (MÓVIL) -->
+        <!-- 📱 VISTA TARJETAS (MÓVIL) · Matriz por cuadrícula (Item #1) -->
         <div class="md:hidden grid grid-cols-2 gap-3 mb-20">
           ${students.map(s => {
             const currentStatus = attMap[s.id] || null;
-            const statusColor = currentStatus === 'present' ? 'ring-emerald-500 ring-4' : currentStatus === 'late' ? 'ring-amber-500 ring-4' : currentStatus === 'absent' ? 'opacity-40 grayscale' : 'ring-slate-100 ring-2';
-            
+            const statusColor = currentStatus === 'present' ? 'ring-emerald-500 ring-4' : currentStatus === 'late' ? 'ring-amber-500 ring-4' : currentStatus === 'excused' ? 'ring-sky-500 ring-4' : currentStatus === 'absent' ? 'opacity-40 grayscale' : 'ring-slate-100 ring-2';
+            const overlay = currentStatus === 'present' ? '<i data-lucide="check" class="text-white w-8 h-8 drop-shadow-md"></i>' : currentStatus === 'late' ? '<i data-lucide="clock" class="text-white w-8 h-8 drop-shadow-md"></i>' : currentStatus === 'excused' ? '<i data-lucide="shield-check" class="text-white w-8 h-8 drop-shadow-md"></i>' : '';
+            const overlayBg = currentStatus === 'present' ? 'bg-emerald-500/20' : currentStatus === 'late' ? 'bg-amber-500/20' : currentStatus === 'excused' ? 'bg-sky-500/20' : '';
+            const statusLabels = { present: 'presente', late: 'tarde', excused: 'excusa', absent: 'ausente' };
+            // Ciclo de 1 toque por los 4 estados: presente → tarde → ausente →
+            // excusa → presente. El maintaining marca "presente" directo.
+            const cycle = ['present', 'late', 'absent', 'excused'];
+            const next = cycle[(cycle.indexOf(currentStatus) + 1) % cycle.length];
+            const label = statusLabels[currentStatus] || 'sin marcar';
+
             return `
-              <div class="bg-white p-4 rounded-[2rem] border border-slate-100 shadow-sm flex flex-col items-center text-center gap-3 transition-all active:scale-95" onclick="App.registerAttendance('${s.id}', '${currentStatus === 'present' ? 'late' : currentStatus === 'late' ? 'absent' : 'present'}')">
+              <div class="att-card bg-white p-4 rounded-[2rem] border border-slate-100 shadow-sm flex flex-col items-center text-center gap-3 transition-all active:scale-95 cursor-pointer" data-status="${currentStatus || ''}" data-student-id="${s.id}"
+                   onclick="if(App.shouldIgnoreAttendanceClick?.())return;App.registerAttendance('${s.id}', '${next}')"
+                   onpointerdown="App.handleAttendancePointerDown?.(event, '${s.id}')"
+                   onpointerup="App.handleAttendancePointerUp?.(event, '${s.id}')"
+                   onpointerleave="App.cancelAttendanceLongPress?.()"
+                   onpointercancel="App.cancelAttendanceLongPress?.()"
+                   oncontextmenu="return false">
                 <div class="relative w-20 h-20 rounded-[1.5rem] overflow-hidden ${statusColor} transition-all duration-300">
                   ${s.avatar_url ? `<img src="${s.avatar_url}" class="w-full h-full object-cover">` : `<div class="w-full h-full flex items-center justify-center bg-orange-50 text-orange-500 font-black text-2xl">${s.name.charAt(0)}</div>`}
-                  ${currentStatus === 'present' ? '<div class="absolute inset-0 bg-emerald-500/20 flex items-center justify-center"><i data-lucide="check" class="text-white w-8 h-8 drop-shadow-md"></i></div>' : ''}
-                  ${currentStatus === 'late' ? '<div class="absolute inset-0 bg-amber-500/20 flex items-center justify-center"><i data-lucide="clock" class="text-white w-8 h-8 drop-shadow-md"></i></div>' : ''}
+                  ${overlay ? `<div class="absolute inset-0 ${overlayBg} flex items-center justify-center">${overlay}</div>` : ''}
                 </div>
                 <div class="min-w-0">
                   <p class="font-black text-slate-800 text-xs truncate w-full px-2 uppercase tracking-tight">${safeEscapeHTML(s.name.split(' ')[0])}</p>
-                  <p class="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">${currentStatus || 'Sin marcar'}</p>
+                  <p class="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">${label}</p>
                 </div>
               </div>
             `;
@@ -231,6 +248,17 @@ export async function initAttendance(options = {}) {
         </div>
       `;
       if (window.lucide) window.lucide.createIcons();
+
+      // 📊 Item #4 + #35: el header y el aforo leen de este evento. Se dispara
+      // tras cada render para que el contador "18/20" nunca quede en 0/0.
+      const _counts = {
+        total: students.length,
+        present: students.filter(s => attMap[s.id] === 'present').length,
+        late: students.filter(s => attMap[s.id] === 'late').length,
+        excused: students.filter(s => attMap[s.id] === 'excused').length,
+        absent: students.filter(s => attMap[s.id] === 'absent').length,
+      };
+      window.dispatchEvent(new CustomEvent('kk:attendance-rendered', { detail: _counts }));
   } catch (err) {
     Helpers.safeLog('error', 'Error en initAttendance:', err);
     listContainer.innerHTML = Helpers.errorState('Error al cargar asistencia');
@@ -337,66 +365,92 @@ export async function markAllPresent() {
 
 // 👆 Handlers para experiencia de asistencia Premium (Tocar/Mantener)
 let attendanceLongPressTimer = null;
+let attendanceLongPressFired = false;
 const _pendingAttendance = new Set();
 
-export function handleAttendancePointerDown(e, studentId) {
-  attendanceLongPressTimer = setTimeout(() => {
-    attendanceLongPressTimer = null;
-    Helpers.vibrate('heavy');
-    registerAttendance(studentId, 'late');
-  }, 600); // 600ms para marcar como tarde
-}
-
-export function handleAttendancePointerUp(e, studentId) {
+/** Cancela el maintaining sin registrar nada (al salir o cancelar el dedo). */
+export function cancelAttendanceLongPress() {
   if (attendanceLongPressTimer) {
     clearTimeout(attendanceLongPressTimer);
     attendanceLongPressTimer = null;
-    Helpers.vibrate('light');
-    registerAttendance(studentId, 'present');
   }
 }
 
+export function handleAttendancePointerDown(e, studentId) {
+  cancelAttendanceLongPress();
+  attendanceLongPressFired = false;
+  attendanceLongPressTimer = setTimeout(() => {
+    attendanceLongPressTimer = null;
+    attendanceLongPressFired = true;
+    Helpers.vibrate('heavy');
+    // Mantener = "Presente" directo. El toque ya recorre los 4 estados.
+    registerAttendance(studentId, 'present');
+  }, 600); // 600ms
+}
+
+export function handleAttendancePointerUp(e, studentId) {
+  if (!attendanceLongPressTimer) return;
+  cancelAttendanceLongPress();
+  if (!studentId) return;
+  Helpers.vibrate('light');
+  registerAttendance(studentId, 'present');
+}
+
+/** Evita que el `click` del navegador dispare un segundo cambio tras mantener. */
+export function shouldIgnoreAttendanceClick() {
+  if (!attendanceLongPressFired) return false;
+  attendanceLongPressFired = false;
+  return true;
+}
+
 export async function registerAttendance(studentId, status) {
+  if (!studentId || !status) return;
   if (_pendingAttendance.has(studentId)) return;
   _pendingAttendance.add(studentId);
   const classroom = AppState.get('classroom');
   const today = new Date().toISOString().split('T')[0];
-  if (!studentId || !status) return;
 
   // ✅ OPTIMISTIC UI: Feedback visual inmediato
-  const btnPresent = document.getElementById(`btn-${studentId}-present`);
-  const btnLate = document.getElementById(`btn-${studentId}-late`);
-  const btnAbsent = document.getElementById(`btn-${studentId}-absent`);
-  const prevStates = [btnPresent, btnLate, btnAbsent].map(b => ({ cls: b?.className, id: b?.id }));
+  const STATUS_BTNS = ['present', 'late', 'absent', 'excused'];
+  const prevStates = STATUS_BTNS
+    .map(st => document.getElementById(`btn-${studentId}-${st}`))
+    .map(b => ({ cls: b?.className, id: b?.id }));
 
   const updateUI = (newStatus) => {
-    [btnPresent, btnLate, btnAbsent].forEach(b => {
+    STATUS_BTNS.forEach(st => {
+      const b = document.getElementById(`btn-${studentId}-${st}`);
       if (b) {
         b.className = b.className.replace(/bg-\w+-500 text-white shadow-lg/g, '');
         b.classList.add('bg-slate-50', 'text-slate-600');
       }
     });
-    if (newStatus === 'present') {
-      btnPresent?.classList.remove('bg-slate-50', 'text-slate-600');
-      btnPresent?.classList.add('bg-emerald-500', 'text-white', 'shadow-lg');
-    } else if (newStatus === 'late') {
-      btnLate?.classList.remove('bg-slate-50', 'text-slate-600');
-      btnLate?.classList.add('bg-amber-500', 'text-white', 'shadow-lg');
-    } else if (newStatus === 'absent') {
-      btnAbsent?.classList.remove('bg-slate-50', 'text-slate-600');
-      btnAbsent?.classList.add('bg-rose-500', 'text-white', 'shadow-lg');
+    const active = document.getElementById(`btn-${studentId}-${newStatus}`);
+    if (active) {
+      const tone = {
+        present: ['bg-emerald-500', 'text-white', 'shadow-lg'],
+        late:    ['bg-amber-500',   'text-white', 'shadow-lg'],
+        absent:  ['bg-rose-500',    'text-white', 'shadow-lg'],
+        excused: ['bg-sky-500',     'text-white', 'shadow-lg'],
+      }[newStatus];
+      if (tone) {
+        active.classList.remove('bg-slate-50', 'text-slate-600');
+        active.classList.add(...tone);
+      }
     }
   };
 
   updateUI(status);
 
   try {
-    let statusLiteral = status === 'present' ? 'Presente' : status === 'late' ? 'Tarde' : 'Ausente';
+    const STATUS_LABELS = {
+      present: 'Presente', late: 'Tardanza', absent: 'Ausente', excused: 'Excusa'
+    };
+    const statusLiteral = STATUS_LABELS[status] || status;
     const now = new Date().toISOString();
 
     const attRecord = { student_id: studentId, classroom_id: classroom?.id, date: today, status };
     // Record real arrival/departure time
-    if (status === 'present' || status === 'late') {
+    if (status === 'present' || status === 'late' || status === 'excused') {
       attRecord.check_in = now;
     } else if (status === 'absent') {
       attRecord.check_out = now;

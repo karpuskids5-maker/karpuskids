@@ -323,11 +323,10 @@ class CarnetsManager {
     const { jsPDF } = window.jspdf || {};
     if (!jsPDF) throw new Error('Librería jsPDF no disponible');
 
-    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-    const totalPages = students.length;
+    // Cada hoja tiene exactamente el tamaño del carnet — sin márgenes ni sobrantes
+    const cardFormat = [CARD_W, CARD_H];
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: cardFormat });
     const now = new Date();
-    const dateStr = now.toLocaleDateString('es-ES');
-    const timeStr = now.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
 
     await this._loadLogo();
 
@@ -338,22 +337,19 @@ class CarnetsManager {
       this._updateProgress(`Generando QR ${i + 1} de ${students.length}`, ((i + 1) / students.length) * 40);
     }
 
-    // 1 hoja A4 por estudiante: FRENTE centrado arriba, REVERSO centrado abajo.
-    const cardX = (PAGE_W - CARD_W) / 2;
-    const frontY = PAGE_H / 4 - CARD_H / 2;
-    const backY = (PAGE_H * 3) / 4 - CARD_H / 2;
-
+    // Cada estudiante genera 2 hojas: frente y reverso, cada una exactamente CARD_W × CARD_H
+    let firstPage = true;
     for (let i = 0; i < students.length; i++) {
-      if (i > 0) doc.addPage('a4', 'portrait');
       const s = students[i];
 
-      this._drawPageBackground(doc);
-      this._drawFooter(doc, `Carnet ${i + 1} de ${students.length} · Frente + Reverso`, students.length, dateStr, timeStr);
+      // --- Frente ---
+      if (!firstPage) doc.addPage(cardFormat, 'landscape');
+      firstPage = false;
+      this._drawFrontCard(doc, s, 0, 0, this._qrCache[s.id]);
 
-      this._drawFrontCard(doc, s, cardX, frontY, this._qrCache[s.id]);
-      this._drawCutMarks(doc, cardX, frontY);
-      this._drawBackCard(doc, s, cardX, backY);
-      this._drawCutMarks(doc, cardX, backY);
+      // --- Reverso ---
+      doc.addPage(cardFormat, 'landscape');
+      this._drawBackCard(doc, s, 0, 0);
 
       this._updateProgress(`Generando carnet ${i + 1} de ${students.length}`, 40 + ((i + 1) / students.length) * 58);
     }
@@ -415,9 +411,6 @@ class CarnetsManager {
 
     doc.setFillColor(255, 255, 255);
     doc.roundedRect(x, y, w, h, 2, 2, 'F');
-    doc.setDrawColor(...GREEN.light);
-    doc.setLineWidth(0.3);
-    doc.roundedRect(x, y, w, h, 2, 2, 'S');
 
     this._drawCardBackground(doc, x, y, w, h);
 
@@ -608,9 +601,6 @@ class CarnetsManager {
 
     doc.setFillColor(255, 255, 255);
     doc.roundedRect(x, y, w, h, 2, 2, 'F');
-    doc.setDrawColor(...GREEN.light);
-    doc.setLineWidth(0.3);
-    doc.roundedRect(x, y, w, h, 2, 2, 'S');
 
     this._drawCardBackground(doc, x, y, w, h);
 
@@ -652,12 +642,12 @@ class CarnetsManager {
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(3);
     doc.setTextColor(...GREEN.darkText);
-    doc.text('🔒 Este carnet es propiedad de la Estancia Karpus Kids.', cx, textY, { align: 'center' });
+    doc.text('Este carnet es propiedad de la Estancia Karpus Kids.', cx, textY, { align: 'center' });
     textY += 2.8;
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(2.8);
     doc.setTextColor(...GREEN.slate);
-    doc.text('En caso de pérdida favor devolver a la institución.', cx, textY, { align: 'center' });
+    doc.text('En caso de perdida favor devolver a la institucion.', cx, textY, { align: 'center' });
 
     const line2Y = textY + 2;
     doc.setDrawColor(...GREEN.primary);
@@ -668,16 +658,16 @@ class CarnetsManager {
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(2.8);
     doc.setTextColor(...GREEN.dark);
-    doc.text('📞 ' + INSTITUTIONAL.phone, cx, contactY, { align: 'center' });
+    doc.text('Tel: ' + INSTITUTIONAL.phone, cx, contactY, { align: 'center' });
     contactY += 3.8;
-    doc.text('✉️ ' + INSTITUTIONAL.email, cx, contactY, { align: 'center' });
+    doc.text('Email: ' + INSTITUTIONAL.email, cx, contactY, { align: 'center' });
     contactY += 3.8;
-    doc.text('🌐 ' + INSTITUTIONAL.facebook + ' · ' + INSTITUTIONAL.instagram + ' · ' + INSTITUTIONAL.tiktok, cx, contactY, { align: 'center' });
+    doc.text(INSTITUTIONAL.facebook + '  ' + INSTITUTIONAL.instagram + '  ' + INSTITUTIONAL.tiktok, cx, contactY, { align: 'center' });
     contactY += 3.8;
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(2.5);
     doc.setTextColor(...GREEN.slate);
-    doc.text('📍 ' + INSTITUTIONAL.address, cx, contactY, { align: 'center' });
+    doc.text('Dir: ' + INSTITUTIONAL.address, cx, contactY, { align: 'center' });
 
     doc.setFillColor(...GREEN.primary);
     doc.roundedRect(x, y + h - 2.5, w, 2.5, 0, 0, 'F');

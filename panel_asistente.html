@@ -835,6 +835,18 @@
             </div>
           </div>
 
+          <!-- Item #23: Mini-chart asistencia semanal (últimos 7 días) -->
+          <div class="bg-gradient-to-br from-teal-600 to-emerald-700 rounded-2xl p-5 text-white shadow-md relative overflow-hidden">
+            <div class="flex items-center justify-between mb-1 relative z-10">
+              <h3 class="text-sm font-black flex items-center gap-2">
+                <span class="w-2 h-5 bg-white/70 rounded-full"></span> Asistencia 7 días
+              </h3>
+              <span class="text-[10px] font-black uppercase tracking-widest text-white/70">presentes/día</span>
+            </div>
+            <div class="h-40 relative z-10"><canvas id="attendanceMiniChart"></canvas></div>
+            <i data-lucide="activity" class="absolute -bottom-6 -right-4 w-28 h-28 text-white/10 -rotate-12"></i>
+          </div>
+
           <!-- Income chart -->
           <div class="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
             <h3 class="text-sm font-black text-slate-700 mb-4 flex items-center gap-2">
@@ -854,12 +866,40 @@
             <h2 class="text-2xl font-black text-slate-800 tracking-tight">Gestión de Alumnos</h2>
             <p class="text-sm text-slate-400 font-medium">Administra la base de datos de estudiantes</p>
           </div>
-          <div class="flex items-center gap-3">
-            <div class="relative flex-1 md:w-80 group">
+          <div class="flex flex-wrap items-center gap-3">
+            <div class="relative flex-1 md:w-64 group">
               <i data-lucide="search" class="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-teal-500 transition-colors"></i>
               <input type="text" id="searchStudentInput" placeholder="Buscar por nombre o matrícula..."
                 class="w-full pl-12 pr-4 py-3 bg-white border-2 border-slate-100 rounded-2xl text-sm font-bold text-slate-700 outline-none focus:border-teal-400 focus:ring-4 focus:ring-teal-50 transition-all shadow-sm">
             </div>
+
+            <!-- Item #11: filtro de aula (poblado dinámicamente por students.js) -->
+            <div class="relative">
+              <i data-lucide="school" class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none"></i>
+              <select id="filterStudentClassroom"
+                class="appearance-none pl-10 pr-9 py-3 bg-white border-2 border-slate-100 rounded-2xl text-sm font-bold text-slate-700 outline-none focus:border-teal-400 focus:ring-4 focus:ring-teal-50 transition-all shadow-sm cursor-pointer">
+                <option value="">Todas las aulas</option>
+              </select>
+            </div>
+
+            <!-- Item #12: filtro de estado operativo -->
+            <div class="relative">
+              <i data-lucide="toggle-left" class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none"></i>
+              <select id="filterStudentStatus"
+                class="appearance-none pl-10 pr-9 py-3 bg-white border-2 border-slate-100 rounded-2xl text-sm font-bold text-slate-700 outline-none focus:border-teal-400 focus:ring-4 focus:ring-teal-50 transition-all shadow-sm cursor-pointer">
+                <option value="">Activos e inactivos</option>
+                <option value="active">Solo activos</option>
+                <option value="inactive">Solo inactivos</option>
+              </select>
+            </div>
+
+            <!-- Item #20: exportar / imprimir lista -->
+            <button id="btnExportStudents" onclick="window.App.students?._exportList?.()"
+              class="px-4 py-3 bg-violet-50 text-violet-700 border border-violet-200 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-violet-100 transition-all active:scale-95 flex items-center gap-2 shrink-0"
+              title="Exportar lista de estudiantes a CSV">
+              <i data-lucide="download" class="w-4 h-4"></i> Exportar
+            </button>
+
             <button id="btnCarnetsAssistant" onclick="App.carnets.openModal()" class="px-4 py-3 bg-green-50 text-green-700 border border-green-200 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-green-100 transition-all active:scale-95 flex items-center gap-2 shrink-0">
               <i data-lucide="badge-check" class="w-4 h-4"></i> Carnets
             </button>
@@ -867,6 +907,14 @@
               <i data-lucide="user-plus" class="w-4 h-4"></i> Nuevo
             </button>
           </div>
+        </div>
+
+        <!-- Resumen de resultados + paginación (el contenedor de paginación lo
+             crea el JS; este span lo rellena StudentsModule._renderPageContent) -->
+        <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
+          <span id="studentsResultMeta" class="text-xs font-bold text-slate-400 uppercase tracking-widest">
+            <i data-lucide="users" class="w-3.5 h-3.5 inline mr-1.5 -mt-0.5"></i> Cargando estudiantes...
+          </span>
         </div>
 
         <div class="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
@@ -877,6 +925,8 @@
                   <th class="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-[0.15em]">Estudiante / Matrícula</th>
                   <th class="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-[0.15em]">Aula / Nivel</th>
                   <th class="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-[0.15em]">Padre / Tutor</th>
+                  <!-- Item #18: contacto de emergencia siempre visible -->
+                  <th class="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-[0.15em]">Contacto Emergencia</th>
                   <th class="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-[0.15em]">Acciones Rápidas</th>
                 </tr>
               </thead>
@@ -934,8 +984,28 @@
           </select>
         </div>
 
-        <div id="preregList" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-          <!-- Cards inyectadas por JS -->
+        <!-- Item #1: tabla SaaS divide-y.
+             IMPORTANTE: InscripcionesModule.render() inyecta filas de tabla
+             (7 columnas + un empty-state con colspan 7). Por eso el contenedor
+             debe ser un tbody, NO un div con display:grid (rompía el layout). -->
+        <div class="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse kk-table-cards min-w-[900px]">
+              <thead class="bg-slate-50 border-b border-slate-100 sticky top-0 z-10">
+                <tr>
+                  <th class="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-[0.15em]">Estudiante</th>
+                  <th class="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-[0.15em]">Padres</th>
+                  <th class="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-[0.15em]">Contacto</th>
+                  <th class="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-[0.15em]">Nivel / Horario</th>
+                  <th class="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-[0.15em]">Fecha</th>
+                  <th class="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-[0.15em]">Estado</th>
+                  <th class="px-4 py-3 text-right text-[10px] font-black text-slate-400 uppercase tracking-[0.15em]">Acciones</th>
+                </tr>
+              </thead>
+              <!-- El id que busca el módulo: es el tbody -->
+              <tbody id="preregList" class="divide-y divide-slate-50"></tbody>
+            </table>
+          </div>
         </div>
       </section>
 
@@ -1126,9 +1196,18 @@
             </h1>
             <p class="text-sm text-slate-400 font-medium mt-1">Monitoreo en tiempo real de entradas y salidas</p>
           </div>
-          <div class="flex gap-3">
-            <button id="btnExportExcel" class="px-6 py-3 bg-white text-emerald-600 border-2 border-emerald-50 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-emerald-50 transition-all shadow-sm flex items-center gap-2">
+          <div class="flex flex-wrap gap-3">
+            <!-- Item #34: exportar accesos a CSV -->
+            <button id="btnExportExcel" onclick="window.App.access?._exportToCSV?.()" class="px-6 py-3 bg-white text-emerald-600 border-2 border-emerald-50 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-emerald-50 transition-all shadow-sm flex items-center gap-2">
               <i data-lucide="file-spreadsheet" class="w-4 h-4"></i> Exportar Reporte
+            </button>
+            <!-- Item #32: activar el escáner de carnet desde el propio panel -->
+            <button id="btnAccessScannerVisible" onclick="window.App?.access?.openScanner?.()" class="px-6 py-3 bg-white text-teal-600 border-2 border-teal-50 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-teal-50 transition-all shadow-sm flex items-center gap-2">
+              <i data-lucide="scan-line" class="w-4 h-4"></i> Escanear Carnet
+            </button>
+            <!-- Modo exterior: pantalla de alto contraste para el punto de acceso -->
+            <button id="btnExteriorMode" class="px-6 py-3 bg-slate-800 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-900 transition-all shadow-lg flex items-center gap-2">
+              <i data-lucide="sun-dim" class="w-4 h-4"></i> Modo Exterior
             </button>
             <a href="attendance-live.html" target="_blank" class="px-8 py-3 bg-orange-500 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-orange-200 hover:bg-orange-600 hover:-translate-y-0.5 transition-all flex items-center gap-2">
               <i data-lucide="maximize" class="w-4 h-4"></i> Abrir Terminal de Ponche
@@ -1236,6 +1315,8 @@
                   <th class="px-4 py-3 text-center text-[10px] font-black text-slate-400 uppercase tracking-wider">Entrada</th>
                   <th class="px-4 py-3 text-center text-[10px] font-black text-slate-400 uppercase tracking-wider">Salida</th>
                   <th class="px-4 py-3 text-center text-[10px] font-black text-slate-400 uppercase tracking-wider">Estado</th>
+                  <!-- Item #21: el método de registro evita conflitar "tarde" con scanner -->
+                  <th class="px-4 py-3 text-center text-[10px] font-black text-slate-400 uppercase tracking-wider">Método</th>
                 </tr>
               </thead>
               <tbody id="accessTableBody" class="divide-y divide-slate-50">
@@ -1516,8 +1597,15 @@
               <button data-status="overdue" class="status-pill px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200">Vencido</button>
             </div>
 
+            <!-- Item #20: exportar pagos a CSV (respeta los filtros activos) -->
+            <button id="btnExportPaymentsCSV" onclick="window.App?.payments?._exportPaymentsCSV?.()"
+              class="p-2 text-teal-500 hover:text-teal-700 hover:bg-teal-50 rounded-xl border border-teal-100 transition-all ml-auto"
+              title="Exportar pagos filtrados a CSV">
+              <i data-lucide="download" class="w-4 h-4"></i>
+            </button>
+
             <!-- Refresh -->
-            <button id="btnRefreshPayments" class="p-2 text-slate-400 hover:text-teal-600 hover:bg-teal-50 rounded-xl border border-slate-100 transition-all ml-auto" title="Actualizar">
+            <button id="btnRefreshPayments" class="p-2 text-slate-400 hover:text-teal-600 hover:bg-teal-50 rounded-xl border border-slate-100 transition-all" title="Actualizar">
               <i data-lucide="refresh-cw" class="w-4 h-4"></i>
             </button>
           </div>
@@ -1849,6 +1937,22 @@
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('/OneSignalSDKWorker.js', { scope: '/' })
           .then(() => {})
+          .catch(() => {});
+
+        // App shell offline (FASE F). Se registra DESPUÉS de OneSignal para no
+        // replacing su worker; el SW propio solo cachea estáticos same-origin.
+        navigator.serviceWorker.register('/sw.js', { scope: '/' })
+          .then((reg) => {
+            reg.addEventListener('updatefound', () => {
+              const sw = reg.installing;
+              if (!sw) return;
+              sw.addEventListener('statechange', () => {
+                if (sw.state === 'installed' && navigator.serviceWorker.controller) {
+                  window.dispatchEvent(new CustomEvent('kk:sw-update'));
+                }
+              });
+            });
+          })
           .catch(() => {});
       });
     }

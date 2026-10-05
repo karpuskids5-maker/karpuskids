@@ -1310,6 +1310,11 @@
         navigator.serviceWorker.register('/OneSignalSDKWorker.js', { scope: '/' })
           .then(() => {})
           .catch(() => {});
+
+        // App shell offline (FASE F). Después de OneSignal para no replace su worker.
+        navigator.serviceWorker.register('/sw.js', { scope: '/' })
+          .then(() => {})
+          .catch(() => {});
       });
     }
 

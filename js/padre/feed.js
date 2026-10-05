@@ -18,11 +18,18 @@ if (!window.WallModule) {
     sendComment: (...a) => WallModule.sendComment(...a),
     deletePost: (...a) => WallModule.deletePost(...a),
     toggleLike: (...a) => WallModule.toggleLike(...a),
+    // Reacciones — los onclick inline de openReactionPicker las invocan por
+    // la variable global, así que deben estar expuestas aquí.
+    toggleReaction: (...a) => WallModule.toggleReaction(...a),
+    openReactionPicker: (...a) => WallModule.openReactionPicker(...a),
+    closeReactionPicker: (...a) => WallModule.closeReactionPicker(...a),
+    // Lightbox de dos columnas (media + conversación)
+    openLightbox: (...a) => WallModule.openLightbox(...a),
+    openLightboxFromPost: (...a) => WallModule.openLightboxFromPost(...a),
+    closeLightbox: (...a) => WallModule.closeLightbox(...a),
     // Video — muro mostrará el fotograma (poster) antes de reproducir
     playVideoCard: (...a) => WallModule.playVideoCard(...a),
     _mountVideo: (...a) => WallModule._mountVideo(...a),
-    playVideo: (...a) => WallModule.playVideo(...a),
-    _mountVideoPreview: (...a) => WallModule._mountVideoPreview(...a),
     _showVideoPreview: (...a) => WallModule._showVideoPreview(...a),
     _hideVideoPreview: (...a) => WallModule._hideVideoPreview(...a),
     _onVideoError: (...a) => WallModule._onVideoError(...a),
@@ -37,6 +44,7 @@ if (!window.WallModule) {
 export const FeedModule = {
   _classroomId: null,
   _channel: null,
+  _videoObserver: null,
 
   /**
    * Inicializa el muro
@@ -53,6 +61,79 @@ export const FeedModule = {
       classroomId: student.classroom_id,
       parentId: parent.id // Pasar parentId explícitamente para RLS
     }, AppState);
+
+    // ✨ MEJORAS mejora.md — Confetti like + pausa videos
+    setTimeout(() => {
+      try { FeedModule._setupHeartExplode(); } catch (e) { console.warn('[OPT] heart:', e); }
+      try { FeedModule._setupSmartVideoPause(); } catch (e) { console.warn('[OPT] video:', e); }
+    }, 600);
+  },
+
+  /**
+   * 💖 Heart-explode: Confetti al dar me gusta a una publicación
+   */
+  _setupHeartExplode() {
+    Helpers.delegate(document.body, '[data-action="like"]', 'click', (_e, btn) => {
+      const wasLiked = btn.classList.contains('text-orange-600');
+      // Si NO estaba likeado → lanzar confetti (al dar like)
+      if (!wasLiked) {
+        Helpers.vibrate?.('light');
+        const rect = btn.getBoundingClientRect();
+        const origin = {
+          x: (rect.left + rect.width / 2) / window.innerWidth,
+          y: (rect.top  + rect.height / 2) / window.innerHeight,
+        };
+        if (window.confetti) {
+          confetti({
+            particleCount: 45,
+            spread: 65,
+            origin,
+            colors: ['#f43f5e','#fb7185','#fda4af','#fecaca','#fff1f2'],
+            startVelocity: 35,
+            gravity: 1.2,
+            scalar: 0.8,
+            ticks: 80
+          });
+        }
+        // CSS visual: añadir clase heart-explode al icono
+        const icon = btn.querySelector('[data-lucide="heart"], i.heart');
+        if (icon) {
+          icon.classList.add('heart-explode');
+          setTimeout(() => icon.classList.remove('heart-explode'), 700);
+        }
+      }
+    });
+  },
+
+  /**
+   * ⏯️  Pausado inteligente de videos al hacer scroll fuera de viewport
+   */
+  _setupSmartVideoPause() {
+    if (!('IntersectionObserver' in window)) return;
+    if (FeedModule._videoObserver) FeedModule._videoObserver.disconnect();
+
+    FeedModule._videoObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        const v = entry.target;
+        if (v.tagName !== 'VIDEO') return;
+        if (!entry.isIntersecting || entry.intersectionRatio < 0.4) {
+          if (!v.paused) { v.pause(); }
+        } else {
+          // Entró en viewport: reproducir silenciosamente (autoplay muted policy)
+          if (v.paused && v.hasAttribute('data-smart-play')) {
+            const p = v.play();
+            if (p && typeof p.catch === 'function') p.catch(() => {});
+          }
+        }
+      });
+    }, { threshold: [0, 0.4, 1] });
+
+    document.querySelectorAll('#classFeed video, .wall-img video').forEach(v => {
+      v.muted = true;
+      v.setAttribute('data-smart-play', 'true');
+      v.setAttribute('playsinline', 'true');
+      FeedModule._videoObserver.observe(v);
+    });
   },
 
   /**

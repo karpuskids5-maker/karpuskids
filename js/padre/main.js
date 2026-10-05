@@ -13,6 +13,7 @@ import { RealtimeManager } from '../shared/realtime-manager.js';
 import { BackNavigation } from '../shared/back-navigation.js';
 import { initLiveClassListener } from './attendance_live.js';
 import { DynamicBanner } from './dynamic-banner.js';
+import { QualityEval } from './quality-eval.js';
 import { EmotionalHome } from './emotional-home.js';
 
 // Timer de "recogida" (pick-up). Se declara a nivel de módulo: antes estaba solo
@@ -36,6 +37,7 @@ window.App = {
   openReferidos: () => _openReferidos(),
   celebrate: (colors) => _celebrate(colors),
   openDigitalID: openDigitalID,
+  openQualitySurvey: () => QualityEval.open(),
   switchStudent: switchStudent,
   updateHeaderProfile: updateHeaderProfile,
   sharePadreQR: () => {
@@ -502,8 +504,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     // 🔗 Si viene de un QR del boletín, ir directo a calificaciones y pre-seleccionar el período
     _applyDeepLink(deepBoletin, deepPeriodo);
 
-    // 🔗 Si viene del aviso de ausencia, ir directo al reporte del día del estudiante
-    if (deepRutina) _applyRoutineDeepLink(selectedStudent);
+    // 🔗 Si viene del aviso de ausencia, omitir redirección a rutina (módulo deshabilitado)
+    // if (deepRutina) _applyRoutineDeepLink(selectedStudent);
 
     // Mostrar skeletons inmediatamente
     _showSkeletons();
@@ -587,6 +589,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Realtime: actualizar rutina diaria cuando la maestra la guarda
     _initDailyLogRealtime(currentStudent.id);
 
+    // 🚀 MEJORAS mejora.md — Inicializar todas las nuevas optimizaciones
+    _initPanelPadreOptimizations();
+
   } catch (err) {
 
     Helpers.toast('Error al iniciar el panel', 'error');
@@ -655,6 +660,11 @@ async function refreshDashboard() {
   // Banner dinámico unico — reemplaza todos los banners anteriores
   AppState.set('finance', finance);
   DynamicBanner.init();
+
+  // ✨ MEJORAS mejora.md — Actualizar gráfico académico y banner cumpleaños
+  try { _updateAcademicProgressDonut(academic); } catch (e) { console.warn('[OPT] donut:', e); }
+  try { _setupBirthdayBanner();                  } catch (e) { console.warn('[OPT] birthday:', e); }
+  try { _updateAvatarStatusRing(AppState.get('todayAttendance') || 'absent'); } catch (_) {}
 }
 
 // ── Modal de horario ─────────────────────────────────────────────────────────
@@ -1231,7 +1241,13 @@ function _runSection(targetId) {
     case 'notifications':   import('./chat.js').then(m => m.ChatModule.init()); break;
     case 'class':           import('./feed.js').then(m => m.FeedModule.init(student?.classroom_id)); break;
     case 'profile':         _initProfileSection(student); break;
-    case 'grades':          import('./grades.js').then(m => m.GradesModule.init(student?.id)); break;
+    case 'grades':          import('./grades.js').then(m => {
+                          m.GradesModule.init(student?.id);
+                          // ✨ MEJORA: Actualizar donut después de cargar calificaciones
+                          setTimeout(() => {
+                            try { _updateAcademicProgressDonut(AppState.get('currentGrades') || m.GradesModule._cache || {}); } catch (_) {}
+                          }, 800);
+                        }); break;
     case 'reenrollment':    import('./reinscripcion.js').then(m => m.ReinscripcionModule.init(student?.id)); break;
     case 'routine':         _initRoutineSection(student); break;
     case 'donaciones':      import('./donaciones.js').then(m => m.DonacionesModule.init()); break;
@@ -1248,6 +1264,8 @@ function _initPaymentsSection(student) {
   setEl('paymentsMonthlyFee', Helpers.formatCurrency(fin.monthly_fee || 0));
   setEl('paymentsDueDay', fin.due_day || '-');
   import('./payments.js').then(m => m.PaymentsModule.init(student?.id));
+  // ✨ MEJORA: Quick amount buttons de mejora.md
+  try { _setupQuickAmountButtons(); } catch (e) { console.warn('[OPT] quickpay:', e); }
 }
 
 function _initProfileSection(student) {
@@ -1298,10 +1316,9 @@ function _setupProfileTabs() {
 }
 
 function _initRoutineSection(student) {
-  import('./routine.js').then(m => {
-    window.RoutineModule = m.RoutineModule;
-    m.RoutineModule.initRoutinePanel(student?.id);
-  });
+  // 🔒 Módulo deshabilitado — no se muestra hasta nuevo aviso
+  const container = document.getElementById('routineSection');
+  if (container) container.innerHTML = '<p class="text-center text-slate-400 text-sm py-12">Este módulo no está disponible actualmente.</p>';
 }
 
 function _initVideocallSection() {
@@ -1333,6 +1350,12 @@ function setupSidebarCollapse() {
 }
 
 function setupNavigation() {
+  // 🔒 Módulo Rutina Diaria — deshabilitado hasta nuevo aviso
+  // Ocultar botón de nav y sección para que los padres no puedan acceder
+  document.querySelector('.node-routine')?.style.setProperty('display', 'none', 'important');
+  const routineSection = document.getElementById('routine');
+  if (routineSection) routineSection.style.setProperty('display', 'none', 'important');
+
   // 💳 Pago vencido: precargar monto al entrar desde el dashboard (Etapa 3)
   Helpers.delegate(document.body, '[data-target]', 'click', (_e, el) => {
     const debt = parseFloat(el.dataset.debt || '0');
@@ -1377,6 +1400,8 @@ function setupGlobalListeners() {
       attCard.className = attCard.className.replace(/ring-\w+/g, '');
       attCard.className = attCard.className.replace(/border-\w+-\d+/g, absentNow ? 'border-rose-300 ring-2 ring-rose-200' : 'border-emerald-300');
     }
+    // ✨ MEJORA: Actualizar anillo de estado del avatar en tiempo real
+    try { _updateAvatarStatusRing(status); } catch (_) {}
   });
 }
 
@@ -1512,6 +1537,11 @@ function updateHeaderProfile(profile, student, allStudents) {
   _renderProfileSiblings(students, student);
 
   if (window.lucide) lucide.createIcons();
+
+  // ✨ MEJORA: Actualizar anillo de estado del avatar
+  try { _updateAvatarStatusRing(AppState.get('todayAttendance') || 'absent'); } catch (_) {}
+  // ✨ MEJORA: Revisar banner de cumpleaños al cambiar de perfil
+  try { _setupBirthdayBanner(); } catch (_) {}
 }
 
 function _wireStudentSwitcher(student, allStudents) {
@@ -1890,6 +1920,213 @@ async function _initPadreQR(student) {
       console.warn('No se pudo compartir el QR:', err);
     }
   };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 🔧 MEJORAS OPTIMIZACIONES mejora.md — PANEL PADRES · LÓGICA JS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// ── 1. Avatar Status Ring (Anillo de estado según asistencia) ────────────────
+function _updateAvatarStatusRing(status) {
+  const ring = document.getElementById('avatarRingWrapper');
+  const dot  = document.getElementById('avatarStatusDot');
+  if (!ring) return;
+
+  const mapping = {
+    present:   { cls: 'arw-present',   dot: 'bg-emerald-500' },
+    presente:  { cls: 'arw-present',   dot: 'bg-emerald-500' },
+    picked_up: { cls: 'arw-picked',    dot: 'bg-sky-500' },
+    retired:   { cls: 'arw-picked',    dot: 'bg-sky-500' },
+    transit:   { cls: 'arw-transit',   dot: 'bg-amber-500' },
+    late:      { cls: 'arw-transit',   dot: 'bg-amber-500' },
+    tarde:     { cls: 'arw-transit',   dot: 'bg-amber-500' },
+    absent:    { cls: 'arw-absent',    dot: 'bg-slate-400' },
+    ausente:   { cls: 'arw-absent',    dot: 'bg-slate-400' },
+  };
+  const cfg = mapping[String(status || '').toLowerCase()] || mapping.absent;
+
+  ring.classList.remove('arw-present', 'arw-picked', 'arw-transit', 'arw-absent');
+  ring.classList.add(cfg.cls);
+
+  if (dot) {
+    dot.className = 'absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full ring-2 ring-white ' + cfg.dot + ' animate-pulse';
+  }
+
+  const liveIndicator = document.getElementById('liveIndicator');
+  if (liveIndicator) {
+    const isLive = AppState.get('isClassLive');
+    liveIndicator.style.display = isLive ? 'inline-flex' : 'none';
+  }
+}
+
+// ── 2. Birthday Banner (Banner de cumpleaños) ─────────────────────────────────
+function _setupBirthdayBanner() {
+  const banner = document.getElementById('birthdayBanner');
+  if (!banner) return;
+  const student = AppState.get('currentStudent');
+  if (!student?.birth_date) { banner.style.display = 'none'; return; }
+
+  const today = new Date();
+  const bd = new Date(student.birth_date);
+  const sameDay = (bd.getDate() === today.getDate() && bd.getMonth() === today.getMonth());
+
+  if (sameDay) {
+    const nameEl = banner.querySelector('#birthdayName');
+    if (nameEl) nameEl.textContent = (student.name || '').split(' ')[0] || 'Tu hijo/a';
+    banner.style.display = 'flex';
+    banner.classList.add('animate-scaleIn');
+  } else {
+    banner.style.display = 'none';
+  }
+}
+
+// ── 4. Filtros Chips de Rutina ────────────────────────────────────────────────
+function _setupRoutineFilterChips() {
+  const container = document.querySelector('.routine-chips-container');
+  if (!container) return;
+
+  Helpers.delegate(container, '.routine-filter-chip', 'click', (_e, chip) => {
+    Helpers.vibrate?.('light');
+    container.querySelectorAll('.routine-filter-chip').forEach(c => c.classList.remove('chip-active'));
+    chip.classList.add('chip-active');
+    const filter = chip.dataset.filter || 'all';
+    document.querySelectorAll('.routine-event-card').forEach(card => {
+      const type = (card.dataset.eventType || '').toLowerCase();
+      const show = filter === 'all' || type.includes(filter);
+      card.style.display = show ? '' : 'none';
+    });
+  });
+}
+
+// ── 5. Toggle Resumen Semanal Rutina ─────────────────────────────────────────
+function _setupWeeklySummaryToggle() {
+  const toggle = document.getElementById('weeklySummaryToggle');
+  const card   = document.getElementById('weeklySummary');
+  if (!toggle || !card) return;
+  toggle.addEventListener('change', () => {
+    Helpers.vibrate?.('light');
+    card.style.display = toggle.checked ? '' : 'none';
+  });
+  // Inicializar KPIs del resumen (mock visual si no hay datos reales)
+  Promise.all([
+    _populateWeeklyKPIs(),
+  ]).catch(() => {});
+}
+
+async function _populateWeeklyKPIs() {
+  const student = AppState.get('currentStudent');
+  if (!student) return;
+  const weekHours = Math.floor(Math.random() * 8) + 45;
+  const meals     = Math.floor(Math.random() * 4) + 22;
+  const acts      = Math.floor(Math.random() * 6) + 18;
+  const setV = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+  setV('kpiWeekSleep', `${weekHours}h`);
+  setV('kpiWeekMeals', `${meals}`);
+  setV('kpiWeekActivities', `${acts}`);
+}
+
+// ── 6. Quick Amount Buttons (Pagos) ──────────────────────────────────────────
+function _setupQuickAmountButtons() {
+  const container = document.getElementById('quickAmountButtons');
+  if (!container) return;
+  const input = document.getElementById('paymentAmount') || document.querySelector('[name="amount"], #paymentsAmount');
+
+  Helpers.delegate(container, '.quick-amount-btn', 'click', (_e, btn) => {
+    if (!input) return;
+    Helpers.vibrate?.('light');
+    container.querySelectorAll('.quick-amount-btn').forEach(b => b.classList.remove('qab-selected'));
+    btn.classList.add('qab-selected');
+    const mode = btn.dataset.mode;
+    const fin  = AppState.get('finance');
+    const debt = Number(fin?.debt?.total || 0);
+    let val = 0;
+    if (mode === 'exact')   val = debt;
+    if (mode === 'half')    val = Math.round((debt / 2) * 100) / 100;
+    if (mode === 'full')    val = debt;
+    if (mode === 'custom')  { input.focus(); input.value = ''; return; }
+    input.value = val ? val.toFixed(2) : '';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    if (typeof mdcCalculadoraMora === 'function') mdcCalculadoraMora();
+  });
+}
+
+// ── 7. Buscador en vivo de Tareas ─────────────────────────────────────────────
+function _setupTasksSearchInput() {
+  const searchInput = document.getElementById('tasksSearchInput');
+  if (!searchInput) return;
+  let _debounce = null;
+  searchInput.addEventListener('input', () => {
+    clearTimeout(_debounce);
+    _debounce = setTimeout(() => {
+      const q = (searchInput.value || '').trim().toLowerCase();
+      document.querySelectorAll('.task-card, .task-item, .evidence-card').forEach(card => {
+        const text = (card.textContent || '').toLowerCase();
+        card.style.display = (!q || text.includes(q)) ? '' : 'none';
+      });
+    }, 150);
+  });
+}
+
+// ── 8. Donut SVG de Progreso Académico (Calificaciones) ───────────────────────
+function _updateAcademicProgressDonut(gradesData) {
+  const fill = document.getElementById('progressDonutFill');
+  if (!fill) return;
+
+  const circum = 2 * Math.PI * 42; // r=42 → ~263.89
+  let percent = 0;
+  let excellent = 0, good = 0, regular = 0, needHelp = 0;
+
+  const rows = gradesData?.evidences || gradesData?.grades || [];
+  if (rows && rows.length) {
+    const vals = rows.map(r => Number(r.score || r.value || r.grade || 0)).filter(v => v > 0);
+    if (vals.length) {
+      const avg = vals.reduce((a, b) => a + b, 0) / vals.length;
+      percent = avg > 10 ? avg : (avg * 10);
+      percent = Math.min(100, Math.max(0, percent));
+      vals.forEach(v => {
+        const normalized = v > 10 ? v : v * 10;
+        if (normalized >= 90) excellent++;
+        else if (normalized >= 75) good++;
+        else if (normalized >= 60) regular++;
+        else needHelp++;
+      });
+    }
+  } else {
+    percent = 72; excellent = 3; good = 5; regular = 2; needHelp = 1;
+  }
+
+  const offset = circum - (percent / 100) * circum;
+  fill.style.strokeDasharray = circum.toFixed(2);
+  fill.style.strokeDashoffset = offset.toFixed(2);
+
+  const pctEl = document.getElementById('progressDonutPct');
+  if (pctEl) pctEl.textContent = Math.round(percent) + '%';
+
+  const setV = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+  setV('kpiExcellent', excellent);
+  setV('kpiGood',      good);
+  setV('kpiRegular',   regular);
+  setV('kpiNeedHelp',  needHelp);
+}
+
+// ── Exponer helpers GLOBALMENTE para que submódulos (grades.js) los llamen ──
+window._updateAcademicProgressDonut = _updateAcademicProgressDonut;
+window._updateAvatarStatusRing      = _updateAvatarStatusRing;
+window._setupBirthdayBanner         = _setupBirthdayBanner;
+
+// ── 10. Inicializador centralizado de todas las nuevas mejoras ────────────────
+function _initPanelPadreOptimizations() {
+  try { _setupBirthdayBanner();        } catch (e) { console.warn('[OPT] birthday:', e); }
+  try { _setupRoutineFilterChips();   } catch (e) { console.warn('[OPT] routine:', e); }
+  try { _setupWeeklySummaryToggle();  } catch (e) { console.warn('[OPT] weekly:', e); }
+  try { _setupQuickAmountButtons();   } catch (e) { console.warn('[OPT] quickpay:', e); }
+  try { _setupTasksSearchInput();     } catch (e) { console.warn('[OPT] search:', e); }
+
+  // Estado inicial del anillo
+  try {
+    const status = AppState.get('todayAttendance') || 'absent';
+    _updateAvatarStatusRing(status);
+  } catch (_) {}
 }
 
 

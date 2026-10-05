@@ -1,4 +1,4 @@
-import { ensureRole, supabase, initOneSignal, sendPush, emitEvent } from '/js/shared/supabase.js';
+﻿import { ensureRole, supabase, initOneSignal, sendPush, emitEvent } from '/js/shared/supabase.js';
 import { showNotifyFeedback } from '/js/shared/notify-feedback.js';
 import { AppState } from './state.js';
 import { Helpers } from '/js/shared/helpers.js';
@@ -82,7 +82,7 @@ function openAssistantChatView() {
 }
 
 // Definir objeto App globalmente para evitar ReferenceError en onclicks del HTML
-// Global close modal fallback � always available even before openNewPostModal is called
+// Global close modal fallback — always available even before openNewPostModal is called
 window._closeAsistenteModal = () => {
   const gc = document.getElementById('globalModalContainer');
   if (gc) { gc.style.display = 'none'; gc.innerHTML = ''; }
@@ -134,12 +134,15 @@ window.App = {
     _confirmApproval: (id) => import('./payments.js').then(m => m.PaymentsModule._confirmApproval(id)),
     sendPaymentReminder: (id, ch) => import('./payments.js').then(m => m.PaymentsModule.sendPaymentReminder(id, ch)),
     sendDigitalReceipt:  (id, ch) => import('./payments.js').then(m => m.PaymentsModule.sendDigitalReceipt(id, ch)),
+    _exportPaymentsCSV:  ()       => import('./payments.js').then(m => m.PaymentsModule._exportPaymentsCSV()),
   },
   students: {
-    init: () => import('./modules/students.js').then(m => m.StudentsModule.init()),
-    loadStudents: () => import('./modules/students.js').then(m => m.StudentsModule.loadStudents?.()),
-    openModal: (id) => import('./modules/students.js').then(m => m.StudentsModule.openModal(id)),
-    _deleteStudent: (id, name) => import('./modules/students.js').then(m => m.StudentsModule._deleteStudent(id, name)),
+    init:          ()             => import('./modules/students.js').then(m => m.StudentsModule.init()),
+    loadStudents:  ()             => import('./modules/students.js').then(m => m.StudentsModule.loadStudents?.()),
+    openModal:     (id)           => import('./modules/students.js').then(m => m.StudentsModule.openModal(id)),
+    _deleteStudent:(id, name)     => import('./modules/students.js').then(m => m.StudentsModule._deleteStudent(id, name)),
+    _exportList:   ()             => import('./modules/students.js').then(m => m.StudentsModule._exportList()),
+    toggleActive:  (id, active)   => import('./modules/students.js').then(m => m.StudentsModule.toggleActive(id, active)),
   },
   inscripciones: {
     init: () => import('../directora/inscripciones.module.js').then(m => m.InscripcionesModule.init()),
@@ -166,6 +169,8 @@ window.App = {
     setPunchType:  (type)     => import('./access.js').then(m => m.AccessModule.setPunchType(type)),
     stopScanner:   ()         => import('./access.js').then(m => m.AccessModule.stopScanner()),
     toggleExteriorMode: ()    => import('./access.js').then(m => m.AccessModule.toggleExteriorMode()),
+    openScanner:   ()         => import('./access.js').then(m => m.AccessModule.openScanner()),
+    _exportToCSV:  ()         => import('./access.js').then(m => m.AccessModule._exportToCSV()),
   },
   dashboard: {
     init: () => import('./modules/dashboard.js').then(m => m.DashboardModule.init()),
@@ -173,7 +178,7 @@ window.App = {
 };
 
 /**
- * Inicializaci�n principal del Panel de Asistente
+ * Inicialización principal del Panel de Asistente
  */
 document.addEventListener('DOMContentLoaded', async () => {
   
@@ -199,7 +204,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }).catch(() => {});
 
-  // ?? Sistema de badges por secci�n
+  // Sistema de badges por sección
   BadgeSystem.init(auth.user.id);
 
   // ?? Sincronización en vivo: cuando cambia un estudiante, refrescar la
@@ -233,7 +238,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   } else {
   }
   
-  initNavigation(); // Esto cargar� el dashboard y configurar� los listeners
+  initNavigation(); // Esto cargará el dashboard y configurar� los listeners
 
   // Asignar funciones internas al objeto global App
   Object.assign(window.App, {
@@ -471,7 +476,7 @@ async function submitNewPost() {
 }
 
 /**
- * Navegaci�n lateral
+ * Navegación lateral
  */
 const loadedSections = new Set();
 
@@ -495,10 +500,10 @@ function initNavigation() {
       loadedSections.delete('muro');
     }
 
-    // 1. Limpiar clases activas en botones de navegación�n
+    // 1. Limpiar clases activas en botones de navegación
     navLinks.forEach(l => {
       l.classList.remove('bg-white/20', 'bg-teal-50', 'text-teal-600', 'active');
-      // Si el bot�n est� en el sidebar y no es el activo, restaurar su estilo original de texto blanco
+      // Si el botón está en el sidebar y no es el activo, restaurar su estilo original de texto blanco
       if (!l.classList.contains('active')) {
         l.classList.add('text-white');
       }
@@ -544,10 +549,10 @@ function initNavigation() {
       BackNavigation.push(() => showSection(prevSection, { pushHistory: false }), { kind: 'section' });
     }
 
-    // ?? Marcar badge como le�do al entrar a la secci�n
+    // Marcar badge como leído al entrar a la sección
     BadgeSystem.mark(target);
 
-    // 3. Cerrar sidebar en m�vil autom�ticamente al cambiar de secci�n
+    // 3. Cerrar sidebar en móvil automáticamente al cambiar de secci�n
     const sidebar = document.getElementById('sidebar');
     if (sidebar && window.innerWidth < 768) {
       sidebar.classList.remove('mobile-visible');
@@ -555,7 +560,7 @@ function initNavigation() {
       if (ov) ov.style.display = 'none';
     }
 
-    // ? --- L�GICA DE CARGA PEREZOSA (LAZY LOADING) ---
+    // LÓGICA DE CARGA PEREZOSA (LAZY LOADING) ---
     if (!loadedSections.has(target)) {
       try {
         switch (target) {
@@ -693,7 +698,7 @@ function initNavigation() {
   import('./modules/dashboard.js').then(m => m.DashboardModule.init().then(() => loadedSections.add('dashboard')));
   showSection('dashboard', { pushHistory: false });
 
-  // -- Hamburger m�vil ------------------------------------------------------
+  // -- Hamburger móvil ------------------------------------------------------
   const menuBtn = document.getElementById('menuBtn');
   const sidebar  = document.getElementById('sidebar');
   const overlay  = document.getElementById('sidebarOverlay');
@@ -717,7 +722,7 @@ function initNavigation() {
     overlay.addEventListener('click', _closeSidebar);
   }
 
-  // Cerrar sidebar al hacer click en el main (m�vil)
+  // Cerrar sidebar al hacer click en el main (móvil)
   document.getElementById('layoutShell')?.addEventListener('click', () => {
     if (window.innerWidth < 768 && sidebar?.classList.contains('mobile-visible')) {
       _closeSidebar();

@@ -416,7 +416,8 @@ export const AccessModule = {
     const icon  = isEntry ? 'check-circle' : 'log-out';
     const title = isEntry ? 'Entrada Registrada' : 'Salida Registrada';
 
-    // Feedback de Sonido
+    // Feedback de Sonido (primero WebAudio beep fallback, luego assets)
+    this._playBeep(isEntry ? 880 : 660, isEntry ? 120 : 160);
     try {
       const audio = new Audio(isEntry ? 'assets/sounds/success.mp3' : 'assets/sounds/exit.mp3');
       audio.play().catch(() => {});
@@ -585,9 +586,20 @@ export const AccessModule = {
       combined = combined.slice(0, 200);
 
       if (!combined.length) {
-        tbody.innerHTML = `<tr><td colspan="7" class="py-12 text-center text-slate-300 font-bold uppercase tracking-widest text-xs">Sin registros encontrados</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="8" class="py-12 text-center text-slate-300 font-bold uppercase tracking-widest text-xs">Sin registros encontrados</td></tr>`;
         return;
       }
+
+      const methodBadge = (log) => {
+        if (log.type === 'student') {
+          const base = 'px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-tighter border flex items-center gap-1 w-max mx-auto shadow-sm';
+          if (log.status === 'late') return `<span class="${base} bg-amber-50 text-amber-700 border-amber-200"><i data-lucide="timer" class="w-3 h-3"></i> Scanner · Tarde</span>`;
+          if (log.status === 'retirado') return `<span class="${base} bg-sky-50 text-sky-700 border-sky-200"><i data-lucide="scan-line" class="w-3 h-3"></i> Scanner · Salida</span>`;
+          return `<span class="${base} bg-emerald-50 text-emerald-700 border-emerald-200"><i data-lucide="scan" class="w-3 h-3"></i> Scanner QR</span>`;
+        }
+        const base = 'px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-tighter border flex items-center gap-1 w-max mx-auto shadow-sm';
+        return `<span class="${base} bg-violet-50 text-violet-700 border-violet-200"><i data-lucide="badge-check" class="w-3 h-3"></i> Credencial</span>`;
+      };
 
       tbody.innerHTML = combined.map(log => {
         const dateStr = new Date(log.date + 'T12:00:00').toLocaleDateString('es-DO', { day: '2-digit', month: 'short' });
@@ -606,7 +618,7 @@ export const AccessModule = {
 
         return `
           <tr class="hover:bg-slate-50/80 transition-all group">
-            <td class="px-8 py-4">
+            <td data-label="Persona" class="px-4 py-4">
               <div class="flex items-center gap-3">
                 <div class="w-10 h-10 rounded-2xl bg-white border-2 border-slate-100 shadow-sm overflow-hidden shrink-0 group-hover:border-teal-200 transition-all">
                   ${log.avatar ? `<img src="${log.avatar}" class="w-full h-full object-cover">` : `<div class="w-full h-full flex items-center justify-center bg-slate-50 text-slate-300 font-black">${log.name.charAt(0)}</div>`}
@@ -617,30 +629,31 @@ export const AccessModule = {
                 </div>
               </div>
             </td>
-            <td class="px-8 py-4">
+            <td data-label="Rol" class="px-4 py-4">
               <span class="px-2 py-0.5 rounded-md text-[9px] font-black uppercase border ${roleClass}">${roleLabel}</span>
             </td>
-            <td class="px-8 py-4 font-mono text-[10px] text-slate-400 font-bold tracking-tighter">${log.id_code}</td>
-            <td class="px-8 py-4">
+            <td data-label="ID" class="px-4 py-4 font-mono text-[10px] text-slate-400 font-bold tracking-tighter">${log.id_code}</td>
+            <td data-label="Fecha" class="px-4 py-4">
               <div class="text-sm font-black text-slate-600">${dateStr}</div>
               <div class="text-[9px] font-bold text-slate-300 uppercase tracking-widest">Fecha</div>
             </td>
-            <td class="px-8 py-4 text-center">
+            <td data-label="Entrada" class="px-4 py-4 text-center">
               <div class="font-black text-slate-800 italic text-sm">${inTime}</div>
               <div class="text-[9px] font-bold text-slate-300 uppercase tracking-widest">Entrada</div>
             </td>
-            <td class="px-8 py-4 text-center">
+            <td data-label="Salida" class="px-4 py-4 text-center">
               <div class="font-black text-slate-800 italic text-sm">${outTime}</div>
               <div class="text-[9px] font-bold text-slate-300 uppercase tracking-widest">Salida</div>
             </td>
-            <td class="px-8 py-4 text-center">${statusBadge}</td>
+            <td data-label="Método" class="px-4 py-4 text-center">${methodBadge(log)}</td>
+            <td data-label="Estado" class="px-4 py-4 text-center">${statusBadge}</td>
           </tr>`;
       }).join('');
 
       if (window.lucide) lucide.createIcons();
     } catch (err) {
       Helpers.safeLog('error', 'Error loading history:', err);
-      tbody.innerHTML = `<tr><td colspan="7" class="py-12 text-center text-rose-500 font-bold">${Helpers.errorState('Fallo al cargar historial')}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="8" class="py-12 text-center text-rose-500 font-bold">${Helpers.errorState('Fallo al cargar historial')}</td></tr>`;
     }
   },
 
@@ -707,6 +720,96 @@ export const AccessModule = {
       });
     } catch (e) {
       Helpers.safeLog('error', 'Error updating chart:', e);
+    }
+  },
+
+  _playBeep(freq = 660, durationMs = 140) {
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return;
+      const ctx = new AC();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.12, ctx.currentTime + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + durationMs / 1000);
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.start(); osc.stop(ctx.currentTime + durationMs / 1000 + 0.02);
+      setTimeout(() => { try { ctx.close(); } catch (_) {} }, durationMs + 120);
+    } catch (_) { /* WebAudio unavailable, silent */ }
+  },
+
+  async _exportToCSV() {
+    try {
+      Helpers.showLoader('Generando reporte de accesos...');
+      const from = document.getElementById('accessFilterFrom')?.value;
+      const to   = document.getElementById('accessFilterTo')?.value;
+      const todayStr = new Date().toISOString().split('T')[0];
+      const fromD = from || todayStr;
+      const toD   = to   || todayStr;
+
+      const [attResult, punchResult] = await Promise.allSettled([
+        supabase.from('attendance')
+          .select('id, date, check_in, check_out, status, student:student_id(name, matricula)')
+          .gte('date', fromD).lte('date', toD)
+          .order('date', { ascending: false }).order('check_in', { ascending: false }).limit(2000),
+        supabase.from('door_punches')
+          .select('id, date, punched_at, punch_type, staff:staff_id(name, role, access_code)')
+          .not('staff_id', 'is', null)
+          .gte('date', fromD).lte('date', toD)
+          .order('date', { ascending: false }).order('punched_at', { ascending: false }).limit(2000),
+      ]);
+      const rows = [];
+      const attData = attResult.status === 'fulfilled' ? (attResult.value.data || []) : [];
+      attData.forEach(a => {
+        const name = a.student?.name || 'Estudiante';
+        const inT = a.check_in ? new Date(a.check_in).toLocaleTimeString() : '';
+        const outT = a.check_out ? new Date(a.check_out).toLocaleTimeString() : '';
+        const methodMap = { present: 'Scanner QR', late: 'Scanner QR (Tardanza)', retirado: 'Scanner QR (Salida)', ausente: 'Sin registro', absent: 'Sin registro' };
+        rows.push([
+          a.date, name, 'Estudiante', a.student?.matricula || '-', inT, outT, methodMap[a.status] || a.status, a.status || ''
+        ]);
+      });
+      const staffMap = {};
+      (punchResult.status === 'fulfilled' ? (punchResult.value.data || []) : []).forEach(p => {
+        const key = `${p.staff?.id || 'x'}-${p.date}`;
+        if (!staffMap[key]) {
+          staffMap[key] = { date: p.date, name: p.staff?.name || 'Personal', role: p.staff?.role || 'staff', code: p.staff?.access_code || '-', check_in: null, check_out: null };
+        }
+        if (p.punch_type === 'check_in')  staffMap[key].check_in  = p.punched_at;
+        if (p.punch_type === 'check_out') staffMap[key].check_out = p.punched_at;
+      });
+      Object.values(staffMap).forEach(s => {
+        const inT = s.check_in ? new Date(s.check_in).toLocaleTimeString() : '';
+        const outT = s.check_out ? new Date(s.check_out).toLocaleTimeString() : '';
+        rows.push([s.date, s.name, s.role, s.code, inT, outT, 'Credencial Personal', 'Personal']);
+      });
+
+      rows.sort((a, b) => String(b[0]).localeCompare(String(a[0])));
+      const headers = ['Fecha', 'Nombre', 'Rol', 'ID / Matrícula', 'Entrada', 'Salida', 'Método', 'Estado'];
+      const csv = [
+        headers.join(','),
+        ...rows.map(r => r.map(cell => {
+          const v = String(cell ?? '').replace(/"/g, '""');
+          return /[",\n]/.test(v) ? `"${v}"` : v;
+        }).join(','))
+      ].join('\n');
+      const bom = '\uFEFF';
+      const blob = new Blob([bom + csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `accesos-karpus-${fromD}_${toD}.csv`;
+      document.body.appendChild(a); a.click();
+      a.remove(); URL.revokeObjectURL(url);
+      Helpers.toast(`Exportados ${rows.length} registros`, 'success');
+    } catch (e) {
+      Helpers.safeLog('error', 'Export access CSV failed:', e);
+      Helpers.toast('Error al exportar CSV', 'error');
+    } finally {
+      Helpers.hideLoader();
     }
   }
 };

@@ -869,6 +869,7 @@
 
             </div>
           </div>
+          </div>
         </section>
 
         <!-- REINSCRIPCIÓN -->
@@ -892,6 +893,7 @@
               <div id="chatListPanel" class="chat-list-col">
                 <div class="p-4 border-b border-slate-200 shrink-0">
                   <div class="relative">
+                    <label for="chatSearchInput" class="sr-only">Buscar contactos</label>
                     <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"></i>
                     <input id="chatSearchInput" type="text" class="w-full pl-10 pr-3 py-2 rounded-xl border border-slate-200 bg-white text-sm focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Buscar personal...">
                   </div>
@@ -1313,6 +1315,11 @@
         navigator.serviceWorker.register('/OneSignalSDKWorker.js', { scope: '/' })
           .then(() => {})
           .catch(() => {});
+
+        // App shell offline (FASE F). Después de OneSignal para no replace su worker.
+        navigator.serviceWorker.register('/sw.js', { scope: '/' })
+          .then(() => {})
+          .catch(() => {});
       });
     }
   </script>
@@ -1409,5 +1416,6 @@
       </div>
     </div>
   </div>
+  <!-- /app-panel-padre -->
 </body>
 </html>

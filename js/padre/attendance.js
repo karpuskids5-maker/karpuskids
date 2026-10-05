@@ -201,17 +201,30 @@ export const AttendanceModule = {
       const lastDay   = new Date(year, month, 0).getDate();
       const endDate   = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
 
-      const { data, error } = await supabase
-        .from('attendance')
-        .select('id, student_id, date, status, check_in, check_out, absence_reason')
-        .eq('student_id', this._studentId)
-        .gte('date', startDate)
-        .lte('date', endDate)
-        .order('date', { ascending: true });
+      // Cargar asistencia y solicitudes de ausencia en paralelo
+      const [attRes, reqRes] = await Promise.all([
+        supabase
+          .from('attendance')
+          .select('id, student_id, date, status, check_in, check_out, absence_reason')
+          .eq('student_id', this._studentId)
+          .gte('date', startDate)
+          .lte('date', endDate)
+          .order('date', { ascending: true }),
+        supabase
+          .from('attendance_requests')
+          .select('date, reason, note, status')
+          .eq('student_id', this._studentId)
+          .gte('date', startDate)
+          .lte('date', endDate)
+      ]);
 
-      if (error) throw error;
+      if (attRes.error) throw attRes.error;
 
-      this._attendance = data || [];
+      this._attendance = attRes.data || [];
+      // Mapa de fechas con solicitud del padre (para colorear azul en calendario)
+      this._requestMap = new Map(
+        (reqRes.data || []).map(r => [r.date, r])
+      );
 
       // KPIs — Normalizar estados para conteo robusto y asegurar que sean números
       const present = this._attendance.filter(a => ['present', 'presente'].includes(a.status?.toLowerCase())).length;
@@ -224,12 +237,69 @@ export const AttendanceModule = {
 
       this.renderCalendar(year, month);
       this.renderList(this._attendance);
+      this._renderTodayBanner();
 
     } catch (err) {
       if (calendar) {
         calendar.innerHTML = Helpers.emptyState('Error al cargar asistencia', '❌');
       }
     }
+  },
+
+  /** Banner de hoy: azul si el padre notificó, rojo si ausencia automática. */
+  _renderTodayBanner() {
+    const container = document.getElementById('todayAbsenceBannerContainer');
+    if (!container) return;
+
+    const today = new Date().toISOString().split('T')[0];
+    const todayAtt = this._attendance.find(a => a.date === today &&
+      ['absent', 'ausente'].includes(a.status?.toLowerCase()));
+
+    if (!todayAtt) { container.innerHTML = ''; return; }
+
+    const request  = this._requestMap?.get(today);
+    const isNotified = !!request;
+    const motivo   = request?.reason || todayAtt.absence_reason || null;
+    const nota     = request?.note   || null;
+
+    if (isNotified) {
+      container.innerHTML = `
+        <div class="flex items-start gap-3 p-4 rounded-2xl bg-blue-50 border border-blue-200">
+          <div class="w-9 h-9 rounded-xl bg-blue-100 flex items-center justify-center shrink-0">
+            <i data-lucide="calendar-check" class="w-5 h-5 text-blue-600"></i>
+          </div>
+          <div class="flex-1 min-w-0">
+            <p class="text-sm font-black text-blue-800">Ausencia notificada ✅</p>
+            <p class="text-xs font-bold text-blue-600 mt-0.5">${Helpers.escapeHTML(motivo || 'Motivo registrado')}</p>
+            ${nota ? `<p class="text-[10px] text-blue-500 mt-1">${Helpers.escapeHTML(nota)}</p>` : ''}
+            <p class="text-[10px] text-blue-400 mt-1">La estancia ya fue notificada.</p>
+          </div>
+          <button type="button"
+            class="shrink-0 text-[10px] font-black text-blue-600 bg-blue-100 hover:bg-blue-200 px-3 py-1.5 rounded-xl transition-colors"
+            onclick="document.getElementById('modalAbsence').classList.remove('hidden'); document.getElementById('modalAbsence').classList.add('flex');">
+            Editar
+          </button>
+        </div>`;
+    } else {
+      container.innerHTML = `
+        <div class="flex items-start gap-3 p-4 rounded-2xl bg-rose-50 border border-rose-200">
+          <div class="w-9 h-9 rounded-xl bg-rose-100 flex items-center justify-center shrink-0">
+            <i data-lucide="alarm-clock" class="w-5 h-5 text-rose-600"></i>
+          </div>
+          <div class="flex-1 min-w-0">
+            <p class="text-sm font-black text-rose-800">Ausencia registrada ⚠️</p>
+            <p class="text-xs font-bold text-rose-600 mt-0.5">${Helpers.escapeHTML(todayAtt.absence_reason || 'Ausencia Automática')}</p>
+            <p class="text-[10px] text-rose-400 mt-1">Tu pequeño figura como ausente hoy. ¿Deseas justificar?</p>
+          </div>
+          <button type="button"
+            class="shrink-0 text-[10px] font-black text-rose-600 bg-rose-100 hover:bg-rose-200 px-3 py-1.5 rounded-xl transition-colors"
+            onclick="document.getElementById('modalAbsence').classList.remove('hidden'); document.getElementById('modalAbsence').classList.add('flex');">
+            Justificar
+          </button>
+        </div>`;
+    }
+
+    if (window.lucide) lucide.createIcons();
   },
 
   renderCalendar(year, month) {
@@ -250,6 +320,18 @@ export const AttendanceModule = {
       if (isNaN(day) || day < 1 || day > 31) return;
       attMap.set(day, a.status?.toLowerCase());
     });
+
+    // Mapa de días con solicitud del padre para colorear azul
+    const reqDayMap = new Set();
+    if (this._requestMap) {
+      this._requestMap.forEach((_, date) => {
+        const parts = date.split('-');
+        if (parts.length < 3) return;
+        const m = parseInt(parts[1], 10);
+        const d = parseInt(parts[2], 10);
+        if (m === month) reqDayMap.add(d);
+      });
+    }
 
     const today     = new Date();
     const todayDay  = today.getDate();
@@ -272,7 +354,11 @@ export const AttendanceModule = {
 
       if (status === 'present' || status === 'presente') {
         cls += 'bg-green-500 text-white shadow-lg shadow-green-100 scale-105 z-10';
+      } else if ((status === 'absent' || status === 'ausente') && reqDayMap.has(d)) {
+        // Ausencia notificada por el padre → azul
+        cls += 'bg-blue-500 text-white shadow-lg shadow-blue-100';
       } else if (status === 'absent' || status === 'ausente') {
+        // Ausencia automática / sin aviso → rojo
         cls += 'bg-rose-500 text-white shadow-lg shadow-rose-100';
       } else if (status === 'late' || status === 'tarde') {
         cls += 'bg-amber-500 text-white shadow-lg shadow-amber-100';

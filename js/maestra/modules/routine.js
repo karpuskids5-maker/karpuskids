@@ -1332,26 +1332,8 @@ function _renderRoutineLayout({ todayLabel, students, logsMap, withReport, sched
 
     <!-- ═══ NIVEL 2: CONTENEDOR COLECTIVO ═══ -->
 
-    <!-- Banner Siestas Activas -->
-    ${activeSiestas.length > 0 ? `
-    <div class="bg-white border-2 border-purple-200 rounded-[1.5rem] p-3 sm:p-4 flex items-center gap-3 sm:gap-4 shadow-sm" style="background:linear-gradient(135deg, #faf5ff 0%, #f0f0ff 100%);">
-      <div class="w-10 h-10 sm:w-12 sm:h-12 text-white rounded-2xl flex items-center justify-center text-lg sm:text-xl shrink-0 shadow-lg animate-pulse" style="background:linear-gradient(135deg, #9333ea, #7c3aed);box-shadow:0 4px 14px rgba(147,51,234,0.35);">😴</div>
-      <div class="flex-1 min-w-0">
-        <p class="text-sm font-black text-purple-800">${activeSiestas.length} siesta${activeSiestas.length > 1 ? 's' : ''} activa${activeSiestas.length > 1 ? 's' : ''}</p>
-        <p class="text-[10px] font-bold text-purple-600 truncate">
-          ${activeSiestas.slice(0,2).map(s => {
-            const log = logsMap[s.id] || {};
-            const openSiesta = (log.events || []).filter(e => e.type === 'siesta').find(e => e.open);
-            const elapsed = openSiesta ? Math.round((Date.now() - new Date(openSiesta.created_at).getTime()) / 60000) : '?';
-            return `${s.name.split(' ')[0]} <span data-siesta-elapsed="${openSiesta?.created_at || ''}">${elapsed}min</span>`;
-          }).join(', ')}${activeSiestas.length > 2 ? ` +${activeSiestas.length - 2}` : ''}
-        </p>
-      </div>
-      <button onclick="App.wakeAllSiestas()" class="shrink-0 px-3 py-2 text-white rounded-xl font-black text-[9px] uppercase tracking-wide hover:brightness-110 active:scale-95 transition-all shadow-lg" style="background:linear-gradient(135deg, #9333ea, #7c3aed);">
-        Despertar
-      </button>
-    </div>
-    ` : ''}
+    <!-- Banner Siestas Activas — DESHABILITADO hasta nuevo aviso -->
+    ${''/* activeSiestas.length > 0 ? '...' : '' */}
 
     <!-- Banner Salidas del Día (estudiantes retirados: ya no reciben más eventos) -->
     ${retirados.length > 0 ? `

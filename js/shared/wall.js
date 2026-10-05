@@ -429,7 +429,47 @@ const WallModule = {
       .wall-album-slide img.wall-album-img{width:100%;height:auto;max-height:min(70vh,520px);object-fit:contain;display:block;margin-inline:auto}
       @media (max-width:640px){.wall-album-slide img.wall-album-img{max-height:min(56vh,420px)}}
       .wall-lightbox-media{width:100%;height:auto;max-height:85vh;object-fit:contain;border-radius:0.75rem}
+      /* ── Lightbox de escritorio: media a la izquierda, conversación a la derecha ── */
+      .wall-lb-shell{position:relative;width:100%;max-height:92vh;background:#0b1220;border-radius:1.25rem;overflow:hidden;box-shadow:0 30px 80px rgba(0,0,0,0.55);display:flex;flex-direction:column}
+      @media (min-width:900px){.wall-lb-shell{flex-direction:row;max-width:1240px;height:88vh}}
+      .wall-lb-media{position:relative;display:flex;align-items:center;justify-content:center;background:#000;flex:1 1 auto;min-height:0;overflow:hidden}
+      @media (min-width:900px){.wall-lb-media{flex:1 1 62%}}
+      .wall-lb-media .wall-lightbox-media{max-height:92vh;width:100%;height:auto;object-fit:contain;background:#000}
+      @media (min-width:900px){.wall-lb-media .wall-lightbox-media{max-height:none;height:100%;width:100%}}
+      .wall-lb-side{background:#ffffff;color:#1e293b;display:flex;flex-direction:column;flex:0 0 auto;border-top:1px solid #e2e8f0;min-height:0;max-height:34vh}
+      @media (min-width:900px){.wall-lb-side{flex:1 1 38%;border-top:none;border-left:1px solid #e2e8f0;max-height:none}}
+      .wall-lb-head{display:flex;align-items:center;gap:8px;padding:12px 16px;border-bottom:1px solid #e2e8f0;flex:0 0 auto}
+      .wall-lb-head-title{font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:0.09em;color:#64748b}
+      .wall-lb-list{flex:1 1 auto;overflow-y:auto;overscroll-behavior:contain;padding:14px 16px;display:flex;flex-direction:column;gap:14px}
+      .wall-lb-foot{display:flex;gap:8px;align-items:center;padding:12px 16px;border-top:1px solid #e2e8f0;background:#f8fafc;flex:0 0 auto}
+      .wall-lb-input{flex:1;min-width:0;padding:10px 14px;font-size:13px;border:1px solid #e2e8f0;border-radius:14px;background:#fff;outline:none}
+      .wall-lb-input:focus{border-color:#c7d2fe;box-shadow:0 0 0 2px #e0e7ff}
+      .wall-lb-send{flex:0 0 auto;padding:10px 14px;border:none;border-radius:14px;background:#4f46e5;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:transform 0.15s,background 0.15s}
+      .wall-lb-send:hover{background:#4338ca}
+      .wall-lb-send:active{transform:scale(0.94)}
+      .wall-lb-reactions{display:flex;gap:5px;flex-wrap:wrap;padding:10px 16px;border-top:1px solid #f1f5f9;flex:0 0 auto;background:#fff}
+      .wall-lb-reaction{width:34px;height:34px;border-radius:50%;border:1px solid #e2e8f0;background:#fff;font-size:16px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:transform 0.15s,background 0.15s}
+      .wall-lb-reaction:hover{transform:scale(1.16);background:#f8fafc}
+      .wall-lb-empty{margin:auto;text-align:center;font-size:12px;color:#94a3b8;font-style:italic;padding:20px}
       .wall-progress-bar{height:3px;background:linear-gradient(90deg,#f97316,#22c55e);border-radius:2px;transition:width 0.1s linear}
+      /* ── Controles táctiles del video (feed vertical móvil) ── */
+      .wall-scrub{position:absolute;left:0;right:0;bottom:0;height:20px;z-index:6;cursor:pointer;touch-action:none;-webkit-tap-highlight-color:transparent}
+      /* La tira de miniaturas ocupa el pie del wrapper: la barra sube para no taparla */
+      .wall-scrub.wall-scrub-above-strip{bottom:56px}
+      .wall-scrub-track{position:absolute;left:0;right:0;bottom:3px;height:3px;background:rgba(255,255,255,0.28);border-radius:2px;transition:height 0.18s ease}
+      .wall-scrub:hover .wall-scrub-track,.wall-scrub.wall-scrub-active .wall-scrub-track{height:6px}
+      .wall-scrub-fill{position:absolute;left:0;top:0;bottom:0;width:0;border-radius:2px;background:linear-gradient(90deg,#f97316,#22c55e)}
+      .wall-scrub-knob{position:absolute;bottom:3px;left:0;width:13px;height:13px;margin-left:-6.5px;border-radius:50%;background:#fff;box-shadow:0 2px 7px rgba(0,0,0,0.5);opacity:0;transform:scale(0.5);transition:opacity 0.18s ease,transform 0.18s ease;pointer-events:none}
+      .wall-scrub:hover .wall-scrub-knob,.wall-scrub.wall-scrub-active .wall-scrub-knob{opacity:1;transform:scale(1)}
+      .wall-scrub-time{position:absolute;bottom:26px;transform:translateX(-50%);background:rgba(0,0,0,0.78);color:#fff;font-size:10px;font-weight:900;padding:3px 8px;border-radius:7px;white-space:nowrap;pointer-events:none;opacity:0;transition:opacity 0.15s ease;backdrop-filter:blur(4px)}
+      .wall-scrub.wall-scrub-active .wall-scrub-time{opacity:1}
+      .wall-hold-pause{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:7;pointer-events:none;display:flex;flex-col;align-items:center;gap:7px;opacity:0;transition:opacity 0.16s ease}
+      .wall-hold-pause.wall-hold-on{opacity:1}
+      .wall-hold-icon{width:54px;height:54px;border-radius:50%;background:rgba(0,0,0,0.62);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,0.32);color:#fff;font-size:19px;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 18px rgba(0,0,0,0.4)}
+      .wall-hold-label{background:rgba(0,0,0,0.62);backdrop-filter:blur(8px);color:#fff;font-size:9px;font-weight:900;text-transform:uppercase;letter-spacing:0.07em;padding:3px 9px;border-radius:7px;white-space:nowrap}
+      .wall-tap-icon{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:7;pointer-events:none;width:56px;height:56px;border-radius:50%;background:rgba(0,0,0,0.55);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,0.32);color:#fff;font-size:20px;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity 0.14s ease}
+      .wall-tap-icon.wall-tap-on{opacity:1}
+      @media (prefers-reduced-motion:reduce){.wall-scrub-track,.wall-scrub-knob,.wall-scrub-time,.wall-hold-pause,.wall-tap-icon{transition:none}}
       @keyframes wall-like-pop{0%{transform:scale(1)}30%{transform:scale(1.45)}60%{transform:scale(0.9)}100%{transform:scale(1)}}
       @keyframes wall-particle-fly{0%{opacity:1;transform:translate(0,0) scale(1)}100%{opacity:0;transform:translate(var(--tx),var(--ty)) scale(0.3)}}
       @keyframes wall-counter-bump{0%{transform:scale(1)}40%{transform:scale(1.25)}100%{transform:scale(1)}}
@@ -1166,7 +1206,7 @@ const WallModule = {
     const optimized = optimizeImageUrl(original, { width: isSlow ? 600 : 1200, quality: isSlow ? 60 : 80 });
     return `
       <div class="rounded-2xl overflow-hidden border border-slate-100 mb-4 cursor-zoom-in bg-slate-50 relative shadow-inner"
-           onclick="WallModule.openLightbox('${_sanitizeHTML(p.display_media_url)}','image')" role="button" aria-label="Ver imagen">
+           onclick="WallModule.openLightbox('${_sanitizeHTML(p.display_media_url)}','image','${p.id}')" role="button" aria-label="Ver imagen">
         <div class="wall-shimmer absolute inset-0 rounded-2xl" id="img-shimmer-${p.id}"></div>
         <img id="wall-img-${p.id}" src="${_sanitizeHTML(optimized)}" loading="lazy" decoding="async"
              data-fallback-src="${_sanitizeHTML(original)}"
@@ -1212,7 +1252,7 @@ const WallModule = {
       <div class="wall-album-carousel mb-4 rounded-2xl overflow-hidden border border-slate-100 shadow-inner relative" id="album-${p.id}">
         <div class="wall-album-track" id="album-track-${p.id}">
           ${urls.map((url, i) => `
-            <div class="wall-album-slide" onclick="WallModule.openLightbox('${_sanitizeHTML(url)}','image')" role="button" aria-label="Foto ${i+1} de ${urls.length}">
+            <div class="wall-album-slide" onclick="WallModule.openLightbox('${_sanitizeHTML(url)}','image','${p.id}')" role="button" aria-label="Foto ${i+1} de ${urls.length}">
               <img src="${_sanitizeHTML(url)}" loading="${i === 0 ? 'eager' : 'lazy'}" class="wall-album-img" alt="Foto ${i+1}">
             </div>`).join('')}
         </div>
@@ -1263,6 +1303,19 @@ const WallModule = {
   /** El usuario pidió menos movimiento: nada de autoplay ni hover-preview. */
   _prefersReducedMotion() {
     try { return window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true; }
+    catch (_) { return false; }
+  },
+
+  /**
+   * ¿Usamos los controles propios en vez de los nativos del <video>?
+   * Solo en táctil: ahí los nativos se superponen al pie del video y son
+   * difíciles de alcanzar. En escritorio se conservan (teclado, volumen,
+   * pantalla completa).
+   */
+  _useCustomControls() {
+    if (this._options.forceNativeControls) return false;
+    if (this._options.useCustomControls === true) return true;
+    try { return window.matchMedia?.('(hover: none), (pointer: coarse)').matches === true; }
     catch (_) { return false; }
   },
 
@@ -1361,8 +1414,12 @@ const WallModule = {
     wrapper.style.background = '#000';
     wrapper.classList.add('is-loading');
     const preload = autoplay ? 'auto' : 'metadata';
+    // En táctil los controles nativos se montan como una barra que tapa el pie
+    // del video y compite con la barra de progreso propia. Se sustituyen por
+    // los controles del módulo (scrub + tap + mantener presionado).
+    const customControls = this._useCustomControls();
     wrapper.innerHTML = `
-      <video id="wall-vid-${postId}" class="wall-custom-video w-full" controls playsinline loop ${muted ? 'muted' : ''} preload="${preload}"
+      <video id="wall-vid-${postId}" class="wall-custom-video w-full" playsinline loop ${customControls ? '' : 'controls'} ${muted ? 'muted' : ''} preload="${preload}"
              ${posterUrl ? `poster="${_sanitizeHTML(posterUrl)}"` : ''}
              style="display:block;"
              onended="document.getElementById('wall-replay-${postId}')?.classList.remove('hidden')"
@@ -1495,17 +1552,206 @@ const WallModule = {
     } catch (_) { /* best-effort */ }
   },
 
+  /**
+   * Barra de progreso táctil (scrub). En dispositivos sin hover los controles
+   * nativos del <video> estorban en un feed vertical, así que se usan los
+   * controles propios: barra arrastrable + tap para play/pause + mantener
+   * presionado para pausar sin sonido de fondo.
+   */
   _attachVideoProgress(vid, postId) {
-    // Append progress bar
-    const bar = document.createElement('div');
-    bar.style.cssText = 'position:absolute;bottom:0;left:0;right:0;height:3px;background:rgba(255,255,255,0.2);pointer-events:none;';
-    bar.innerHTML = `<div id="wall-vprog-${postId}" class="wall-progress-bar" style="width:0%"></div>`;
-    vid.parentElement?.appendChild(bar);
+    if (document.getElementById(`wall-scrub-${postId}`)) return;
+    const host = vid.parentElement;
+    if (!host) return;
+
+    // En escritorio los controles nativos ya pintan su propia barra y libran
+    // gestos; se conserva la barra decorativa anterior (sin interacción).
+    if (!this._useCustomControls()) {
+      const legacy = document.createElement('div');
+      legacy.style.cssText = 'position:absolute;bottom:0;left:0;right:0;height:3px;background:rgba(255,255,255,0.2);pointer-events:none;';
+      legacy.innerHTML = `<div id="wall-vprog-${postId}" class="wall-progress-bar" style="width:0%"></div>`;
+      host.appendChild(legacy);
+      vid.addEventListener('timeupdate', () => {
+        if (!vid.duration) return;
+        const prog = document.getElementById(`wall-vprog-${postId}`);
+        if (prog) prog.style.width = `${(vid.currentTime / vid.duration) * 100}%`;
+      });
+      return;
+    }
+
+    const wrap = document.createElement('div');
+    wrap.className = 'wall-scrub';
+    wrap.id = `wall-scrub-${postId}`;
+    // Videos con >=3 miniaturas traen una tira fija en el pie del wrapper.
+    if (document.getElementById(`thumb-strip-${postId}`)) {
+      wrap.classList.add('wall-scrub-above-strip');
+    }
+    wrap.innerHTML = `
+      <div class="wall-scrub-track"><div class="wall-scrub-fill" id="wall-vprog-${postId}"></div></div>
+      <div class="wall-scrub-knob"></div>
+      <div class="wall-scrub-time" id="wall-vtime-${postId}">0:00</div>`;
+    host.appendChild(wrap);
+
+    const fill  = document.getElementById(`wall-vprog-${postId}`);
+    const knob  = wrap.querySelector('.wall-scrub-knob');
+    const label = document.getElementById(`wall-vtime-${postId}`);
+
+    const paint = (ratio) => {
+      const pct = Math.max(0, Math.min(100, ratio * 100));
+      if (fill) fill.style.width = `${pct}%`;
+      if (knob) knob.style.left = `${pct}%`;
+      if (label && vid.duration) {
+        label.textContent = `${this._formatVideoDuration(ratio * vid.duration)} / ${this._formatVideoDuration(vid.duration)}`;
+      }
+    };
+
     vid.addEventListener('timeupdate', () => {
-      if (!vid.duration) return;
-      const prog = document.getElementById(`wall-vprog-${postId}`);
-      if (prog) prog.style.width = `${(vid.currentTime / vid.duration) * 100}%`;
+      if (!vid.duration || wrap.dataset.scrubbing === '1') return;
+      paint(vid.currentTime / vid.duration);
     });
+    vid.addEventListener('loadedmetadata', () => {
+      if (vid.duration) paint(vid.currentTime / vid.duration);
+    });
+
+    const ratioFrom = (clientX) => {
+      const r = wrap.getBoundingClientRect();
+      if (!r.width) return 0;
+      return Math.max(0, Math.min(1, (clientX - r.left) / r.width));
+    };
+
+    // Pointer Events cubre touch, mouse y lápiz con un solo camino de código.
+    // touch-action:none (CSS) evita que el scroll de la página robe el gesto.
+    const onDown = (e) => {
+      if (!vid.duration || !isFinite(vid.duration)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      wrap.dataset.scrubbing = '1';
+      wrap.classList.add('wall-scrub-active');
+      wrap.setPointerCapture?.(e.pointerId);
+      const ratio = ratioFrom(e.clientX);
+      paint(ratio);
+      vid.currentTime = ratio * vid.duration;
+    };
+    const onMove = (e) => {
+      if (wrap.dataset.scrubbing !== '1') return;
+      e.preventDefault();
+      const ratio = ratioFrom(e.clientX);
+      paint(ratio);
+      vid.currentTime = ratio * vid.duration;
+    };
+    const onUp = (e) => {
+      if (wrap.dataset.scrubbing !== '1') return;
+      wrap.dataset.scrubbing = '0';
+      wrap.classList.remove('wall-scrub-active');
+      wrap.releasePointerCapture?.(e.pointerId);
+    };
+
+    wrap.addEventListener('pointerdown', onDown);
+    wrap.addEventListener('pointermove', onMove);
+    wrap.addEventListener('pointerup', onUp);
+    wrap.addEventListener('pointercancel', onUp);
+    wrap.addEventListener('lostpointercapture', onUp);
+
+    this._setupHoldToPause(vid, postId);
+  },
+
+  /**
+   * Mantener presionado el video → pausa mientras se sostiene y retoma al
+   * soltar (sin dejar el video en pausa si el usuario solo queria ver el
+   * momento). El doble tap sigue reservando el gesto para el corazón, así que
+   * el primer tap ya encendido no cuenta como "soltar/reanudar".
+   */
+  _setupHoldToPause(vid, postId) {
+    if (vid.dataset.holdReady === '1') return;
+    vid.dataset.holdReady = '1';
+
+    const host = vid.parentElement;
+    if (!host) return;
+
+    const icon = document.createElement('div');
+    icon.className = 'wall-hold-pause';
+    icon.id = `wall-hold-${postId}`;
+    icon.innerHTML = `<div class="wall-hold-icon">⏸</div><div class="wall-hold-label">Pausado</div>`;
+    host.appendChild(icon);
+
+    let timer = null;
+    let holding = false;
+    let lastTapAt = 0;
+    let suppressClickUntil = 0;
+
+    const wasPlayingBefore = () => !vid.paused && !vid.ended;
+
+    const start = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        // Un tap simple ya quedó como "toggle": no pausamos dos veces.
+        if (Date.now() - lastTapAt < 320) return;
+        holding = true;
+        icon.classList.add('wall-hold-on');
+        if (wasPlayingBefore()) vid.pause();
+        if (navigator.vibrate) navigator.vibrate(12);
+      }, 240);
+    };
+
+    const finish = () => {
+      clearTimeout(timer);
+      timer = null;
+      if (!holding) return;
+      holding = false;
+      icon.classList.remove('wall-hold-on');
+      if (vid.paused && !vid.ended) vid.play().catch(() => {});
+      // El navegador emite click justo después de touchend/mouseup. Sin esta
+      // ventana, ese click invertiría el estado y dejaría el video pausado
+      // tras una pulsación larga.
+      suppressClickUntil = Date.now() + 350;
+    };
+
+    // El scroll cancela la pulsación: no debe pausarse nada.
+    const cancel = () => {
+      clearTimeout(timer);
+      timer = null;
+      if (!holding) return;
+      holding = false;
+      icon.classList.remove('wall-hold-on');
+      suppressClickUntil = Date.now() + 350;
+    };
+
+    vid.addEventListener('touchstart', start, { passive: true });
+    vid.addEventListener('touchend', finish, { passive: true });
+    vid.addEventListener('touchcancel', cancel, { passive: true });
+    vid.addEventListener('touchmove', cancel, { passive: true });
+    vid.addEventListener('mousedown', start);
+    // Sin mouseup el video quedaba pausado para siempre tras una pulsación larga.
+    vid.addEventListener('mouseup', finish);
+    vid.addEventListener('mouseleave', cancel);
+    // En touch el click se dispara después del touchend: se filtra para no
+    // alternar play/pause al terminar de mantener presionado.
+    vid.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const now = Date.now();
+      if (now < suppressClickUntil) return;
+      if (now - lastTapAt < 320) return;
+      lastTapAt = now;
+      if (vid.paused) vid.play().catch(() => {});
+      else vid.pause();
+      this._flashTapIcon(postId, vid.paused);
+    });
+  },
+
+  /** Destello del icono play/pause al tocar el video */
+  _flashTapIcon(postId, isPaused) {
+    const host = document.getElementById(`video-wrapper-${postId}`);
+    if (!host) return;
+    let icon = document.getElementById(`wall-tap-${postId}`);
+    if (!icon) {
+      icon = document.createElement('div');
+      icon.className = 'wall-tap-icon';
+      icon.id = `wall-tap-${postId}`;
+      host.appendChild(icon);
+    }
+    icon.textContent = isPaused ? '▶' : '⏸';
+    icon.classList.add('wall-tap-on');
+    clearTimeout(icon._t);
+    icon._t = setTimeout(() => icon.classList.remove('wall-tap-on'), 520);
   },
 
   _replayVideo(postId) {
@@ -1519,12 +1765,14 @@ const WallModule = {
   },
 
   // ── Lightbox Inmersivo ───────────────────────────────────────────────────────
-  openLightbox(url, type) {
+  openLightbox(url, type, postId = null) {
     if (!url) return;
     const isVideo = type === 'video' || /\.(mp4|webm|mov|m4v)$/i.test(url);
-    const content = isVideo
+    const media = isVideo
       ? `<video controls playsinline autoplay muted loop class="wall-lightbox-media" preload="metadata" style="background:#000"><source src="${_sanitizeHTML(url)}" type="video/mp4"></video>`
       : `<img src="${_sanitizeHTML(url)}" class="wall-lightbox-media select-none" alt="Publicación" draggable="false" loading="eager">`;
+
+    const hasPost = !!postId && !!document.getElementById(`post-${postId}`);
 
     const lb = document.createElement('div');
     lb.id = 'wall-lightbox';
@@ -1534,30 +1782,135 @@ const WallModule = {
     lb.setAttribute('aria-modal', 'true');
     lb.setAttribute('aria-label', 'Visor de multimedia');
     lb.innerHTML = `
-      <button onclick="document.getElementById('wall-lightbox')?.remove()" class="absolute top-4 right-4 w-10 h-10 bg-white/15 hover:bg-white/30 rounded-full flex items-center justify-center text-white z-50 transition-colors" aria-label="Cerrar">
+      <button id="wall-lb-close" aria-label="Cerrar"
+        class="absolute top-4 right-4 w-10 h-10 bg-white/15 hover:bg-white/30 rounded-full flex items-center justify-center text-white z-50 transition-colors">
         <i data-lucide="x" class="w-5 h-5"></i>
       </button>
-      <div class="relative max-w-5xl w-full" onclick="event.stopPropagation()">${content}</div>`;
-    lb.onclick = () => { lb.remove(); };
-    // Liberación de memoria al cerrar
-    lb.addEventListener('remove', () => {
-      const vid = lb.querySelector('video');
-      if (vid) { vid.pause(); vid.src = ''; }
-    });
+      <div class="wall-lb-shell" onclick="event.stopPropagation()">
+        <div class="wall-lb-media">${media}</div>
+        ${hasPost ? `
+        <aside class="wall-lb-side">
+          <div class="wall-lb-head">
+            <i data-lucide="message-circle" class="w-4 h-4 text-slate-400"></i>
+            <span class="wall-lb-head-title">Conversación</span>
+            <span id="wall-lb-count-${postId}" class="wall-counter ml-auto"></span>
+          </div>
+          <div id="wall-lb-list-${postId}" class="wall-lb-list">
+            <div class="py-4 text-center"><div class="animate-spin w-5 h-5 border-2 border-slate-200 border-t-slate-400 rounded-full mx-auto"></div></div>
+          </div>
+          <div id="wall-lb-reactions-${postId}" class="wall-lb-reactions"></div>
+          <div class="wall-lb-foot">
+            <input type="text" id="wall-lb-input-${postId}" class="wall-lb-input" placeholder="Escribe un comentario..." aria-label="Escribir comentario">
+            <button id="wall-lb-send-${postId}" class="wall-lb-send" aria-label="Enviar comentario">
+              <i data-lucide="send" class="w-4 h-4"></i>
+            </button>
+          </div>
+        </aside>` : ''}
+      </div>`;
+    lb.onclick = () => { this.closeLightbox(); };
     document.body.appendChild(lb);
     if (window.lucide) lucide.createIcons();
+
+    document.getElementById('wall-lb-close')?.addEventListener('click', (e) => { e.stopPropagation(); this.closeLightbox(); });
+    if (hasPost) this._wireLightboxConversation(postId, lb);
 
     // Touch swipe para cerrar
     let startY = 0;
     lb.addEventListener('touchstart', e => { startY = e.touches[0].clientY; }, { passive: true });
     lb.addEventListener('touchend', e => {
-      if (Math.abs(e.changedTouches[0].clientY - startY) > 80) lb.remove();
+      if (Math.abs(e.changedTouches[0].clientY - startY) > 80) this.closeLightbox();
     }, { passive: true });
+
+    // Escape cierra (paridad con el lightbox global)
+    this._lbEscHandler = (e) => {
+      if (e.key === 'Escape' && document.getElementById('wall-lightbox')) {
+        e.stopPropagation();
+        this.closeLightbox();
+      }
+    };
+    document.addEventListener('keydown', this._lbEscHandler, true);
+  },
+
+  /**
+   * Cierre real del lightbox. Antes se relieda en un listener del evento
+   * 'remove', que el DOM nunca emite, así que el <video> seguía reproduciendo
+   * y el listener de Escape se acumulaba en cada apertura.
+   */
+  closeLightbox() {
+    const lb = document.getElementById('wall-lightbox');
+    if (!lb) return;
+    const vid = lb.querySelector('video');
+    if (vid) { try { vid.pause(); vid.removeAttribute('src'); vid.load(); } catch (_) { /* noop */ } }
+    lb.remove();
+    this._unbindLightboxEsc();
+  },
+
+  _unbindLightboxEsc() {
+    if (this._lbEscHandler) document.removeEventListener('keydown', this._lbEscHandler, true);
+    this._lbEscHandler = null;
+  },
+
+  /**
+   * Panel lateral del lightbox: reutiliza el hilo de comentarios y las
+   * reacciones del post sin duplicar consultas ni marcado.
+   */
+  async _wireLightboxConversation(postId, lb) {
+    const list    = document.getElementById(`wall-lb-list-${postId}`);
+    const input   = document.getElementById(`wall-lb-input-${postId}`);
+    const sendBtn = document.getElementById(`wall-lb-send-${postId}`);
+    const counter = document.getElementById(`wall-lb-count-${postId}`);
+    const rxRow   = document.getElementById(`wall-lb-reactions-${postId}`);
+    if (!list) return;
+
+    if (counter) counter.textContent = document.getElementById(`comment-count-${postId}`)?.textContent || '';
+
+    if (rxRow) {
+      rxRow.innerHTML = `
+        <button id="wall-lb-like-${postId}" class="wall-lb-reaction" aria-label="Me gusta">
+          ${document.getElementById(`like-main-${postId}`)?.classList.contains('active') ? '❤️' : '🤍'}
+        </button>
+        <button id="wall-lb-more-${postId}" class="wall-lb-reaction" style="width:auto;padding:0 10px;font-size:11px;font-weight:900;color:#64748b" aria-label="Más reacciones">+</button>`;
+      rxRow.querySelector('#wall-lb-like-' + postId)?.addEventListener('click', () => {
+        // El botón del lightbox se sincroniza dentro de _refreshReactionUI.
+        this.toggleReaction(postId, 'like');
+      });
+      rxRow.querySelector('#wall-lb-more-' + postId)?.addEventListener('click', (e) => {
+        this.openReactionPicker(postId, e.currentTarget);
+      });
+    }
+
+    if (sendBtn) {
+      sendBtn.addEventListener('click', async () => {
+        const ok = await this.sendComment(postId, null, { inputEl: input, listEl: list });
+        if (!ok) return;
+        if (input) input.value = '';
+        const fresh = await this._fetchComments(postId);
+        if (!document.getElementById('wall-lightbox')) return;
+        this.renderComments(postId, fresh, list);
+        list.scrollTop = list.scrollHeight;
+        const feedList = document.getElementById(`comments-list-${postId}`);
+        if (feedList) this.renderComments(postId, fresh, feedList);
+      });
+    }
+
+    if (input) {
+      input.addEventListener('keydown', (e) => {
+        if (e.key !== 'Enter') return;
+        e.preventDefault();
+        sendBtn?.click();
+      });
+    }
+
+    const comments = await this._fetchComments(postId);
+    // El overlay pudo cerrarse mientras cargaba el hilo.
+    if (!document.getElementById('wall-lightbox')) return;
+    this.renderComments(postId, comments, list);
+    if (counter) counter.textContent = String(comments.length);
   },
 
   openLightboxFromPost(postId) {
     const img = document.querySelector(`#post-${postId} img`);
-    if (img) this.openLightbox(img.src, 'image');
+    if (img) this.openLightbox(img.src, 'image', postId);
   },
 
   // ── Reacciones ───────────────────────────────────────────────────────────────
@@ -1692,6 +2045,14 @@ const WallModule = {
       if (labelEl) labelEl.textContent = label;
     }
 
+    // Sincroniza el botón del panel lateral del lightbox: es el único punto de
+    // paso para tap directo y para el selector de reacciones.
+    const likeLb = document.getElementById(`wall-lb-like-${postId}`);
+    if (likeLb) {
+      likeLb.textContent = (current && current !== 'like') ? current : (current ? '❤️' : '🤍');
+      likeLb.setAttribute('aria-pressed', String(!!current));
+    }
+
     this._updateReactionChips(postId, delta, added, removed);
   },
 
@@ -1814,22 +2175,27 @@ const WallModule = {
   },
 
   // ── Comentarios ──────────────────────────────────────────────────────────────
-  async sendComment(postId, parentId = null) {
+  /**
+   * `opts.inputEl` / `opts.listEl` permiten enviar desde el panel lateral del
+   * lightbox sin colgarlo del input de la tarjeta del feed. Sin ellos mantiene
+   * el comportamiento original.
+   */
+  async sendComment(postId, parentId = null, opts = {}) {
     const inputId = parentId ? `reply-input-${parentId}` : `comment-input-${postId}`;
-    const input = document.getElementById(inputId);
+    const input = opts.inputEl || document.getElementById(inputId);
     const raw = input?.value.trim();
-    if (!raw) return;
+    if (!raw) return false;
 
     const now = Date.now();
     if (now - this._lastPostTime < _SPAM_COOLDOWN_MS) {
       Helpers.toast('Espera un momento antes de comentar de nuevo', 'warning');
-      return;
+      return false;
     }
 
     const content = _sanitizeHTML(raw);
     const user = this._appState?.get('user');
     const profile = this._appState?.get('profile');
-    if (!user) return;
+    if (!user) return false;
 
     let userName;
     if (profile?.role === 'padre') {
@@ -1839,9 +2205,9 @@ const WallModule = {
       userName = profile?.name || 'Personal';
     }
 
-    const list = parentId
+    const list = opts.listEl || (parentId
       ? document.getElementById(`replies-list-${parentId}`)
-      : document.getElementById(`comments-list-${postId}`);
+      : document.getElementById(`comments-list-${postId}`));
 
     const tempId = `temp-${Date.now()}`;
     if (list) {
@@ -1893,9 +2259,11 @@ const WallModule = {
         // Notificar autor del post
         this._notifyCommentAuthor(postId, newComment?.id, userName, content);
       }
+      return true;
     } catch (_) {
       document.getElementById(tempId)?.remove();
       input.value = raw;
+      return false;
     }
   },
 
@@ -2001,8 +2369,10 @@ const WallModule = {
     return data || [];
   },
 
-  renderComments(postId, comments) {
-    const container = document.getElementById(`comments-list-${postId}`);
+  renderComments(postId, comments, targetEl = null) {
+    // `targetEl` permite renderizar la misma lista dentro del lightbox de dos
+    // columnas sin duplicar el markup ni el marcado de respuestas.
+    const container = targetEl || document.getElementById(`comments-list-${postId}`);
     if (!container) return;
     if (!comments.length) {
       container.innerHTML = '<p class="text-center text-[10px] text-slate-400 italic py-2">Sé el primero en comentar.</p>';
@@ -2623,7 +2993,7 @@ if (typeof window !== 'undefined') {
   if (!window.WallModule) {
     window.WallModule = WallModule;
   }
-  window.openLightbox = (url, type) => WallModule.openLightbox(url, type);
+  window.openLightbox = (url, type, postId = null) => WallModule.openLightbox(url, type, postId);
 }
 
 // Los límites y el validador se exportan para que los tres paneles del Muro

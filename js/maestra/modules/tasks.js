@@ -13,23 +13,35 @@ export async function initTasks() {
   const container = document.getElementById('tab-tasks');
   if (!container) return;
 
-  container.innerHTML = `
-    <div class="flex justify-between items-center mb-8">
-      <h3 class="text-2xl font-black text-slate-800 flex items-center gap-3">Mochila de Tareas</h3>
-      <button onclick="App.openNewTaskModal()" class="px-6 py-3 bg-orange-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-orange-200 hover:bg-orange-700 transition-all flex items-center gap-2">
-        <i data-lucide="plus-circle" class="w-5 h-5"></i> Nueva Tarea
-      </button>
-    </div>
-    <div id="tasksListContainer" class="space-y-4">
-      <div class="animate-pulse space-y-4">
-        <div class="h-32 bg-slate-50 rounded-3xl"></div>
-        <div class="h-32 bg-slate-50 rounded-3xl"></div>
+  // NO se reescribe `container.innerHTML`: el header sticky (#tasksHeader) vive
+  // dentro de #tab-tasks y contiene la barra de progreso de entregas (#6), el
+  // filtro de pendientes (#27) y el botón de calificación en lote (#19).
+  // Antes este render los borraba y esas funciones quedaban muertas.
+  let headerTitle = document.getElementById('tasksHeaderTitle');
+  if (!headerTitle) {
+    container.innerHTML = `
+      <div class="flex justify-between items-center mb-8">
+        <h3 class="text-2xl font-black text-slate-800 flex items-center gap-3">Mochila de Tareas</h3>
+        <button onclick="App.openNewTaskModal()" class="px-6 py-3 bg-orange-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-orange-200 hover:bg-orange-700 transition-all flex items-center gap-2">
+          <i data-lucide="plus-circle" class="w-5 h-5"></i> Nueva Tarea
+        </button>
       </div>
-    </div>
-  `;
+      <div id="tasksListContainer" class="space-y-4"></div>
+    `;
+    headerTitle = document.getElementById('tasksHeaderTitle');
+  } else {
+    headerTitle.textContent = 'Mochila de Tareas';
+  }
   if (window.lucide) window.lucide.createIcons();
 
-  const listContainer = document.getElementById('tasksListContainer');
+  let listContainer = document.getElementById('tasksListContainer');
+  if (!listContainer) {
+    listContainer = document.createElement('div');
+    listContainer.id = 'tasksListContainer';
+    listContainer.className = 'grid grid-cols-1 md:grid-cols-2 gap-4';
+    container.appendChild(listContainer);
+  }
+
   try {
     const tasks = await MaestraApi.getTasksByClassroom(classroom.id, AppState.get('activePeriod')?.id);
     let subjectMap = {};
@@ -42,35 +54,103 @@ export async function initTasks() {
     } catch (_) {}
 
     if (!tasks.length) {
+      listContainer.className = 'space-y-4';
       listContainer.innerHTML = '<div class="text-center p-8 text-slate-500">Aún no has asignado tareas.</div>';
+      _dispatchTasksProgress({ total: 0, delivered: 0, pending: 0, graded: 0 });
       return;
     }
+    listContainer.className = 'grid grid-cols-1 md:grid-cols-2 gap-4';
 
-    // Cargar conteo de entregas pendientes de revisar
+    // Cargar conteo de entregas pendientes de revisar + mapa para el filtro #27
     const taskIds = tasks.map(t => t.id);
-    const { data: pendingSubmissions } = await supabase
+    const { data: allSubmissions } = await supabase
       .from('task_evidences')
-      .select('task_id')
-      .in('task_id', taskIds)
-      .neq('status', 'graded');
+      .select('task_id, status')
+      .in('task_id', taskIds);
 
     const pendingMap = {};
-    (pendingSubmissions || []).forEach(s => {
-      pendingMap[s.task_id] = (pendingMap[s.task_id] || 0) + 1;
+    const deliveredMap = {};
+    const gradedMap = {};
+    (allSubmissions || []).forEach(s => {
+      deliveredMap[s.task_id] = (deliveredMap[s.task_id] || 0) + 1;
+      if (s.status === 'graded') gradedMap[s.task_id] = (gradedMap[s.task_id] || 0) + 1;
+      else pendingMap[s.task_id] = (pendingMap[s.task_id] || 0) + 1;
     });
 
-    listContainer.innerHTML = tasks.map(t => {
-      const dueDate = new Date(t.due_date).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' });
-      const pendingCount = pendingMap[t.id] || 0;
-      return `
-      <div class="bg-white p-6 rounded-3xl border-2 border-slate-50 shadow-sm hover:shadow-md transition-all group">
+    // Item #6: "12 de 15 alumnos han entregado" + barra + contador por revisar
+    const totalStudents = (AppState.get('students') || []).length;
+    const expected = totalStudents * tasks.length;
+    const delivered = Object.values(deliveredMap).reduce((a, b) => a + b, 0);
+    const pending = Object.values(pendingMap).reduce((a, b) => a + b, 0);
+    const graded = Object.values(gradedMap).reduce((a, b) => a + b, 0);
+    _dispatchTasksProgress({ total: expected, delivered, pending, graded });
+
+    // Se guarda en AppState para que el filtro del header (#27) pueda aplicarse
+    // a las tarjetas ya pintadas sin volver a consultar la base de datos.
+    _taskFilterData = {
+      tasks,
+      subjectMap,
+      pendingMap,
+      deliveredMap,
+      gradedMap,
+      totalStudents,
+    };
+
+    renderTasksList();
+    if (window.lucide) lucide.createIcons();
+  } catch (e) {
+    listContainer.innerHTML = Helpers.errorState('Error al cargar tareas', 'App.initTasks()');
+    if (window.lucide) window.lucide.createIcons();
+  }
+}
+
+/** Datos + estado del filtro de la lista de tareas (Item #27) */
+let _taskFilterData = null;
+let _taskFilterValue = 'all';
+
+/** Avisa al bloque de mejoras (barra de progreso) del conteo real (#6) */
+function _dispatchTasksProgress(meta) {
+  try { window.dispatchEvent(new CustomEvent('kk:tasks-progress', { detail: meta })); } catch (_) {}
+}
+
+/** Cambia el filtro de la lista de tareas y re-pinta (Item #27) */
+export function setTasksFilter(value) {
+  _taskFilterValue = ['all', 'pending', 'graded'].includes(value) ? value : 'all';
+  renderTasksList();
+}
+
+/** Re-pinta la lista aplicando el filtro activo (Item #27) */
+export function renderTasksList() {
+  const data = _taskFilterData;
+  const listContainer = document.getElementById('tasksListContainer');
+  if (!data || !listContainer) return;
+  const { tasks, subjectMap, pendingMap, deliveredMap, gradedMap, totalStudents } = data;
+
+  const visible = tasks.filter(t => {
+    if (_taskFilterValue === 'pending') return (pendingMap[t.id] || 0) > 0;
+    if (_taskFilterValue === 'graded')  return (gradedMap[t.id] || 0) > 0;
+    return true;
+  });
+
+  if (!visible.length) {
+    listContainer.innerHTML = `<div class="col-span-full text-center p-8 text-slate-400 text-sm font-bold">No hay tareas en este filtro.</div>`;
+    return;
+  }
+
+  listContainer.innerHTML = visible.map(t => {
+    const dueDate = new Date(t.due_date).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' });
+    const pendingCount = pendingMap[t.id] || 0;
+    const deliveredCount = deliveredMap[t.id] || 0;
+    const done = totalStudents ? Math.min(100, Math.round((deliveredCount / totalStudents) * 100)) : 0;
+    return `
+      <div class="bg-white p-6 rounded-3xl border-2 border-slate-50 shadow-sm hover:shadow-md transition-all group" data-task-id="${t.id}">
         <div class="flex justify-between items-start mb-4">
-          <div>
-            <h4 class="font-black text-slate-800 text-base mb-1">${safeEscapeHTML(t.title)}</h4>
+          <div class="min-w-0">
+            <h4 class="font-black text-slate-800 text-base mb-1 truncate">${safeEscapeHTML(t.title)}</h4>
             ${t.config_id && subjectMap[String(t.config_id)] ? `<span class="inline-block mb-1 px-2 py-0.5 bg-indigo-50 text-indigo-600 rounded-full text-[10px] font-black uppercase">${safeEscapeHTML(subjectMap[String(t.config_id)])}</span>` : ''}
             <p class="text-xs font-bold text-slate-400 flex items-center gap-1.5"><i data-lucide="calendar" class="w-3 h-3"></i> Entrega: ${dueDate}</p>
           </div>
-          <div class="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+          <div class="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
             <button onclick="App.openEditTaskModal('${t.id}')" class="p-2 bg-slate-100 text-slate-500 rounded-lg hover:bg-blue-100 hover:text-blue-600 transition-colors" title="Editar Tarea">
               <i data-lucide="edit" class="w-4 h-4"></i>
             </button>
@@ -79,10 +159,24 @@ export async function initTasks() {
             </button>
           </div>
         </div>
-        <p class="text-sm text-slate-600 line-clamp-2">${safeEscapeHTML(t.description)}</p>
-        <div class="flex justify-between items-center pt-4 border-t border-slate-50 mt-4">
-          <div>
+        <p class="text-sm text-slate-600 line-clamp-2 mb-3">${safeEscapeHTML(t.description || '')}</p>
+
+        <!-- Item #6: progreso de entregas por tarea -->
+        ${totalStudents ? `
+        <div class="mb-3">
+          <div class="flex items-center justify-between mb-1">
+            <span class="text-[9px] font-black uppercase tracking-widest text-slate-400">Entregas</span>
+            <span class="text-[10px] font-black text-slate-600">${deliveredCount} / ${totalStudents}</span>
+          </div>
+          <div class="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+            <div class="h-full rounded-full bg-gradient-to-r from-emerald-400 to-teal-500 transition-all duration-700" style="width:${done}%"></div>
+          </div>
+        </div>` : ''}
+
+        <div class="flex justify-between items-center pt-4 border-t border-slate-50">
+          <div class="flex flex-wrap items-center gap-1.5">
             ${t.file_url ? '<span class="px-2 py-1 bg-blue-50 text-blue-600 text-[10px] font-bold rounded-full flex items-center gap-1"><i data-lucide="paperclip" class="w-3 h-3"></i> Adjunto</span>' : ''}
+            ${pendingCount > 0 ? `<span class="px-2 py-1 bg-rose-50 text-rose-600 text-[10px] font-bold rounded-full flex items-center gap-1"><i data-lucide="hourglass" class="w-3 h-3"></i> ${pendingCount} por calificar</span>` : (gradedMap[t.id] ? `<span class="px-2 py-1 bg-emerald-50 text-emerald-600 text-[10px] font-bold rounded-full flex items-center gap-1"><i data-lucide="check-check" class="w-3 h-3"></i> Calificada</span>` : '')}
           </div>
           <button onclick="App.viewTaskSubmissions('${t.id}')" class="relative px-4 py-2 bg-orange-600 text-white rounded-xl text-[10px] font-black uppercase hover:bg-orange-700 transition-all shadow-sm flex items-center gap-2">
             Ver Entregas
@@ -90,12 +184,9 @@ export async function initTasks() {
           </button>
         </div>
       </div>
-    `}).join('');
-    if (window.lucide) window.lucide.createIcons();
-  } catch (e) {
-    listContainer.innerHTML = Helpers.errorState('Error al cargar tareas', 'App.initTasks()');
-    if (window.lucide) window.lucide.createIcons();
-  }
+    `;
+  }).join('');
+  if (window.lucide) lucide.createIcons();
 }
 
 export async function openEditTaskModal(taskId) {
@@ -319,12 +410,127 @@ async function _getPeriodStatus(classroomId) {
   }
 }
 
+/**
+ * Estado del visor split-screen de entregas.
+ * `list` es el subconjunto de alumnos que sí entregaron: la navegación
+ * anterior/siguiente recorre esa lista, no el aula completa.
+ */
+const _SubPane = {
+  taskId: null,
+  list: [],      // [{ id, name, file_url, comment, status }]
+  index: -1,
+};
+
+/** Estilos del panel de evidencia (inyectados una vez) */
+function _injectPaneStyles() {
+  if (document.getElementById('kk-sub-pane-styles')) return;
+  const style = document.createElement('style');
+  style.id = 'kk-sub-pane-styles';
+  style.textContent = `
+    .kk-pane{background:#f8fafc;border:1px solid #e2e8f0;border-radius:1.25rem;overflow:hidden;display:flex;flex-direction:column}
+    .kk-pane-head{display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid #e2e8f0;background:#fff;flex:0 0 auto}
+    .kk-pane-title{font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:0.08em;color:#64748b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .kk-pane-nav{width:30px;height:30px;border-radius:8px;border:1px solid #e2e8f0;background:#fff;color:#475569;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all 0.15s;flex:0 0 auto}
+    .kk-pane-nav:hover:not(:disabled){background:#f1f5f9;border-color:#cbd5e1}
+    .kk-pane-nav:disabled{opacity:0.35;cursor:not-allowed}
+    .kk-pane-nav svg{width:15px;height:15px}
+    .kk-pane-body{flex:1 1 auto;overflow:auto;overscroll-behavior:contain;background:#0f172a;display:flex;align-items:center;justify-content:center;padding:10px}
+    .kk-pane-body img,.kk-pane-body video,.kk-pane-body iframe{max-width:100%;max-height:100%;width:auto;height:auto;border-radius:8px;display:block;background:#000}
+    .kk-pane-body iframe{width:100%;height:100%;border:none}
+    .kk-pane-empty{color:#94a3b8;font-size:12px;font-weight:700;text-align:center;padding:24px}
+    .kk-pane-foot{border-top:1px solid #e2e8f0;background:#fff;padding:10px 14px;flex:0 0 auto}
+    .kk-pane-chip{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:9999px;font-size:9px;font-weight:900;text-transform:uppercase;letter-spacing:0.05em}
+    .kk-pane-chip-pending{background:#fef3c7;color:#92400e}
+    .kk-pane-chip-done{background:#dcfce7;color:#166534}`;
+  document.head.appendChild(style);
+}
+
+/** Detecta el tipo de archivo por extensión para elegir el preview correcto */
+function _evidenceKind(url = '') {
+  const clean = String(url).split('?')[0];
+  if (/\.(mp4|webm|mov|m4v|avi)$/i.test(clean)) return 'video';
+  if (/\.pdf$/i.test(clean)) return 'pdf';
+  if (/\.(jpe?g|png|gif|webp|avif|bmp|heic)$/i.test(clean)) return 'image';
+  return 'file';
+}
+
+/** Markup del preview para una entrega */
+function _renderEvidencePreview(url) {
+  if (!url) {
+    return '<div class="kk-pane-empty">Este alumno aún no entrega la tarea.</div>';
+  }
+  const safe = safeEscapeHTML(encodeURI(url));
+  switch (_evidenceKind(url)) {
+    case 'image':
+      return `<img src="${safe}" alt="Evidencia" loading="eager">`;
+    case 'video':
+      return `<video src="${safe}" controls playsinline preload="metadata"></video>`;
+    case 'pdf':
+      return `<iframe src="${safe}" title="Evidencia en PDF"></iframe>`;
+    default:
+      return `<div class="kk-pane-empty">Formato no previsualizable.<br><a href="${safe}" target="_blank" rel="noopener" class="underline">Abrir en otra pestaña</a></div>`;
+  }
+}
+
+/** Re-renderiza el panel derecho con la entrega del alumno indicado */
+export function renderSubmissionPane(studentId) {
+  const idx = _SubPane.list.findIndex(s => s.id === studentId);
+  if (idx === -1) return;
+  _SubPane.index = idx;
+
+  const pane = document.getElementById('taskEvidencePane');
+  if (!pane) return;
+  const entry = _SubPane.list[idx];
+
+  pane.innerHTML = `
+    <div class="kk-pane-head">
+      <button id="kkPanePrev" class="kk-pane-nav" ${idx === 0 ? 'disabled' : ''} aria-label="Entrega anterior">
+        <i data-lucide="chevron-left"></i>
+      </button>
+      <span class="kk-pane-title">${safeEscapeHTML(entry.name)} · ${idx + 1}/${_SubPane.list.length}</span>
+      <button id="kkPaneNext" class="kk-pane-nav" ${idx === _SubPane.list.length - 1 ? 'disabled' : ''} aria-label="Entrega siguiente" style="margin-left:auto">
+        <i data-lucide="chevron-right"></i>
+      </button>
+    </div>
+    <div class="kk-pane-body">${_renderEvidencePreview(entry.file_url)}</div>
+    <div class="kk-pane-foot flex items-center gap-2 flex-wrap">
+      <span class="kk-pane-chip ${entry.status === 'graded' ? 'kk-pane-chip-done' : 'kk-pane-chip-pending'}">
+        ${entry.status === 'graded' ? '✅ Calificada' : '⏳ Por calificar'}
+      </span>
+      ${entry.file_url ? `<a href="${safeEscapeHTML(encodeURI(entry.file_url))}" target="_blank" rel="noopener"
+        class="ml-auto text-[10px] font-black uppercase tracking-widest text-blue-600 hover:underline">Abrir original ↗</a>` : ''}
+    </div>`;
+
+  document.getElementById('kkPanePrev')?.addEventListener('click', () => renderSubmissionPane(_SubPane.list[idx - 1]?.id));
+  document.getElementById('kkPaneNext')?.addEventListener('click', () => renderSubmissionPane(_SubPane.list[idx + 1]?.id));
+  if (window.lucide) lucide.createIcons();
+}
+
+/** Punto de entrada desde el onclick de cada tarjeta de alumno */
+export function viewSubmissionPane(studentId) {
+  renderSubmissionPane(studentId);
+}
+
+/**
+ * Acción "Ver Entrega". En escritorio el panel derecho ya muestra la evidencia,
+ * así que solo se actualiza el visor; en móvil, donde no hay panel, se abre el
+ * lightbox a pantalla completa.
+ */
+export function openSubmission(studentId, url) {
+  renderSubmissionPane(studentId);
+  const isDesktop = window.matchMedia?.('(min-width: 768px)').matches === true;
+  if (!isDesktop && url && typeof window.openLightbox === 'function') {
+    window.openLightbox(url, 'image');
+  }
+}
+
 export async function viewTaskSubmissions(taskId) {
   const students = AppState.get('students') || [];
   const classroom = AppState.get('classroom');
   const modalId = 'taskSubmissionsModal';
 
   try {
+    _injectPaneStyles();
     // Verificar estado del período ANTES de mostrar el modal
     const { open: periodOpen, period } = await _getPeriodStatus(classroom?.id);
 
@@ -337,6 +543,18 @@ export async function viewTaskSubmissions(taskId) {
     const subMap = {};
     (submissions || []).forEach(s => subMap[s.student_id] = s);
 
+    // El panel navega solo entre quienes sí entregaron.
+    _SubPane.taskId = taskId;
+    _SubPane.list = students
+      .filter(s => subMap[s.id]?.file_url)
+      .map(s => ({
+        id: s.id,
+        name: s.name,
+        file_url: subMap[s.id].file_url,
+        comment: subMap[s.id].comment,
+        status: subMap[s.id].status,
+      }));
+
     // Banner de período cerrado
     const closedBanner = !periodOpen ? `
       <div class="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-2xl flex items-center gap-3">
@@ -348,7 +566,7 @@ export async function viewTaskSubmissions(taskId) {
       </div>` : '';
 
     const content = `
-      <div class="bg-white w-full max-w-4xl rounded-[2.5rem] shadow-2xl p-8 animate-fadeIn flex flex-col max-h-[90vh]">
+      <div class="bg-white w-full max-w-5xl rounded-[2.5rem] shadow-2xl p-6 md:p-8 animate-fadeIn flex flex-col h-[80vh]">
         <div class="flex justify-between items-start mb-6">
           <div>
             <h3 class="text-2xl font-black text-slate-800">Revisión de Entregas</h3>
@@ -373,7 +591,8 @@ export async function viewTaskSubmissions(taskId) {
             <button onclick="App._bulkGradeAll('${taskId}','iniciado')" class="px-3 py-1.5 bg-sky-100 hover:bg-sky-200 border border-sky-300 rounded-xl text-[9px] font-black text-sky-700 transition-all active:scale-95">🚀 Iniciado</button>
           </div>
         </div>` : ''}
-        <div class="space-y-4 overflow-y-auto pr-2 flex-1">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 flex-1">
+        <div class="space-y-4 overflow-y-auto pr-1 md:pr-2">
           ${students.length > 0 ? students.map(s => {
             const sub = subMap[s.id];
             const hasSubmission = sub && sub.file_url;
@@ -387,11 +606,17 @@ export async function viewTaskSubmissions(taskId) {
             return `
               <div class="p-5 bg-slate-50 rounded-2xl border ${isGraded ? 'border-green-200 bg-green-50/30' : 'border-slate-100'}">
                 <div class="flex items-center justify-between mb-4">
-                  <div class="font-bold text-slate-800">${safeEscapeHTML(s.name)}</div>
-                  ${hasSubmission 
-                    ? `<a href="${safeUrl}" target="_blank" class="px-3 py-1.5 bg-blue-100 text-blue-600 rounded-lg text-xs font-bold hover:bg-blue-200 transition-colors flex items-center gap-2">
-                         <i data-lucide="download" class="w-3 h-3"></i> Ver Entrega
-                       </a>`
+                  <button onclick="App.viewSubmissionPane('${s.id}')"
+                    class="font-bold text-slate-800 text-left flex items-center gap-2 ${hasSubmission ? 'hover:text-orange-600 transition-colors' : 'cursor-default'}"
+                    ${hasSubmission ? `title="Ver evidencia en el panel derecho"` : ''}>
+                    ${hasSubmission ? `<span class="w-2 h-2 rounded-full bg-orange-500 shrink-0"></span>` : ''}
+                    ${safeEscapeHTML(s.name)}
+                  </button>
+                  ${hasSubmission
+                    ? `<button onclick="App.openSubmission('${s.id}', '${safeUrl}')"
+                        class="px-3 py-1.5 bg-blue-100 text-blue-600 rounded-lg text-xs font-bold hover:bg-blue-200 transition-colors flex items-center gap-2">
+                         <i data-lucide="eye" class="w-3 h-3"></i> Ver Entrega
+                       </button>`
                     : `<span class="px-3 py-1.5 bg-slate-100 text-slate-400 rounded-lg text-xs font-bold">Sin entregar</span>`
                   }
                 </div>
@@ -438,9 +663,19 @@ export async function viewTaskSubmissions(taskId) {
             `;
           }).join('') : '<div class="text-center p-4 text-slate-400">No hay alumnos en la clase.</div>'}
         </div>
+        <!-- Panel de evidencia: split-screen en escritorio -->
+        <aside id="taskEvidencePane" class="kk-pane hidden md:flex"></aside>
+        </div>
       </div>
     `;
     Modal.open(modalId, content);
+    // Primera entrega con contenido: el panel nunca arranca vacío en escritorio.
+    if (_SubPane.list.length) {
+      renderSubmissionPane(_SubPane.list[0].id);
+    } else {
+      const pane = document.getElementById('taskEvidencePane');
+      if (pane) pane.innerHTML = '<div class="kk-pane-body"><div class="kk-pane-empty">A\u00fan nadie entreg\u00f3 esta tarea.</div></div>';
+    }
   } catch (err) {
     safeToast('Error al cargar entregas', 'error');
   }
@@ -782,17 +1017,23 @@ function renderAreasPanel(config, actByConfig, statTotal, taskByConfig = {}, tas
 
 export async function initGradesV2() {
   const classroom = AppState.get('classroom');
-  const container = document.getElementById('tab-grades-v2') || document.getElementById('t-grades-inner');
+  // Prioridad: usar el slot dedicado. Antes se reescribía `#t-grades-inner`, lo que
+  // destruía la cuadrícula Excel (#7), los atajos de nota (#19) y el botón de
+  // comentarios IA (#20), dejándolos como markup muerto.
+  let container = document.getElementById('gradesV2Slot');
+  if (!container) {
+    container = document.getElementById('tab-grades-v2');
+  }
   if (!container) return;
 
   container.innerHTML = `
-    <div class="flex justify-between items-center mb-8">
+    <div class="flex justify-between items-center mb-8 p-4">
       <h3 class="text-2xl font-black text-slate-800 flex items-center gap-3">
         <i data-lucide="star" class="w-6 h-6 text-indigo-500"></i>
         Calificaciones
       </h3>
     </div>
-    <div id="gradesV2Content" class="space-y-4">
+    <div id="gradesV2Content" class="space-y-4 px-4 pb-4">
       <div class="animate-pulse space-y-4">
         <div class="h-32 bg-slate-50 rounded-3xl"></div>
         <div class="h-32 bg-slate-50 rounded-3xl"></div>

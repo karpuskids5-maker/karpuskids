@@ -42,8 +42,20 @@ for (const fn of fns) {
 }
 
 // ── Database ──────────────────────────────────────────────────
+// El esquema vive en supabase/migrations/*.sql (14 migraciones consolidadas).
+// La antigua ruta db/production-fixes.sql quedó obsoleta.
 console.log('\n🗄️ Database:');
-check('production-fixes.sql exists', fs.existsSync('db/production-fixes.sql'), 'Run db/production-fixes.sql in Supabase SQL Editor');
+const MIGRATIONS_DIR = 'supabase/migrations';
+const migrations = fs.existsSync(MIGRATIONS_DIR)
+  ? fs.readdirSync(MIGRATIONS_DIR).filter(f => f.endsWith('.sql')).sort()
+  : [];
+check('supabase/migrations/ has SQL files', migrations.length > 0, 'Add SQL migrations to supabase/migrations/');
+if (migrations.length) {
+  check(`migrations sorted & newest is ${migrations[migrations.length - 1]}`, true, '');
+  const idx = migrations.map((f, i) => [f, i]).filter(([f]) => /^\d{14}_\d{2}_/.test(f));
+  check('migration filenames follow YYYYMMDDHHMMSS_NN_slug.sql', idx.length === migrations.length,
+    `Rename to match convention: ${migrations.filter(f => !/^\d{14}_\d{2}_/.test(f)).join(', ')}`);
+}
 
 // ── PWA ───────────────────────────────────────────────────────
 console.log('\n📱 PWA:');

@@ -1,11 +1,11 @@
 # Migraciones de base de datos — Karpus Kids
 
-Estas 12 migraciones consolidan **44 fuentes SQL** (36 archivos de
+Estas 13 migraciones consolidan **44 fuentes SQL** (36 archivos de
 `migraciones/operativos/` y 8 de `supabase/migrations/`) y corrigen los defectos
 encontrados al auditarlas.
 
 Los 44 archivos originales **se eliminaron del repositorio** tras la
-consolidación: no son válidos para desplegar. Estas 12 son las únicas
+consolidación: no son válidos para desplegar. Estas 13 son las únicas
 migraciones del proyecto y el único estado desplegable del esquema.
 
 ## Aplicar en este orden
@@ -24,13 +24,14 @@ migraciones del proyecto y el único estado desplegable del esquema.
 | 10 | `20260920121000_10_correcciones_auditoria.sql` | Correcciones de auditoría (ver abajo) |
 | 11 | `20260920121100_11_numeracion_recibos.sql` | Consolidada (absorbe las antiguas 11, 12 y 13): mes canónico `month_key()`, correlativo de recibo, policy de comprobante en revisión, **reparación de datos** (unificar `month_paid` a `YYYY-MM` y deduplicar), trigger anti-meses-futuros y ciclo de pagos con `GET DIAGNOSTICS` |
 | 12 | `20260920121200_12_archivo_pagos_fuera_ciclo.sql` | Archivar pagos aprobados: `deleted_at` permitido en `fn_protect_paid_records`, `payments_month_floor_check` admite filas archivadas y **anulación del lote de cobros de `2026-05`** (ids 245-262, RD$ 93,603.00) |
+| 13 | `20260920121300_13_evaluacion_calidad.sql` | Evaluación mensual de calidad: periodos, catálogo de preguntas, respuestas, acciones y alertas, vistas analíticas y cron |
 
 Los timestamps arrancan en `20260920`, después de la última migración anterior
 (`20260919120000_asistencia_unifica_horario.sql`), así que se aplican al final.
 
 ```bash
 supabase db push          # aplica lo pendiente en orden
-# o manual, en orden 01 -> 12:
+# o manual, en orden 01 -> 13:
 psql "$DATABASE_URL" -f 20260920120100_01_esquema.sql
 psql "$DATABASE_URL" -f 20260920120200_02_esquema.sql
 # ... etc
@@ -136,6 +137,51 @@ desincronización entre paneles (propuesta.md):
 - El pase requiere desactivar temporalmente `trg_protect_paid_records` (permite
   tocar filas `paid`); se rehabilita al final, dentro de la misma transacción, y
   deja rastro en `audit_logs` (`payment.data_normalized`).
+
+## Migración 13: evaluación mensual de calidad
+
+Implementa el sistema de `propuesta.md`. Todo el ciclo es SQL; no usa `pg_net`
+ni Edge Functions.
+
+| Objeto | Qué hace |
+|--------|----------|
+| `quality_periods` | Mes evaluado (`period_month`), ventana de apertura/cierre y estado. El día 1 se abre el periodo del mes anterior |
+| `quality_questions` | Catálogo: 4 preguntas de Bloque A (docente) y 6 de Bloque B (institución) |
+| `quality_responses` | Una respuesta por `(period_id, student_id)`. Congela `teacher_id` al enviar, para que un cambio de aula no reescriba el histórico |
+| `quality_answers` | Puntaje 1-5 por pregunta |
+| `quality_actions` | Acciones de mejora (sección 15) |
+| `quality_alerts` | Alertas de descenso (sección 12) |
+| `quality_reminders` | Bitácora de recordatorios de los días 1/7/15/25 (sección 18) |
+| `v_quality_*` | IGSM, índice docente, índice institucional, participación, matriz por docente, tendencias, temas comentados, pendientes |
+| `quality_daily()` | Entrada única del cron: cierra vencidos, abre el día 1, registra recordatorios y calcula alertas |
+| `quality_submit_survey(...)` | RPC que guarda la encuesta completa en una sola transacción |
+
+Detalles de diseño que conviene conocer antes de tocarla:
+
+- **Las vistas llevan `security_invoker = true`.** Sin eso, al crearlas el
+  dueño de la migración, correrían con permisos de superusuario y saltarían el
+  RLS de las tablas subyacentes: cualquier padre autenticado podría leer la
+  matriz completa de docentes y los comentarios de otras familias.
+- **La deduplicación de alertas usa un índice único con `COALESCE(teacher_id,
+  '0000…')`, no un `UNIQUE` de columna.** Las alertas institucionales tienen
+  `teacher_id` NULL, y Postgres considera los NULL distintos entre sí, así que
+  con un `UNIQUE` normal el cron insertaría la misma alerta todos los días.
+- **`quality_generate_alerts()` exige 3+ respuestas por dimensión** antes de
+  alertar, para no generar conclusiones a partir de una o dos familias.
+- **El envío es atómico.** `UNIQUE (period_id, student_id)` +
+  `quality_submit_survey()` evitan que un fallo a mitad del guardado deje una
+  respuesta huérfana que impida al padre reintentar.
+- **Las funciones de automatización son `SECURITY DEFINER` y se revocan a
+  `PUBLIC`.** Postgres concede `EXECUTE` a `PUBLIC` por defecto; sin el
+  `REVOKE`, cualquier usuario autenticado podría abrir o cerrar periodos y
+  generar alertas pulsando el RPC a su antojo. Solo `service_role` los ejecuta.
+- **Sin puntos, cupones ni recompensas** (sección 17). Una puntuación baja
+  genera *Alerta de revisión*; la decisión es de Dirección, y las acciones se
+  miden por su efecto en el mes siguiente, no por cerrar la acción.
+
+> La automatización depende de que `pg_cron` esté instalado. Si no lo está, la
+> migración lo avisa con un `RAISE NOTICE` y el sistema funciona igual: se abre
+> el periodo con `SELECT public.quality_activate_previous_month();`
 
 ## Vocabulario de estados de pago
 

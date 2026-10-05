@@ -23,10 +23,12 @@ const debounce = (fn, delay) => {
 window.App = {
   navigation: { goTo: goToSection },
   students: {
-    openModal: (id) => import('./students.module.js').then(m => m.StudentsModule.openModal(id)),
-    loadStudents: () => import('./students.module.js').then(m => m.StudentsModule.loadStudents()),
-    filter: (v) => import('./students.module.js').then(m => m.StudentsModule.filter?.(v)),
-    delete: (id) => import('./students.module.js').then(m => m.StudentsModule.delete(id)),
+    openModal:    (id)           => import('./students.module.js').then(m => m.StudentsModule.openModal(id)),
+    loadStudents: ()             => import('./students.module.js').then(m => m.StudentsModule._load()),
+    filter:       (v)            => import('./students.module.js').then(m => m.StudentsModule.applyFilters()),
+    delete:       (id)           => import('./students.module.js').then(m => m.StudentsModule.delete(id)),
+    toggleActive: (id, active)   => import('./students.module.js').then(m => m.StudentsModule.toggleActive(id, active)),
+    _exportList:  ()             => import('./students.module.js').then(m => m.StudentsModule._exportCSV()),
   },
   inscripciones: {
     init: () => import('./inscripciones.module.js').then(m => m.InscripcionesModule.init()),
@@ -76,6 +78,10 @@ window.App = {
     init: () => import('./automation.js').then(m => m.AutomationModule.init()),
   },
   reports: { init: () => import('./reports.module.js').then(m => m.ReportsModule.init()) },
+  evaluaciones: {
+    init: () => import('./quality-eval.module.js').then(m => m.QualityEvalModule.init()),
+    saveNewAction: () => import('./quality-eval.module.js').then(m => m.QualityEvalModule.saveNewAction()),
+  },
   donaciones: {
     init: () => import('./donations.module.js').then(m => m.DonationsModule.init()),
     openCampaignModal: (id) => import('./donations.module.js').then(m => m.DonationsModule.openCampaignModal(id)),
@@ -278,6 +284,9 @@ function _applySection(sectionId, opts = {}) {
       case 'reportes':
         import('./reports.module.js').then(m => m.ReportsModule.init());
         break;
+      case 'evaluaciones':
+        import('./quality-eval.module.js').then(m => m.QualityEvalModule.init());
+        break;
       case 'staff-permits':
         import('./permits.module.js').then(m => m.PermitsModule.init());
         break;
@@ -303,6 +312,7 @@ function _applySection(sectionId, opts = {}) {
     const GROUP_OF_SECTION = {
       dashboard: 'principal',
       maestros: 'gestion', estudiantes: 'gestion', inscripciones: 'gestion', aulas: 'gestion',
+      evaluaciones: 'gestion',
       asistencia: 'academico', calificaciones: 'academico',
       pagos: 'finanzas', tienda: 'finanzas', donaciones: 'finanzas',
       'anio-escolar': 'sistema', configuracion: 'sistema'

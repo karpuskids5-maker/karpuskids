@@ -116,12 +116,18 @@ export const InscripcionesModule = {
     if (!list.length) {
       tbody.innerHTML = `
         <tr>
-          <td colspan="7" class="px-4 py-12 text-center">
-            <div class="w-16 h-16 mx-auto rounded-2xl bg-purple-50 text-purple-400 flex items-center justify-center mb-4">
-              <i data-lucide="inbox" class="w-8 h-8"></i>
+          <td colspan="7" class="px-4 py-16 text-center">
+            <div class="relative inline-block mb-5">
+              <div class="absolute inset-0 rounded-3xl bg-gradient-to-br from-purple-200/40 to-indigo-200/40 blur-2xl scale-125"></div>
+              <div class="relative w-20 h-20 mx-auto rounded-3xl bg-gradient-to-br from-purple-50 to-indigo-50 border border-purple-100 text-purple-400 flex items-center justify-center shadow-sm">
+                <i data-lucide="clipboard-list" class="w-9 h-9"></i>
+              </div>
             </div>
-            <h3 class="font-black text-slate-700 mb-1">Sin preinscripciones</h3>
-            <p class="text-xs text-slate-400 font-bold">Comparte el formulario público para recibir solicitudes.</p>
+            <h3 class="font-black text-slate-700 mb-1.5 text-lg">Bandeja de preinscripciones limpia</h3>
+            <p class="text-xs text-slate-400 font-bold mb-4 max-w-sm mx-auto leading-relaxed">No hay solicitudes en este estado. Comparte el formulario público para recibir nuevas solicitudes de inscripción.</p>
+            <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-50 border border-slate-100 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+              <i data-lucide="sparkles" class="w-3 h-3 text-purple-400"></i> Recibirás una notificación por cada nueva solicitud
+            </div>
           </td>
         </tr>`;
       if (window.lucide) lucide.createIcons();
@@ -134,37 +140,48 @@ export const InscripcionesModule = {
       const p2 = r.parent_2 || {};
       const docsCount = Object.keys(r.documents || {}).length;
       const ageText = r.birth_date ? computeAge(r.birth_date) : '';
+      const hasAllergies = !!(r.medical?.allergies && r.medical.allergies.trim());
+      const canAdmit = r.status === 'pending' || r.status === 'reviewing';
 
       return `
-        <tr class="group">
-          <td class="px-4 py-3">
+        <tr class="group hover:bg-slate-50/70 transition-colors">
+          <td data-label="Estudiante" class="px-4 py-3">
             <div class="flex items-center gap-3 min-w-0">
-              <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center text-white font-black text-sm shadow-md shadow-purple-100 shrink-0">
+              <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center text-white font-black text-sm shadow-md shadow-purple-100 shrink-0 ring-2 ring-white">
                 ${Helpers.escapeHTML((r.student_name || '?').charAt(0))}
               </div>
               <div class="min-w-0">
-                <p class="font-black text-slate-800 text-sm truncate">${Helpers.escapeHTML(r.student_name || 'Sin nombre')}${r.student_last_name ? ' ' + Helpers.escapeHTML(r.student_last_name) : ''}</p>
-                <p class="text-[10px] text-slate-400 font-black uppercase tracking-widest">#${r.id}${ageText ? ' · ' + ageText : ''}</p>
+                <p class="font-black text-slate-800 text-sm truncate group-hover:text-indigo-700 transition-colors">${Helpers.escapeHTML(r.student_name || 'Sin nombre')}${r.student_last_name ? ' ' + Helpers.escapeHTML(r.student_last_name) : ''}</p>
+                <p class="text-[10px] text-slate-400 font-black uppercase tracking-widest"><span class="font-mono text-purple-500">#${String(r.id).padStart(4,'0')}</span>${ageText ? ' · ' + ageText : ''}</p>
               </div>
             </div>
           </td>
-          <td class="px-4 py-3 text-xs font-bold text-slate-700">${Helpers.escapeHTML(p1.name || '—')}${p2.name ? ' / ' + Helpers.escapeHTML(p2.name) : ''}</td>
-          <td class="px-4 py-3 text-xs text-slate-500">${Helpers.escapeHTML(r.contact_phone || '—')}<span class="block text-[10px] text-slate-400">${Helpers.escapeHTML(r.contact_email || '')}</span></td>
-          <td class="px-4 py-3 text-xs font-bold text-slate-600">${Helpers.escapeHTML(r.level_requested || '—')}${r.schedule ? '<span class="block text-[10px] font-black text-purple-500 uppercase tracking-wider">' + Helpers.escapeHTML(r.schedule) + (r.entry_time && r.exit_time ? ' · ' + r.entry_time + ' – ' + r.exit_time : '') + '</span>' : ''}</td>
-          <td class="px-4 py-3 text-xs text-slate-500 whitespace-nowrap">${new Date(r.created_at).toLocaleDateString()}</td>
-          <td class="px-4 py-3 whitespace-nowrap">
-            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[10px] font-black uppercase tracking-wider ${meta.cls}">
-              <span class="w-1.5 h-1.5 rounded-full ${meta.dot}"></span>${meta.label}
-            </span>
+          <td data-label="Padres" class="px-4 py-3 text-xs font-bold text-slate-700">${Helpers.escapeHTML(p1.name || '—')}${p2.name ? ' / ' + Helpers.escapeHTML(p2.name) : ''}</td>
+          <td data-label="Contacto" class="px-4 py-3 text-xs text-slate-500">${Helpers.escapeHTML(r.contact_phone || '—')}<span class="block text-[10px] text-slate-400 truncate">${Helpers.escapeHTML(r.contact_email || '')}</span></td>
+          <td data-label="Nivel / Horario" class="px-4 py-3 text-xs font-bold text-slate-600">${Helpers.escapeHTML(r.level_requested || '—')}${r.schedule ? '<span class="block text-[10px] font-black text-purple-500 uppercase tracking-wider mt-0.5">' + Helpers.escapeHTML(r.schedule) + (r.entry_time && r.exit_time ? ' · ' + r.entry_time + '–' + r.exit_time : '') + '</span>' : ''}</td>
+          <td data-label="Fecha" class="px-4 py-3 text-xs text-slate-500 whitespace-nowrap">${new Date(r.created_at).toLocaleDateString()}</td>
+          <td data-label="Estado" class="px-4 py-3 whitespace-nowrap">
+            <div class="flex flex-col gap-1.5">
+              <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[10px] font-black uppercase tracking-wider ${meta.cls} w-max shadow-sm">
+                <span class="w-1.5 h-1.5 rounded-full ${meta.dot} animate-pulse"></span>${meta.label}
+              </span>
+              ${hasAllergies ? `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-wider bg-rose-500 text-white w-max ring-1 ring-rose-200 shadow-sm animate-pulse" title="Alergias: ${Helpers.escapeHTML(r.medical.allergies)}">
+                <i data-lucide="alert-triangle" class="w-3 h-3"></i> Alergias
+              </span>` : ''}
+              ${docsCount ? `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-wider bg-indigo-50 text-indigo-700 w-max ring-1 ring-indigo-100">
+                <i data-lucide="file-text" class="w-3 h-3"></i> ${docsCount} doc${docsCount === 1 ? '' : 's'}
+              </span>` : ''}
+            </div>
           </td>
-          <td class="px-4 py-3">
-            <div class="flex items-center justify-end gap-2">
-              ${r.medical?.allergies ? `<span class="text-[10px] text-rose-500 font-black" title="Alergias registradas">⚠</span>` : ''}
-              ${docsCount ? `<span class="px-2 py-1 bg-indigo-50 text-indigo-600 rounded-lg text-[10px] font-black">${docsCount} docs</span>` : ''}
-              <button onclick="App.inscripciones.reject(${r.id})" class="w-9 h-9 flex items-center justify-center bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white rounded-xl transition-all shadow-sm" title="Rechazar">
+          <td data-label="Acciones" class="px-4 py-3">
+            <div class="flex items-center justify-end gap-1.5">
+              ${canAdmit ? `<button onclick="App.inscripciones.admit(${r.id})" class="w-9 h-9 flex items-center justify-center bg-emerald-50 text-emerald-600 hover:bg-emerald-500 hover:text-white rounded-xl transition-all shadow-sm hover:shadow-md hover:shadow-emerald-500/30 hover:-translate-y-0.5 active:scale-95" title="Aprobar solicitud">
+                <i data-lucide="check" class="w-4 h-4"></i>
+              </button>` : ''}
+              <button onclick="App.inscripciones.reject(${r.id})" class="w-9 h-9 flex items-center justify-center bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white rounded-xl transition-all shadow-sm hover:-translate-y-0.5 active:scale-95" title="Rechazar">
                 <i data-lucide="x" class="w-4 h-4"></i>
               </button>
-              <button onclick="App.inscripciones.openRecord(${r.id})" class="flex items-center gap-1.5 px-3 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-md shadow-purple-100 transition-all active:scale-95">
+              <button onclick="App.inscripciones.openRecord(${r.id})" class="flex items-center gap-1.5 px-3 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-md shadow-purple-100 transition-all active:scale-95 hover:shadow-lg hover:-translate-y-0.5">
                 <i data-lucide="folder-open" class="w-3.5 h-3.5"></i> Revisar
               </button>
             </div>
@@ -172,6 +189,27 @@ export const InscripcionesModule = {
         </tr>`;
     }).join('');
     if (window.lucide) lucide.createIcons();
+  },
+
+  async admit(id) {
+    const prereg = this._list.find(r => String(r.id) === String(id));
+    const name = prereg?.student_name || 'este estudiante';
+    const ok = window.confirm(`¿Aprobar la preinscripción de "${name}"?\n\nEl estado pasará a "Admitida".`);
+    if (!ok) return;
+    try {
+      const { error } = await supabase.rpc('review_preregistration', {
+        p_id: id,
+        p_status: 'admitted',
+        p_notes: `Aprobada rápidamente por staff — ${new Date().toLocaleString()}`,
+      });
+      if (error) throw error;
+      await auditLog('preregistration.admitted', { prereg_id: id, student_name: prereg?.student_name, method: 'one-click' });
+      Helpers.toast('Preinscripción aprobada ✔', 'success');
+      this.init();
+    } catch (e) {
+      Helpers.safeLog('error', 'Error admitting prereg:', e);
+      Helpers.toast('Error al aprobar: ' + (e.message || e), 'error');
+    }
   },
 
   openRecord(id) {
