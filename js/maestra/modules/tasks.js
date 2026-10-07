@@ -21,14 +21,13 @@ export async function initTasks() {
   if (!headerTitle) {
     container.innerHTML = `
       <div class="flex justify-between items-center mb-8">
-        <h3 class="text-2xl font-black text-slate-800 flex items-center gap-3">Mochila de Tareas</h3>
+        <h3 id="tasksHeaderTitle" class="text-2xl font-black text-slate-800 flex items-center gap-3">Mochila de Tareas</h3>
         <button onclick="App.openNewTaskModal()" class="px-6 py-3 bg-orange-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-orange-200 hover:bg-orange-700 transition-all flex items-center gap-2">
           <i data-lucide="plus-circle" class="w-5 h-5"></i> Nueva Tarea
         </button>
       </div>
       <div id="tasksListContainer" class="space-y-4"></div>
     `;
-    headerTitle = document.getElementById('tasksHeaderTitle');
   } else {
     headerTitle.textContent = 'Mochila de Tareas';
   }
@@ -119,9 +118,19 @@ export function setTasksFilter(value) {
   renderTasksList();
 }
 
+/** Chip de estado de una tarea (pendiente / calificada / nada) */
+function _taskStatusBadge(pendingCount, taskId, gradedMap) {
+  if (pendingCount > 0) {
+    return `<span class="px-2 py-1 bg-rose-50 text-rose-600 text-[10px] font-bold rounded-full flex items-center gap-1"><i data-lucide="hourglass" class="w-3 h-3"></i> ${pendingCount} por calificar</span>`;
+  }
+  if (gradedMap[taskId]) {
+    return '<span class="px-2 py-1 bg-emerald-50 text-emerald-600 text-[10px] font-bold rounded-full flex items-center gap-1"><i data-lucide="check-check" class="w-3 h-3"></i> Calificada</span>';
+  }
+  return '';
+}
+
 /** Re-pinta la lista aplicando el filtro activo (Item #27) */
-export function renderTasksList() {
-  const data = _taskFilterData;
+export function renderTasksList() {  const data = _taskFilterData;
   const listContainer = document.getElementById('tasksListContainer');
   if (!data || !listContainer) return;
   const { tasks, subjectMap, pendingMap, deliveredMap, gradedMap, totalStudents } = data;
@@ -176,7 +185,7 @@ export function renderTasksList() {
         <div class="flex justify-between items-center pt-4 border-t border-slate-50">
           <div class="flex flex-wrap items-center gap-1.5">
             ${t.file_url ? '<span class="px-2 py-1 bg-blue-50 text-blue-600 text-[10px] font-bold rounded-full flex items-center gap-1"><i data-lucide="paperclip" class="w-3 h-3"></i> Adjunto</span>' : ''}
-            ${pendingCount > 0 ? `<span class="px-2 py-1 bg-rose-50 text-rose-600 text-[10px] font-bold rounded-full flex items-center gap-1"><i data-lucide="hourglass" class="w-3 h-3"></i> ${pendingCount} por calificar</span>` : (gradedMap[t.id] ? `<span class="px-2 py-1 bg-emerald-50 text-emerald-600 text-[10px] font-bold rounded-full flex items-center gap-1"><i data-lucide="check-check" class="w-3 h-3"></i> Calificada</span>` : '')}
+            ${_taskStatusBadge(pendingCount, t.id, gradedMap)}
           </div>
           <button onclick="App.viewTaskSubmissions('${t.id}')" class="relative px-4 py-2 bg-orange-600 text-white rounded-xl text-[10px] font-black uppercase hover:bg-orange-700 transition-all shadow-sm flex items-center gap-2">
             Ver Entregas
@@ -459,7 +468,8 @@ function _renderEvidencePreview(url) {
   if (!url) {
     return '<div class="kk-pane-empty">Este alumno aún no entrega la tarea.</div>';
   }
-  const safe = safeEscapeHTML(encodeURI(url));
+  // No re-encodear: la URL ya viene limpia desde Supabase
+  const safe = safeEscapeHTML(url);
   switch (_evidenceKind(url)) {
     case 'image':
       return `<img src="${safe}" alt="Evidencia" loading="eager">`;
@@ -497,7 +507,7 @@ export function renderSubmissionPane(studentId) {
       <span class="kk-pane-chip ${entry.status === 'graded' ? 'kk-pane-chip-done' : 'kk-pane-chip-pending'}">
         ${entry.status === 'graded' ? '✅ Calificada' : '⏳ Por calificar'}
       </span>
-      ${entry.file_url ? `<a href="${safeEscapeHTML(encodeURI(entry.file_url))}" target="_blank" rel="noopener"
+      ${entry.file_url ? `<a href="${safeEscapeHTML(entry.file_url)}" target="_blank" rel="noopener"
         class="ml-auto text-[10px] font-black uppercase tracking-widest text-blue-600 hover:underline">Abrir original ↗</a>` : ''}
     </div>`;
 
@@ -523,6 +533,79 @@ export function openSubmission(studentId, url) {
     window.openLightbox(url, 'image');
   }
 }
+
+// ── Helper: construye la fila HTML de un alumno en el modal de entregas ──────
+function _buildStudentRow(s, sub, taskId, periodOpen) {
+  const hasSubmission = !!(sub?.file_url);
+  const isGraded      = sub?.status === 'graded';
+  const rawUrl        = hasSubmission ? sub.file_url : '';
+  const disabledAttr  = periodOpen ? '' : 'disabled';
+  const disabledCls   = periodOpen ? '' : ' opacity-50 cursor-not-allowed';
+
+  const gradeTag = isGraded ? '<div class="text-xs text-green-600 font-bold mt-2 flex items-center gap-1"><i data-lucide="check-circle" class="w-3 h-3"></i> Calificado</div>' : '';
+
+  return `
+    <div class="p-5 bg-slate-50 rounded-2xl border ${isGraded ? 'border-green-200 bg-green-50/30' : 'border-slate-100'}">
+      <div class="flex items-center justify-between mb-4 gap-2">
+        <button data-view-pane="${s.id}"
+          class="font-bold text-slate-800 text-left flex items-center gap-2 min-w-0 ${hasSubmission ? 'hover:text-orange-600 transition-colors' : 'cursor-default'}"
+          ${hasSubmission ? 'title="Ver evidencia en el panel derecho"' : ''}>
+          ${hasSubmission ? '<span class="w-2 h-2 rounded-full bg-orange-500 shrink-0"></span>' : ''}
+          <span class="truncate">${safeEscapeHTML(s.name)}</span>
+        </button>
+        ${hasSubmission
+          ? `<button data-open-submission="${s.id}" data-url="${safeEscapeHTML(rawUrl)}"
+              class="shrink-0 px-3 py-1.5 bg-blue-100 text-blue-600 rounded-lg text-xs font-bold hover:bg-blue-200 transition-colors flex items-center gap-2">
+               <i data-lucide="eye" class="w-3 h-3"></i> Ver Entrega
+             </button>`
+          : '<span class="shrink-0 px-3 py-1.5 bg-slate-100 text-slate-400 rounded-lg text-xs font-bold">Sin entregar</span>'
+        }
+      </div>
+      <div class="grid grid-cols-1 gap-3">
+        <div>
+          <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Retroalimentación</label>
+          <textarea id="feedback-${s.id}" ${disabledAttr} rows="2"
+            class="w-full p-2 bg-white rounded-lg text-xs border border-slate-200 focus:ring-1 focus:ring-orange-400 outline-none${disabledCls}"
+            placeholder="Escribe un comentario...">${safeEscapeHTML(sub?.comment || '')}</textarea>
+        </div>
+        <div class="flex items-end gap-2 flex-wrap">
+          <div class="flex-1 min-w-[100px]">
+            <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Nota (0-100)</label>
+            <input type="number" id="score-${s.id}" min="0" max="100" step="0.1"
+              ${disabledAttr} value="${sub?.score_v2 != null ? sub.score_v2 : ''}"
+              class="w-full p-2 rounded-lg text-xs font-black text-center bg-white border border-slate-200 focus:ring-1 focus:ring-orange-400 outline-none${disabledCls}"
+              placeholder="0-100">
+          </div>
+          <div class="flex-1">
+            <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Letra</label>
+            <select id="grade-${s.id}" ${disabledAttr}
+              class="w-full p-2 rounded-lg text-xs font-bold bg-white border border-slate-200${disabledCls}">
+              <option value="">-</option>
+              <option value="A" ${sub?.grade_letter === 'A' ? 'selected' : ''}>A (Excelente)</option>
+              <option value="B" ${sub?.grade_letter === 'B' ? 'selected' : ''}>B (Bien)</option>
+              <option value="C" ${sub?.grade_letter === 'C' ? 'selected' : ''}>C (Suficiente)</option>
+              <option value="D" ${sub?.grade_letter === 'D' ? 'selected' : ''}>D (Mejorable)</option>
+            </select>
+          </div>
+          <div class="flex-1">
+            <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Estrellas</label>
+            <select id="stars-${s.id}" ${disabledAttr}
+              class="w-full p-2 rounded-lg text-xs font-bold bg-white border border-slate-200${disabledCls}">
+              ${[0,1,2,3,4,5].map(n => `<option value="${n}" ${sub?.stars === n ? 'selected' : ''}>${'⭐'.repeat(n) || 'Ninguna'}</option>`).join('')}
+            </select>
+          </div>
+          <button data-save-grade="${s.id}" data-task-id="${taskId}" ${disabledAttr}
+            class="p-2 rounded-lg self-end transition-all ${periodOpen ? 'bg-orange-600 text-white hover:bg-orange-700' : 'bg-slate-300 text-slate-500 cursor-not-allowed'}"
+            title="${periodOpen ? 'Guardar Calificación' : 'Período cerrado'}">
+            <i data-lucide="save" class="w-4 h-4"></i>
+          </button>
+        </div>
+      </div>
+      ${gradeTag}
+    </div>
+  `;
+}
+
 
 export async function viewTaskSubmissions(taskId) {
   const students = AppState.get('students') || [];
@@ -566,20 +649,19 @@ export async function viewTaskSubmissions(taskId) {
       </div>` : '';
 
     const content = `
-      <div class="bg-white w-full max-w-5xl rounded-[2.5rem] shadow-2xl p-6 md:p-8 animate-fadeIn flex flex-col h-[80vh]">
-        <div class="flex justify-between items-start mb-6">
+      <div class="bg-white w-full max-w-5xl rounded-[2.5rem] shadow-2xl p-6 md:p-8 animate-fadeIn flex flex-col" style="height:min(80vh,800px)">
+        <div class="flex justify-between items-start mb-4 shrink-0">
           <div>
             <h3 class="text-2xl font-black text-slate-800">Revisión de Entregas</h3>
             ${period ? `<p class="text-xs font-bold text-slate-400 mt-1">Período: ${safeEscapeHTML(period.name)} ${periodOpen ? '🟢 Abierto' : '🔒 Cerrado'}</p>` : ''}
           </div>
-          <button onclick="Modal.close('${modalId}')" class="p-2 hover:bg-slate-100 rounded-full transition-colors">
+          <button onclick="Modal.close('${modalId}')" class="p-2 hover:bg-slate-100 rounded-full transition-colors shrink-0">
             <i data-lucide="x" class="w-6 h-6 text-slate-400"></i>
           </button>
         </div>
-        ${closedBanner}
+        ${closedBanner ? `<div class="shrink-0">${closedBanner}</div>` : ''}
         ${periodOpen ? `
-        <!-- Calificación Rápida en Lote -->
-        <div class="mb-4 p-4 bg-gradient-to-r from-orange-50 to-amber-50 border-2 border-orange-200 rounded-2xl">
+        <div class="mb-4 p-4 bg-gradient-to-r from-orange-50 to-amber-50 border-2 border-orange-200 rounded-2xl shrink-0">
           <div class="flex items-center gap-2 mb-2">
             <span class="text-lg">⚡</span>
             <p class="text-[10px] font-black text-orange-600 uppercase tracking-widest">Calificación Rápida</p>
@@ -591,84 +673,32 @@ export async function viewTaskSubmissions(taskId) {
             <button onclick="App._bulkGradeAll('${taskId}','iniciado')" class="px-3 py-1.5 bg-sky-100 hover:bg-sky-200 border border-sky-300 rounded-xl text-[9px] font-black text-sky-700 transition-all active:scale-95">🚀 Iniciado</button>
           </div>
         </div>` : ''}
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 flex-1">
-        <div class="space-y-4 overflow-y-auto pr-1 md:pr-2">
-          ${students.length > 0 ? students.map(s => {
-            const sub = subMap[s.id];
-            const hasSubmission = sub && sub.file_url;
-            const isGraded = sub && sub.status === 'graded';
-            const safeUrl = hasSubmission ? encodeURI(sub.file_url) : '#';
-            // Deshabilitar inputs si período cerrado
-            const disabled = !periodOpen ? 'disabled class="opacity-50 cursor-not-allowed"' : '';
-            const disabledSelect = !periodOpen ? 'disabled' : '';
-            const btnDisabled = !periodOpen ? 'disabled title="Período cerrado" class="p-2 bg-slate-300 text-slate-500 rounded-lg cursor-not-allowed self-end"' : 'class="p-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-all self-end" title="Guardar Calificación"';
-
-            return `
-              <div class="p-5 bg-slate-50 rounded-2xl border ${isGraded ? 'border-green-200 bg-green-50/30' : 'border-slate-100'}">
-                <div class="flex items-center justify-between mb-4">
-                  <button onclick="App.viewSubmissionPane('${s.id}')"
-                    class="font-bold text-slate-800 text-left flex items-center gap-2 ${hasSubmission ? 'hover:text-orange-600 transition-colors' : 'cursor-default'}"
-                    ${hasSubmission ? `title="Ver evidencia en el panel derecho"` : ''}>
-                    ${hasSubmission ? `<span class="w-2 h-2 rounded-full bg-orange-500 shrink-0"></span>` : ''}
-                    ${safeEscapeHTML(s.name)}
-                  </button>
-                  ${hasSubmission
-                    ? `<button onclick="App.openSubmission('${s.id}', '${safeUrl}')"
-                        class="px-3 py-1.5 bg-blue-100 text-blue-600 rounded-lg text-xs font-bold hover:bg-blue-200 transition-colors flex items-center gap-2">
-                         <i data-lucide="eye" class="w-3 h-3"></i> Ver Entrega
-                       </button>`
-                    : `<span class="px-3 py-1.5 bg-slate-100 text-slate-400 rounded-lg text-xs font-bold">Sin entregar</span>`
-                  }
-                </div>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
-                  <div class="md:col-span-2">
-                    <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Retroalimentación</label>
-                    <textarea id="feedback-${s.id}" ${disabled} rows="2"
-                      class="w-full p-2 bg-white rounded-lg text-xs border border-slate-200 focus:ring-1 focus:ring-orange-400 outline-none ${!periodOpen ? 'opacity-50 cursor-not-allowed' : ''}"
-                      placeholder="Escribe un comentario...">${safeEscapeHTML(sub?.comment || '')}</textarea>
-                  </div>
-                  <div class="flex items-center gap-2 flex-wrap">
-                    <div class="flex-1 min-w-[110px]">
-                      <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Nota (0-100)</label>
-                      <input type="number" id="score-${s.id}" min="0" max="100" step="0.1"
-                        ${disabled} value="${sub?.score_v2 != null ? sub.score_v2 : ''}"
-                        class="w-full p-2 rounded-lg text-xs font-black text-center bg-white border border-slate-200 focus:ring-1 focus:ring-orange-400 outline-none ${!periodOpen ? 'opacity-50 cursor-not-allowed' : ''}"
-                        placeholder="0-100">
-                    </div>
-                    <div class="flex-1">
-                      <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Letra</label>
-                      <select id="grade-${s.id}" ${disabledSelect}
-                        class="w-full p-2 rounded-lg text-xs font-bold bg-white border border-slate-200 ${!periodOpen ? 'opacity-50 cursor-not-allowed' : ''}">
-                        <option value="">-</option>
-                        <option value="A" ${sub?.grade_letter === 'A' ? 'selected' : ''}>A (Excelente)</option>
-                        <option value="B" ${sub?.grade_letter === 'B' ? 'selected' : ''}>B (Bien)</option>
-                        <option value="C" ${sub?.grade_letter === 'C' ? 'selected' : ''}>C (Suficiente)</option>
-                        <option value="D" ${sub?.grade_letter === 'D' ? 'selected' : ''}>D (Mejorable)</option>
-                      </select>
-                    </div>
-                    <div class="flex-1">
-                      <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Estrellas</label>
-                      <select id="stars-${s.id}" ${disabledSelect}
-                        class="w-full p-2 rounded-lg text-xs font-bold bg-white border border-slate-200 ${!periodOpen ? 'opacity-50 cursor-not-allowed' : ''}">
-                        ${[0,1,2,3,4,5].map(n => `<option value="${n}" ${sub?.stars === n ? 'selected' : ''}>${'⭐'.repeat(n) || 'Ninguna'}</option>`).join('')}
-                      </select>
-                    </div>
-                    <button onclick="${periodOpen ? `App.submitGrade('${taskId}', '${s.id}')` : 'void(0)'}" ${btnDisabled}>
-                      <i data-lucide="save" class="w-4 h-4"></i>
-                    </button>
-                  </div>
-                </div>
-                ${isGraded ? `<div class="text-xs text-green-600 font-bold mt-2 flex items-center gap-1"><i data-lucide="check-circle" class="w-3 h-3"></i> Calificado</div>` : ''}
-              </div>
-            `;
-          }).join('') : '<div class="text-center p-4 text-slate-400">No hay alumnos en la clase.</div>'}
-        </div>
-        <!-- Panel de evidencia: split-screen en escritorio -->
-        <aside id="taskEvidencePane" class="kk-pane hidden md:flex"></aside>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 flex-1 min-h-0">
+          <div class="space-y-4 overflow-y-auto pr-1 md:pr-2 min-h-0">
+            ${students.length > 0 ? students.map(s => _buildStudentRow(s, subMap[s.id], taskId, periodOpen)).join('') : '<div class="text-center p-4 text-slate-400">No hay alumnos en la clase.</div>'}
+          </div>
+          <!-- Panel de evidencia: split-screen en escritorio -->
+          <aside id="taskEvidencePane" class="kk-pane min-h-0 hidden md:flex md:flex-col"></aside>
         </div>
       </div>
     `;
     Modal.open(modalId, content);
+
+    // Delegar clicks — evita onclick inline con URLs que pueden romper el JS
+    const modalEl = document.getElementById(modalId);
+    if (modalEl) {
+      modalEl.addEventListener('click', (e) => {
+        const viewBtn = e.target.closest('[data-view-pane]');
+        if (viewBtn) { renderSubmissionPane(viewBtn.dataset.viewPane); return; }
+
+        const openBtn = e.target.closest('[data-open-submission]');
+        if (openBtn) { openSubmission(openBtn.dataset.openSubmission, openBtn.dataset.url); return; }
+
+        const saveBtn = e.target.closest('[data-save-grade]');
+        if (saveBtn && !saveBtn.disabled) { void submitGrade(saveBtn.dataset.taskId, saveBtn.dataset.saveGrade); }
+      });
+    }
+
     // Primera entrega con contenido: el panel nunca arranca vacío en escritorio.
     if (_SubPane.list.length) {
       renderSubmissionPane(_SubPane.list[0].id);

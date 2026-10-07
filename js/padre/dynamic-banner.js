@@ -4,7 +4,7 @@
  * Replaces 8 separate banners with one smart carousel.
  */
 
-import { AppState } from './appState.js';
+import { AppState, TABLES } from './appState.js';
 import { Helpers } from '/js/shared/helpers.js';
 import { getBirthdayInfo } from '/js/shared/birthday-utils.js';
 import { NotifyPermission } from '/js/shared/notify-permission.js';
@@ -17,6 +17,8 @@ const SLIDE_INTERVAL = 6000;
 // abierto viene de un RPC), así que el primer render ocurre sin ella y el
 // banner se repinta cuando la consulta responde.
 let _qualityStatus = null;
+// Tareas pendientes cacheadas para el banner
+let _taskStatus = null; // { urgentCount, overdueCount, nearestDue, nearestTitle }
 const GRADIENTS = {
   exit_urgent:  'linear-gradient(135deg,#ef4444,#dc2626,#b91c1c)',
   exit_warning: 'linear-gradient(135deg,#fbbf24,#f59e0b,#d97706)',
@@ -33,6 +35,9 @@ const GRADIENTS = {
   new_post:     'linear-gradient(135deg,#f97316,#ea580c,#f59e0b)',
   school:       'linear-gradient(135deg,#8b5cf6,#7c3aed,#6d28d9)',
   quality:      'linear-gradient(135deg,#6366f1,#4f46e5,#4338ca)',
+  task_overdue: 'linear-gradient(135deg,#dc2626,#b91c1c,#991b1b)',
+  task_urgent:  'linear-gradient(135deg,#f97316,#ea580c,#c2410c)',
+  task_soon:    'linear-gradient(135deg,#f59e0b,#d97706,#b45309)',
 };
 
 const ANIMATIONS = {
@@ -49,9 +54,11 @@ const DynamicBanner = {
   _exitTimer: null,
   _entryTimer: null,
   _postCheckTimer: null,
+  _taskCheckTimer: null,
   _lastPostCount: 0,
   _lastPostCheck: 0,
   _onQualitySent: null,
+  _onTaskSubmitted: null,
 
   init() {
     this._container = document.getElementById('dynamicBanner');
@@ -66,14 +73,25 @@ const DynamicBanner = {
     if (this._postCheckTimer) clearInterval(this._postCheckTimer);
     this._postCheckTimer = setInterval(() => this._checkNewPosts(), 30000);
 
-    this._checkQualitySurvey();
+    void this._checkQualitySurvey();
+    void this._checkPendingTasks();
+
+    if (this._taskCheckTimer) clearInterval(this._taskCheckTimer);
+    this._taskCheckTimer = setInterval(() => { void this._checkPendingTasks(); }, 300000); // cada 5 min
 
     if (this._onQualitySent) document.removeEventListener('quality-eval:sent', this._onQualitySent);
     this._onQualitySent = () => {
       _qualityStatus = null;
-      this._checkQualitySurvey();
+      void this._checkQualitySurvey();
     };
     document.addEventListener('quality-eval:sent', this._onQualitySent);
+
+    if (this._onTaskSubmitted) document.removeEventListener('task:submitted', this._onTaskSubmitted);
+    this._onTaskSubmitted = () => {
+      _taskStatus = null;
+      void this._checkPendingTasks();
+    };
+    document.addEventListener('task:submitted', this._onTaskSubmitted);
   },
 
   destroy() {
@@ -81,11 +99,17 @@ const DynamicBanner = {
     if (this._exitTimer) { clearInterval(this._exitTimer); this._exitTimer = null; }
     if (this._entryTimer) { clearInterval(this._entryTimer); this._entryTimer = null; }
     if (this._postCheckTimer) { clearInterval(this._postCheckTimer); this._postCheckTimer = null; }
+    if (this._taskCheckTimer) { clearInterval(this._taskCheckTimer); this._taskCheckTimer = null; }
     if (this._onQualitySent) {
       document.removeEventListener('quality-eval:sent', this._onQualitySent);
       this._onQualitySent = null;
     }
+    if (this._onTaskSubmitted) {
+      document.removeEventListener('task:submitted', this._onTaskSubmitted);
+      this._onTaskSubmitted = null;
+    }
     _qualityStatus = null;
+    _taskStatus = null;
   },
 
   /**
@@ -99,11 +123,80 @@ const DynamicBanner = {
     } catch {
       return; // Sin encuesta disponible: el banner sigue igual.
     }
-    const pending = !!(status && status.open && status.pending);
-    if (pending === !!( _qualityStatus && _qualityStatus.pending)) return;
+    const pending = !!(status?.open && status?.pending);
+    if (pending === !!_qualityStatus?.pending) return;
 
     _qualityStatus = status;
     if (pending) this.refresh();
+  },
+
+  /**
+   * Consulta tareas pendientes/vencidas del alumno actual.
+   * Solo repinta el banner si el estado de urgencia cambia.
+   */
+  async _checkPendingTasks() {
+    const student = AppState.get('currentStudent');
+    if (!student?.classroom_id) return;
+
+    try {
+      // Traer tareas del aula con due_date en los próximos 3 días o ya vencidas
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() + 3);
+
+      const { data: tasks } = await supabase
+        .from(TABLES.TASKS)
+        .select('id, title, due_date')
+        .eq('classroom_id', student.classroom_id)
+        .lte('due_date', cutoff.toISOString())
+        .order('due_date', { ascending: true });
+
+      if (!tasks?.length) {
+        if (_taskStatus !== null) { _taskStatus = null; this.refresh(); }
+        return;
+      }
+
+      // Evidencias ya entregadas — excluir de la cuenta
+      const { data: evidences } = await supabase
+        .from(TABLES.TASK_EVIDENCES)
+        .select('task_id')
+        .eq('student_id', student.id)
+        .in('task_id', tasks.map(t => t.id));
+
+      const deliveredIds = new Set((evidences || []).map(e => e.task_id));
+      const now = new Date();
+
+      const pending = tasks.filter(t => !deliveredIds.has(t.id));
+      if (!pending.length) {
+        if (_taskStatus !== null) { _taskStatus = null; this.refresh(); }
+        return;
+      }
+
+      const overdue  = pending.filter(t => new Date(t.due_date) < now);
+      const upcoming = pending.filter(t => new Date(t.due_date) >= now);
+      // La más urgente: primero vencidas, luego la próxima a vencer
+      const nearest  = overdue.find(Boolean) ?? upcoming.find(Boolean);
+      const daysLeft = Math.ceil((new Date(nearest.due_date) - now) / 86400000);
+
+      const next = {
+        total: pending.length,
+        overdueCount: overdue.length,
+        daysLeft,
+        nearestTitle: nearest.title,
+        nearestDue: nearest.due_date,
+      };
+
+      // Solo repintar si el estado cambió
+      const prev = _taskStatus;
+      const changed = !prev
+        || prev.total !== next.total
+        || prev.overdueCount !== next.overdueCount
+        || prev.daysLeft !== next.daysLeft;
+
+      _taskStatus = next;
+      if (changed) this.refresh();
+    } catch {
+      // Fallo silencioso — el banner no se rompe
+    }
   },
 
   refresh() {
@@ -120,232 +213,180 @@ const DynamicBanner = {
     const now = new Date();
     const name = student.name || 'tu hijo';
 
-    // ── EXIT reminder (highest priority when time-critical) ──
-    if (student.exit_time) {
-      const [eh, em] = student.exit_time.split(':').map(Number);
-      const exitDate = new Date(now); exitDate.setHours(eh, em, 0, 0);
-      const diffMin = Math.round((exitDate - now) / 60000);
+    this._addExitSlides(slides, student, name, now);
+    this._addEntrySlides(slides, student, name, now);
+    this._addDebtSlides(slides);
+    this._addBirthdaySlides(slides, student, name);
+    this._addPostSlide(slides);
+    this._addTaskSlide(slides);
+    this._addQualitySlide(slides);
+    this._addPushSlide(slides);
+    this._addScheduleSlide(slides, student, name);
 
-      if (diffMin > -10 && diffMin <= 120) {
-        if (diffMin < 0) {
-          slides.push({
-            id: 'exit_urgent',
-            priority: 1,
-            gradient: GRADIENTS.exit_urgent,
-            icon: '🚨',
-            anim: ANIMATIONS.bounce,
-            title: `¡Hora de recoger a ${name}!`,
-            msg: `Llevas ${Math.abs(diffMin)} min de retraso. Por favor recógelo lo antes posible.`,
-            cta: null,
-          });
-        } else if (diffMin <= 15) {
-          slides.push({
-            id: 'exit_warning',
-            priority: 2,
-            gradient: GRADIENTS.exit_warning,
-            icon: '🚗',
-            anim: ANIMATIONS.pulse,
-            title: `¡Quedan ${diffMin} min para la salida!`,
-            msg: `Prepárate para recoger a ${name}. La salida es a las ${student.exit_time}.`,
-            cta: null,
-          });
-        } else if (diffMin <= 60) {
-          slides.push({
-            id: 'exit_info',
-            priority: 10,
-            gradient: GRADIENTS.exit_info,
-            icon: '🚗',
-            anim: ANIMATIONS.none,
-            title: `Salida de ${name} a las ${student.exit_time}`,
-            msg: `Quedan ${diffMin} min. Recuerda planificar tu llegada.`,
-            cta: null,
-          });
-        }
-      }
-    }
-
-    // ── ENTRY reminder ──
-    const todayAtt = AppState.get('todayAttendance');
-    if (student.entry_time && todayAtt !== 'present' && todayAtt !== 'presente') {
-      const [ih, im] = student.entry_time.split(':').map(Number);
-      const entryDate = new Date(now); entryDate.setHours(ih, im, 0, 0);
-      const diffMin = Math.round((entryDate - now) / 60000);
-
-      if (diffMin > -60 && diffMin <= 120) {
-        if (diffMin <= 0) {
-          slides.push({
-            id: 'entry_urgent',
-            priority: 3,
-            gradient: GRADIENTS.entry_urgent,
-            icon: '🏫',
-            anim: ANIMATIONS.pulse,
-            title: `¡Hora de llevar a ${name}!`,
-            msg: 'La hora de entrada ya comenzó. ¡Llévalo a Karpus Kids!',
-            cta: null,
-          });
-        } else if (diffMin <= 15) {
-          slides.push({
-            id: 'entry_warning',
-            priority: 4,
-            gradient: GRADIENTS.entry_warning,
-            icon: '🏫',
-            anim: ANIMATIONS.pulse,
-            title: `¡Quedan ${diffMin} min para la entrada!`,
-            msg: `Prepárate para llevar a ${name}. La entrada es a las ${student.entry_time}.`,
-            cta: null,
-          });
-        } else if (diffMin <= 120) {
-          slides.push({
-            id: 'entry_info',
-            priority: 11,
-            gradient: GRADIENTS.entry_info,
-            icon: '🏫',
-            anim: ANIMATIONS.none,
-            title: `Entrada de ${name} a las ${student.entry_time}`,
-            msg: `Quedan ${diffMin} min. Recuerda planificar tu llegada.`,
-            cta: null,
-          });
-        }
-      }
-    }
-
-    // ── DEBT / Payment ──
-    const finance = AppState.get('finance');
-    if (finance?.debt) {
-      const debt = finance.debt.total || 0;
-      const items = finance.debt.items || [];
-      const overdue = items.filter(p => {
-        const s = (p.status || '').toLowerCase();
-        return s === 'overdue' || s === 'vencido';
-      });
-
-      if (overdue.length > 0) {
-        slides.push({
-          id: 'debt_overdue',
-          priority: 5,
-          gradient: GRADIENTS.debt_overdue,
-          icon: '🚨',
-          anim: ANIMATIONS.bounce,
-          title: 'Pago vencido',
-          msg: `Tienes ${overdue.length} mensualidad(es) atrasada(s). Total: ${Helpers.formatCurrency(debt)}`,
-          cta: { label: 'Pagar ahora', action: () => App.navigateTo('payments') },
-        });
-      } else if (debt > 0) {
-        slides.push({
-          id: 'debt',
-          priority: 8,
-          gradient: GRADIENTS.debt,
-          icon: '⚠️',
-          anim: ANIMATIONS.none,
-          title: 'Tienes un saldo pendiente',
-          msg: `Tu balance actual es ${Helpers.formatCurrency(debt)}. Recuerda pagar antes del día 5.`,
-          cta: { label: 'Pagar ahora', action: () => App.navigateTo('payments') },
-        });
-      }
-    }
-
-    // ── BIRTHDAY ──
-    const bday = getBirthdayInfo(student.birth_date);
-    if (bday) {
-      if (bday.isToday) {
-        slides.push({
-          id: 'birthday',
-          priority: 6,
-          gradient: GRADIENTS.birthday,
-          icon: '🎂',
-          anim: ANIMATIONS.bounce,
-          title: `¡Feliz cumpleaños, ${name}!`,
-          msg: `Hoy cumple ${bday.ageTurning} años. ¡Que tenga un día lleno de alegría! 🎉`,
-          cta: null,
-        });
-      } else if (bday.isUpcoming) {
-        slides.push({
-          id: 'birthday_up',
-          priority: 12,
-          gradient: GRADIENTS.birthday_up,
-          icon: '🎂',
-          anim: ANIMATIONS.none,
-          title: `Próximo cumpleaños de ${name}`,
-          msg: `En ${bday.daysUntil} día${bday.daysUntil === 1 ? '' : 's'} cumplirá ${bday.ageTurning} años.`,
-          cta: null,
-        });
-      }
-    }
-
-    // ── NEW POST ──
-    const postCount = AppState.get('unreadPostCount') || 0;
-    if (postCount > 0) {
-      slides.push({
-        id: 'new_post',
-        priority: 9,
-        gradient: GRADIENTS.new_post,
-        icon: '📢',
-        anim: ANIMATIONS.none,
-        title: postCount === 1 ? 'Nueva publicación en el muro' : `${postCount} nuevas publicaciones`,
-        msg: 'Tu aula tiene contenido nuevo. ¡Revisalo!',
-        cta: { label: 'Ver muro', action: () => App.navigateTo('feed') },
-      });
-    }
-
-    // ── QUALITY SURVEY (mensual) ──
-    // Prioridad 7: por encima de saldo y muro, por debajo de cualquier
-    // recordatorio de entrada/salida o pago vencido. Es importante, pero no
-    // puede tapar un evento del día.
-    if (_qualityStatus && _qualityStatus.open && _qualityStatus.pending) {
-      const days = _qualityStatus.daysLeft;
-      const monthLabel = new Date(_qualityStatus.period.period_month)
-        .toLocaleDateString('es-DO', { month: 'long' });
-
-      slides.push({
-        id: 'quality',
-        priority: 7,
-        gradient: GRADIENTS.quality,
-        icon: '💬',
-        anim: ANIMATIONS.pulse,
-        title: `Evalúa el mes de ${monthLabel}`,
-        msg: days === 0
-          ? 'La encuesta cierra hoy. Tu opinión ayuda a mejorar el servicio.'
-          : `Tu opinión sobre la docente y el centro ayuda a mejorar. Cierra en ${days} día${days === 1 ? '' : 's'}.`,
-        cta: { label: 'Responder', action: () => QualityEval.open() },
-      });
-    }
-
-    // ── PUSH NOTIFICATIONS ──
-    if ('Notification' in window && Notification.permission !== 'granted') {
-      slides.push({
-        id: 'push',
-        priority: 13,
-        gradient: GRADIENTS.push,
-        icon: '🔔',
-        anim: ANIMATIONS.pulse,
-        title: 'Activar notificaciones',
-        msg: 'Recibe alertas de asistencia, pagos y mensajes importantes.',
-        cta: { label: 'Activar', action: () => this._activatePush() },
-      });
-    }
-
-    // ── SCHEDULE REMINDER ──
-    if (!student.entry_time || !student.exit_time) {
-      slides.push({
-        id: 'schedule',
-        priority: 14,
-        gradient: GRADIENTS.schedule,
-        icon: '🕐',
-        anim: ANIMATIONS.none,
-        title: 'Horario del estudiante',
-        msg: `Aún no has registrado el horario de entrada y salida de ${name}.`,
-        cta: { label: 'Configurar', action: () => App.openScheduleModal() },
-      });
-    }
-
-    // Sort by priority (lower = more important)
     slides.sort((a, b) => a.priority - b.priority);
     this._slides = slides;
 
-    // Keep current index valid
     if (this._current >= this._slides.length) {
       this._current = 0;
     }
+  },
+
+  _addExitSlides(slides, student, name, now) {
+    if (!student.exit_time) return;
+    const [eh, em] = student.exit_time.split(':').map(Number);
+    const exitDate = new Date(now); exitDate.setHours(eh, em, 0, 0);
+    const diffMin = Math.round((exitDate - now) / 60000);
+    if (diffMin <= -10 || diffMin > 120) return;
+
+    if (diffMin < 0) {
+      slides.push({ id: 'exit_urgent', priority: 1, gradient: GRADIENTS.exit_urgent, icon: '�', anim: ANIMATIONS.bounce,
+        title: `¡Hora de recoger a ${name}!`,
+        msg: `Llevas ${Math.abs(diffMin)} min de retraso. Por favor recógelo lo antes posible.`, cta: null });
+    } else if (diffMin <= 15) {
+      slides.push({ id: 'exit_warning', priority: 2, gradient: GRADIENTS.exit_warning, icon: '🚗', anim: ANIMATIONS.pulse,
+        title: `¡Quedan ${diffMin} min para la salida!`,
+        msg: `Prepárate para recoger a ${name}. La salida es a las ${student.exit_time}.`, cta: null });
+    } else if (diffMin <= 60) {
+      slides.push({ id: 'exit_info', priority: 10, gradient: GRADIENTS.exit_info, icon: '🚗', anim: ANIMATIONS.none,
+        title: `Salida de ${name} a las ${student.exit_time}`,
+        msg: `Quedan ${diffMin} min. Recuerda planificar tu llegada.`, cta: null });
+    }
+  },
+
+  _addEntrySlides(slides, student, name, now) {
+    const todayAtt = AppState.get('todayAttendance');
+    if (!student.entry_time || todayAtt === 'present' || todayAtt === 'presente') return;
+    const [ih, im] = student.entry_time.split(':').map(Number);
+    const entryDate = new Date(now); entryDate.setHours(ih, im, 0, 0);
+    const diffMin = Math.round((entryDate - now) / 60000);
+    if (diffMin <= -60 || diffMin > 120) return;
+
+    if (diffMin <= 0) {
+      slides.push({ id: 'entry_urgent', priority: 3, gradient: GRADIENTS.entry_urgent, icon: '🏫', anim: ANIMATIONS.pulse,
+        title: `¡Hora de llevar a ${name}!`,
+        msg: 'La hora de entrada ya comenzó. ¡Llévalo a Karpus Kids!', cta: null });
+    } else if (diffMin <= 15) {
+      slides.push({ id: 'entry_warning', priority: 4, gradient: GRADIENTS.entry_warning, icon: '🏫', anim: ANIMATIONS.pulse,
+        title: `¡Quedan ${diffMin} min para la entrada!`,
+        msg: `Prepárate para llevar a ${name}. La entrada es a las ${student.entry_time}.`, cta: null });
+    } else {
+      slides.push({ id: 'entry_info', priority: 11, gradient: GRADIENTS.entry_info, icon: '🏫', anim: ANIMATIONS.none,
+        title: `Entrada de ${name} a las ${student.entry_time}`,
+        msg: `Quedan ${diffMin} min. Recuerda planificar tu llegada.`, cta: null });
+    }
+  },
+
+  _addDebtSlides(slides) {
+    const finance = AppState.get('finance');
+    if (!finance?.debt) return;
+    const debt = finance.debt.total || 0;
+    const items = finance.debt.items || [];
+    const overdue = items.filter(p => {
+      const s = (p.status || '').toLowerCase();
+      return s === 'overdue' || s === 'vencido';
+    });
+
+    if (overdue.length > 0) {
+      slides.push({ id: 'debt_overdue', priority: 5, gradient: GRADIENTS.debt_overdue, icon: '🚨', anim: ANIMATIONS.bounce,
+        title: 'Pago vencido',
+        msg: `Tienes ${overdue.length} mensualidad(es) atrasada(s). Total: ${Helpers.formatCurrency(debt)}`,
+        cta: { label: 'Pagar ahora', action: () => App.navigateTo('payments') } });
+    } else if (debt > 0) {
+      slides.push({ id: 'debt', priority: 8, gradient: GRADIENTS.debt, icon: '⚠️', anim: ANIMATIONS.none,
+        title: 'Tienes un saldo pendiente',
+        msg: `Tu balance actual es ${Helpers.formatCurrency(debt)}. Recuerda pagar antes del día 5.`,
+        cta: { label: 'Pagar ahora', action: () => App.navigateTo('payments') } });
+    }
+  },
+
+  _addBirthdaySlides(slides, student, name) {
+    const bday = getBirthdayInfo(student.birth_date);
+    if (!bday) return;
+    if (bday.isToday) {
+      slides.push({ id: 'birthday', priority: 6, gradient: GRADIENTS.birthday, icon: '🎂', anim: ANIMATIONS.bounce,
+        title: `¡Feliz cumpleaños, ${name}!`,
+        msg: `Hoy cumple ${bday.ageTurning} años. ¡Que tenga un día lleno de alegría! 🎉`, cta: null });
+    } else if (bday.isUpcoming) {
+      const plural = bday.daysUntil === 1 ? '' : 's';
+      slides.push({ id: 'birthday_up', priority: 12, gradient: GRADIENTS.birthday_up, icon: '🎂', anim: ANIMATIONS.none,
+        title: `Próximo cumpleaños de ${name}`,
+        msg: `En ${bday.daysUntil} día${plural} cumplirá ${bday.ageTurning} años.`, cta: null });
+    }
+  },
+
+  _addPostSlide(slides) {
+    const postCount = AppState.get('unreadPostCount') || 0;
+    if (postCount === 0) return;
+    const postTitle = postCount === 1 ? 'Nueva publicación en el muro' : `${postCount} nuevas publicaciones`;
+    slides.push({ id: 'new_post', priority: 9, gradient: GRADIENTS.new_post, icon: '�', anim: ANIMATIONS.none,
+      title: postTitle,
+      msg: 'Tu aula tiene contenido nuevo. ¡Revisalo!',
+      cta: { label: 'Ver muro', action: () => App.navigateTo('feed') } });
+  },
+
+  _addTaskSlide(slides) {
+    if (!_taskStatus) return;
+    const slide = this._buildTaskSlide(_taskStatus);
+    if (slide) slides.push(slide);
+  },
+
+  _buildTaskSlide({ total, overdueCount, daysLeft, nearestTitle }) {
+    const name = Helpers.escapeHTML(nearestTitle);
+    const goTasks = () => window.App?.navigateTo?.('tasks');
+
+    if (overdueCount > 0) {
+      const extra = total > 1 ? ` (+${total - 1} más)` : '';
+      const title = overdueCount === 1 ? '¡Tarea vencida sin entregar!' : `¡${overdueCount} tareas vencidas!`;
+      return { id: 'task_overdue', priority: 1.5, gradient: GRADIENTS.task_overdue, icon: '📛',
+        anim: ANIMATIONS.bounce, title,
+        msg: `"${name}"${extra} ya venció. Envíala ahora antes de que afecte las calificaciones.`,
+        cta: { label: 'Entregar ahora', action: goTasks } };
+    }
+
+    if (daysLeft <= 1) {
+      const when = daysLeft <= 0 ? 'hoy' : 'mañana';
+      return { id: 'task_urgent', priority: 2.5, gradient: GRADIENTS.task_urgent, icon: '⏰',
+        anim: ANIMATIONS.pulse, title: `Tarea vence ${when}`,
+        msg: `"${name}" vence ${when}. No dejes que se pase el plazo.`,
+        cta: { label: 'Ver tarea', action: goTasks } };
+    }
+
+    const plural = total > 1 ? `${total} tareas` : 'una tarea';
+    const dayPlural = daysLeft === 1 ? '' : 's';
+    return { id: 'task_soon', priority: 9.5, gradient: GRADIENTS.task_soon, icon: '🎒',
+      anim: ANIMATIONS.none, title: `Tienes ${plural} por entregar`,
+      msg: `"${name}" vence en ${daysLeft} día${dayPlural}. Organiza el tiempo para no atrasarte.`,
+      cta: { label: 'Ver tareas', action: goTasks } };
+  },
+
+  _addQualitySlide(slides) {    if (!_qualityStatus?.open || !_qualityStatus?.pending) return;
+    const days = _qualityStatus.daysLeft;
+    const periodDate = new Date(_qualityStatus.period.period_month + 'T12:00:00Z');
+    const monthLabel = periodDate.toLocaleDateString('es-DO', { month: 'long', timeZone: 'UTC' });
+    const dayPlural = days === 1 ? '' : 's';
+    const msg = days === 0
+      ? 'La encuesta cierra hoy. Tu opinión ayuda a mejorar el servicio.'
+      : `Tu opinión sobre la docente y el centro ayuda a mejorar. Cierra en ${days} día${dayPlural}.`;
+    slides.push({ id: 'quality', priority: 7, gradient: GRADIENTS.quality, icon: '💬', anim: ANIMATIONS.pulse,
+      title: `Evalúa el mes de ${monthLabel}`,
+      msg,
+      cta: { label: 'Responder', action: () => QualityEval.open() } });
+  },
+
+  _addPushSlide(slides) {
+    if (!('Notification' in window) || Notification.permission === 'granted') return;
+    slides.push({ id: 'push', priority: 13, gradient: GRADIENTS.push, icon: '🔔', anim: ANIMATIONS.pulse,
+      title: 'Activar notificaciones',
+      msg: 'Recibe alertas de asistencia, pagos y mensajes importantes.',
+      cta: { label: 'Activar', action: () => this._activatePush() } });
+  },
+
+  _addScheduleSlide(slides, student, name) {
+    if (student.entry_time && student.exit_time) return;
+    slides.push({ id: 'schedule', priority: 14, gradient: GRADIENTS.schedule, icon: '🕐', anim: ANIMATIONS.none,
+      title: 'Horario del estudiante',
+      msg: `Aún no has registrado el horario de entrada y salida de ${name}.`,
+      cta: { label: 'Configurar', action: () => App.openScheduleModal() } });
   },
 
   _render() {
@@ -371,14 +412,17 @@ const DynamicBanner = {
             <p class="font-black text-white text-sm md:text-base leading-tight break-words">${slide.title}</p>
             <p class="text-white/85 text-[11px] md:text-xs font-bold mt-0.5 break-words leading-relaxed">${slide.msg}</p>
           </div>
-          ${hasCTA ? `<button id="${ctaId}" class="w-full lg:w-auto shrink-0 bg-white font-black text-xs px-5 py-2.5 rounded-2xl hover:bg-white/90 transition-all active:scale-95 shadow-md" style="color:${this._btnColor(slide.gradient)}">${slide.cta.label}</button>` : ''}
+          ${hasCTA ? `<button id="${ctaId}" type="button" class="w-full lg:w-auto shrink-0 bg-white font-black text-xs px-5 py-2.5 rounded-2xl hover:bg-white/90 transition-all active:scale-95 shadow-md" style="color:${this._btnColor(slide.gradient)}">${slide.cta.label}</button>` : ''}
         </div>
         ${this._slides.length > 1 ? this._renderDots() : ''}
       </div>`;
 
     if (hasCTA && ctaId) {
       const btn = document.getElementById(ctaId);
-      if (btn) btn.addEventListener('click', slide.cta.action);
+      if (btn) btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        slide.cta.action();
+      });
     }
 
     this._wireDots();

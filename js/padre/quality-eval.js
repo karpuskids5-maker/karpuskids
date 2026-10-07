@@ -49,8 +49,9 @@ const _answers = {
 
 function _monthLabel(iso) {
   if (!iso) return '';
-  const d = new Date(iso);
-  return `${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+  // Parsear como mediodía UTC para evitar desfases de zona horaria
+  const d = new Date(iso.slice(0, 10) + 'T12:00:00Z');
+  return `${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
 }
 
 /** Días que quedan para el cierre, contados desde hoy. */

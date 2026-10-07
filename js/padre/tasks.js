@@ -44,7 +44,7 @@ export const TasksModule = {
     const list = document.getElementById('tasksList');
     if (list && !list._initialized) {
       Helpers.delegate(list, '[data-action="submit"]', 'click', (e, btn) => {
-        this.openSubmitModal(btn.dataset.id);
+        void this.openSubmitModal(btn.dataset.id);
       });
       Helpers.delegate(list, '[data-action="view"]', 'click', (e, btn) => {
         this.viewEvidence(btn.dataset.id);
@@ -147,7 +147,7 @@ export const TasksModule = {
       return Helpers.toast('No tienes tareas pendientes para entregar', 'warning');
     }
     if (candidates.length === 1) {
-      return this.openSubmitModal(candidates[0].id);
+      return void this.openSubmitModal(candidates[0].id);
     }
 
     const rows = candidates.map(t => {
@@ -276,6 +276,8 @@ export const TasksModule = {
 
       // ✅ ÉXITO: Confetti y Mensaje Motivador
       window.App?.celebrate?.(['#f59e0b', '#3b82f6', '#10b981']);
+      // Notificar al banner para que actualice el slide de tareas
+      document.dispatchEvent(new CustomEvent('task:submitted'));
 
       Helpers.toast('¡Misión cumplida! Tarea enviada', 'success');
 

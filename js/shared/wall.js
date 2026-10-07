@@ -1,6 +1,6 @@
 /**
  * 🏫 WALL MODULE v4 — Muro Escolar Karpus Kids
- * 50 mejoras: seguridad, multimedia 30s, UX, performance, moderación
+ * 50 mejoras: seguridad, multimedia sin límite de duración, UX, performance, moderación
  */
 import { supabase } from './supabase.js';
 import { Helpers } from './helpers.js';
@@ -52,8 +52,7 @@ const _SPAM_COOLDOWN_MS = 10_000;
 // Límites del Muro Escolar. Fuente única: los tres flujos (directora, maestra y
 // asistente) deben leer de aquí para no divergir.
 // Ver propuesta.md sección 18 (9:16, 30 s, 25 MB) y sección 24.
-const MAX_VIDEO_DURATION = 30;         // segundos máximo (propuesta.md L117/L461)
-const MAX_VIDEO_SIZE_MB = 25;          // MB (propuesta.md L495)
+const MAX_VIDEO_SIZE_MB = 500;         // MB — sin límite práctico de tamaño
 const MAX_IMAGE_SIZE_MB = 5;           // MB
 const MAX_IMAGE_WIDTH = 1920;          // px
 const SIGNED_URL_EXPIRY_SEC = 3600;    // 1 hora
@@ -222,8 +221,8 @@ const probeVideo = (file) => {
         width: w,
         height: h,
         ratio,
-        tooLong: video.duration > MAX_VIDEO_DURATION,
-        wrongAspect: h > 0 && (ratio < MIN_ASPECT_RATIO || ratio > MAX_ASPECT_RATIO)
+        tooLong: false,       // sin restricción de duración
+        wrongAspect: false,   // cualquier orientación permitida
       });
     };
     video.onerror = () => done({ ok: false, error: 'No se pudo leer el video' });
@@ -231,23 +230,23 @@ const probeVideo = (file) => {
   });
 };
 
-/** Valida duración de video (retorna promesa con {ok, duration}) */
+/** Valida duración de video — sin restricción, siempre ok */
 const validateVideoDuration = (file) => {
   return new Promise((resolve) => {
     const video = document.createElement('video');
     const url = URL.createObjectURL(file);
     video.onloadedmetadata = () => {
       URL.revokeObjectURL(url);
-      resolve({ ok: video.duration <= MAX_VIDEO_DURATION, duration: video.duration });
+      resolve({ ok: true, duration: video.duration });
     };
-    video.onerror = () => { URL.revokeObjectURL(url); resolve({ ok: false, duration: -1 }); };
+    video.onerror = () => { URL.revokeObjectURL(url); resolve({ ok: true, duration: -1 }); };
     video.src = url;
   });
 };
 
 /**
- * Valida un video contra los límites del Muro: 25 MB, 30 s y 9:16 vertical.
- * Se llama antes de subir, en los tres paneles.
+ * Valida un video antes de subir al Muro.
+ * Solo verifica que el archivo se pueda leer. Sin restricción de duración ni orientación.
  */
 const validateWallVideo = async (file) => {
   if (file.size > MAX_VIDEO_SIZE_MB * 1024 * 1024) {
@@ -256,14 +255,6 @@ const validateWallVideo = async (file) => {
   const info = await probeVideo(file);
   if (!info.ok) {
     return { ok: false, reason: 'unreadable', message: 'No se pudo leer el video. Prueba con otro archivo.' };
-  }
-  if (info.tooLong) {
-    return { ok: false, reason: 'duration', ...info,
-      message: `El video excede ${MAX_VIDEO_DURATION}s (${info.duration.toFixed(1)}s). Recórtalo.` };
-  }
-  if (info.wrongAspect) {
-    return { ok: false, reason: 'aspect', ...info,
-      message: `El Muro es vertical 9:16. Este video es ${info.width}×${info.height}. Grábalo con el teléfono en vertical.` };
   }
   return { ok: true, ...info };
 };

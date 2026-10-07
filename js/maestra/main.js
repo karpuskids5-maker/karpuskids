@@ -675,10 +675,10 @@ function _renderStudentCard(s) {
 
   const allergyRow = hasAllergy
     ? `<div class="flex items-start gap-2 rounded-xl bg-rose-50 border border-rose-200 px-3 py-2">
-         <i data-lucide="triangle-alert" class="w-3.5 h-3.5 text-rose-500 mt-0.5 shrink-0"></i>
+         <i data-lucide="alert-triangle" class="w-3.5 h-3.5 text-rose-500 mt-0.5 shrink-0"></i>
          <div class="min-w-0">
            <p class="text-[9px] font-black uppercase tracking-widest text-rose-500">Alergia</p>
-           <p class="text-xs font-bold text-rose-800 break-words">${safeEscapeHTML(s.allergies)}</p>
+           <p class="text-[10px] font-medium text-rose-700 break-words whitespace-pre-line">${safeEscapeHTML(s.allergies)}</p>
          </div>
        </div>`
     : '';
