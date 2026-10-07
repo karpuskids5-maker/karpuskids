@@ -17,7 +17,7 @@
  * este SW no lo intercepta (ver IGNORE_PATHS).
  */
 
-const VERSION = 'kk-v1';
+const VERSION = 'kk-v2';
 const SHELL_CACHE = `kk-shell-${VERSION}`;
 
 /** Rutas que jamás se tocan. */

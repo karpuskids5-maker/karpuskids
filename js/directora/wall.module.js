@@ -77,12 +77,12 @@ export const WallModule = {
             </label>
           </div>
           <input type="file" id="postMediaFile" class="hidden" accept="image/*,video/*" multiple>
-          <p class="text-[10px] text-slate-400">Imágenes (máx ${WALL_LIMITS.maxAlbumPhotos} para álbum) o 1 video vertical 9:16 de hasta ${WALL_LIMITS.maxVideoDurationSec}s / ${WALL_LIMITS.maxVideoSizeMB}MB.</p>
+          <p class="text-[10px] text-slate-400">Imágenes (máx ${WALL_LIMITS.maxAlbumPhotos} para álbum) o video de cualquier duración (máx ${WALL_LIMITS.maxVideoSizeMB}MB).</p>
 
           <!-- Botón grabadora -->
           <button onclick="WallModule._openRecorderFromModal()" type="button"
             class="flex items-center gap-2 text-xs font-black text-red-500 hover:text-red-600 bg-red-50 hover:bg-red-100 px-4 py-2 rounded-2xl transition-all">
-            <i data-lucide="video" class="w-4 h-4"></i> Grabar video (${WALL_LIMITS.maxVideoDurationSec}s)
+            <i data-lucide="video" class="w-4 h-4"></i> Grabar video (hasta 10 min)
           </button>
         </div>
 
