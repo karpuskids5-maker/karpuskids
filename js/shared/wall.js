@@ -52,6 +52,7 @@ const _SPAM_COOLDOWN_MS = 10_000;
 // Límites del Muro Escolar. Fuente única: los tres flujos (directora, maestra y
 // asistente) deben leer de aquí para no divergir.
 // Ver propuesta.md sección 18 (9:16, 30 s, 25 MB) y sección 24.
+const MAX_VIDEO_DURATION = 86400;      // sin límite práctico (24 h)
 const MAX_VIDEO_SIZE_MB = 500;         // MB — sin límite práctico de tamaño
 const MAX_IMAGE_SIZE_MB = 5;           // MB
 const MAX_IMAGE_WIDTH = 1920;          // px
@@ -2686,18 +2687,18 @@ const WallModule = {
           <div class="w-10 h-10 bg-orange-100 rounded-2xl flex items-center justify-center text-xl">✂️</div>
           <div>
             <h3 class="font-black text-slate-800">Recortar Video</h3>
-            <p class="text-xs text-slate-500">El video excede ${MAX_VIDEO_DURATION}s. Elige el segmento a publicar.</p>
+            <p class="text-xs text-slate-500">Elige el segmento a publicar.</p>
           </div>
         </div>
         <video id="trimmer-preview" src="${_sanitizeHTML(url)}" controls muted class="w-full rounded-2xl max-h-48 bg-black" preload="metadata"></video>
         <div class="space-y-2">
           <div class="flex justify-between text-xs font-bold text-slate-500">
             <span>Inicio: <span id="trim-start-val">0</span>s</span>
-            <span>Fin: <span id="trim-end-val">${MAX_VIDEO_DURATION}</span>s (máx ${MAX_VIDEO_DURATION}s)</span>
+            <span>Fin: <span id="trim-end-val">0</span>s</span>
           </div>
           <input type="range" id="trim-start" min="0" max="0" step="0.5" value="0" class="w-full accent-orange-500"
                  oninput="WallModule._updateTrimmer()" aria-label="Punto de inicio">
-          <input type="range" id="trim-end" min="0" max="${MAX_VIDEO_DURATION}" step="0.5" value="${MAX_VIDEO_DURATION}" class="w-full accent-green-500"
+          <input type="range" id="trim-end" min="0" max="0" step="0.5" value="0" class="w-full accent-green-500"
                  oninput="WallModule._updateTrimmer()" aria-label="Punto de fin">
         </div>
         <div class="flex gap-3">
@@ -2711,9 +2712,9 @@ const WallModule = {
     vid.onloadedmetadata = () => {
       const endInput = document.getElementById('trim-end');
       const startInput = document.getElementById('trim-start');
-      if (endInput) { endInput.max = Math.min(vid.duration, vid.duration); }
-      if (startInput) { startInput.max = Math.max(0, vid.duration - MAX_VIDEO_DURATION); }
-      document.getElementById('trim-end-val').textContent = Math.min(MAX_VIDEO_DURATION, vid.duration).toFixed(1);
+      if (endInput) { endInput.max = vid.duration; endInput.value = vid.duration; }
+      if (startInput) { startInput.max = vid.duration; }
+      document.getElementById('trim-end-val').textContent = vid.duration.toFixed(1);
     };
     modal._onTrimmed = onTrimmed;
     modal._originalUrl = url;
@@ -2721,8 +2722,8 @@ const WallModule = {
 
   _updateTrimmer() {
     const start = Number.parseFloat(document.getElementById('trim-start')?.value || 0);
-    const end = Number.parseFloat(document.getElementById('trim-end')?.value || MAX_VIDEO_DURATION);
-    const clamped = Math.min(end, start + MAX_VIDEO_DURATION);
+    const end = Number.parseFloat(document.getElementById('trim-end')?.value || 0);
+    const clamped = Math.max(start + 0.5, end);
     document.getElementById('trim-start-val').textContent = start.toFixed(1);
     document.getElementById('trim-end-val').textContent = clamped.toFixed(1);
     const vid = document.getElementById('trimmer-preview');
@@ -2733,7 +2734,7 @@ const WallModule = {
     const btn = document.getElementById('btn-apply-trim');
     if (btn) { btn.disabled = true; btn.textContent = 'Procesando...'; }
     const start = Number.parseFloat(document.getElementById('trim-start')?.value || 0);
-    const end = Number.parseFloat(document.getElementById('trim-end')?.value || MAX_VIDEO_DURATION);
+    const end = Number.parseFloat(document.getElementById('trim-end')?.value || 0);
     const modal = document.getElementById('wall-trimmer');
 
     // Nota: recorte real requiere FFmpeg WASM. Aquí se usa el segmento con nota informativa.
@@ -2743,7 +2744,7 @@ const WallModule = {
     modal?.remove();
   },
 
-  // ── Grabador Directo de Video (30s, vertical 9:16) ───────────────────────────
+  // ── Grabador Directo de Video (hasta 10 min, cualquier orientación) ─────────
   async openVideoRecorder(onRecorded) {
     try {
       // El Muro es vertical 9:16. Con la cámara trasera ('environment') el
@@ -2779,7 +2780,7 @@ const WallModule = {
               <circle id="record-ring" cx="18" cy="18" r="16" fill="none" stroke="#ef4444" stroke-width="3"
                 stroke-dasharray="100.5" stroke-dashoffset="100.5" style="transition:stroke-dashoffset 0.5s linear"/>
             </svg>
-            <span id="record-timer" class="text-white font-black text-3xl tabular-nums">2:00</span>
+            <span id="record-timer" class="text-white font-black text-3xl tabular-nums">10:00</span>
           </div>
           <div class="flex gap-3">
             <button onclick="WallModule._stopRecording()" class="flex-1 py-3 bg-slate-700 text-white rounded-2xl font-black text-xs" aria-label="Cancelar grabación">Cancelar</button>
@@ -2816,14 +2817,14 @@ const WallModule = {
     const startBtn = document.getElementById('btn-start-rec');
     if (startBtn) { startBtn.textContent = '⏹ Detener'; startBtn.onclick = () => this._stopRecording(true); startBtn.classList.add('animate-pulse'); }
 
-    let remaining = MAX_VIDEO_DURATION;
+    let remaining = 600; // 10 minutos máximo para grabación directa
     const ring = document.getElementById('record-ring');
     const circumference = 100.5;
     this._recorderCountdown = setInterval(() => {
       remaining -= 0.5;
       const timer = document.getElementById('record-timer');
       if (timer) { const m = Math.floor(remaining / 60); const s = Math.floor(remaining % 60); timer.textContent = `${m}:${String(s).padStart(2,'0')}`; }
-      if (ring) ring.style.strokeDashoffset = circumference * (1 - (MAX_VIDEO_DURATION - remaining) / MAX_VIDEO_DURATION);
+      if (ring) ring.style.strokeDashoffset = circumference * (1 - (600 - remaining) / 600);
       if (remaining <= 0) this._stopRecording(true);
     }, 500);
   },
