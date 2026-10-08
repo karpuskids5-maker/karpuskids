@@ -43,8 +43,26 @@
     ]
   }
   </script>
+  <link rel="manifest" href="manifest.json">
   <link rel="icon" href="logo/favicon.ico" sizes="any">
   <link rel="apple-touch-icon" href="logo/apple-touch-icon.png">
+  <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+  <script>
+    window.OneSignalDeferred = window.OneSignalDeferred || [];
+    OneSignalDeferred.push(async function(OneSignal) {
+      await OneSignal.init({
+        appId: "47ce2d1e-152e-4ea7-9ddc-8e2142992989",
+        safari_web_id: "web.onesignal.auto.63402434-7a0e-473d-9d21-f095166311e9",
+        notifyButton: { enable: false },
+        serviceWorkerPath: "OneSignalSDKWorker.js"
+      });
+    });
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/OneSignalSDKWorker.js', { scope: '/' }).catch(() => {});
+      });
+    }
+  </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Poppins:wght@700;800;900&display=swap" rel="stylesheet">
@@ -281,18 +299,20 @@
       </div>
     </nav>
 
-    <!-- Mobile menu -->
-    <div id="mobMenu" style="display:none;background:#fff;border-top:1px solid #f1f5f9;padding:10px 0 14px;border-radius:0 0 16px 16px;box-shadow:0 8px 24px rgba(0,0,0,0.08);">
-      <a href="#nosotros"  style="display:block;padding:12px 16px;font-weight:700;color:#475569;border-radius:10px;" onfocus="this.style.background='#f8fafc'" onblur="this.style.background=''">Nosotros</a>
-      <a href="#programas" style="display:block;padding:12px 16px;font-weight:700;color:#475569;border-radius:10px;" onfocus="this.style.background='#f8fafc'" onblur="this.style.background=''">Programas</a>
-      <a href="#app"       style="display:block;padding:12px 16px;font-weight:700;color:#475569;border-radius:10px;" onfocus="this.style.background='#f8fafc'" onblur="this.style.background=''">App</a>
-      <a href="#galeria"   style="display:block;padding:12px 16px;font-weight:700;color:#475569;border-radius:10px;" onfocus="this.style.background='#f8fafc'" onblur="this.style.background=''">Galería</a>
-      <a href="#donaciones" style="display:block;padding:12px 16px;font-weight:700;color:#475569;border-radius:10px;" onfocus="this.style.background='#f8fafc'" onblur="this.style.background=''">Donaciones</a>
-      <a href="#contacto"  style="display:block;padding:12px 16px;font-weight:700;color:#475569;border-radius:10px;" onfocus="this.style.background='#f8fafc'" onblur="this.style.background=''">Contacto</a>
-      <a href="login.html" style="display:block;margin:8px 16px 0;padding:12px;text-align:center;background:linear-gradient(135deg,#FF9800,#E91E63);color:white;font-weight:900;border-radius:14px;">Acceso Padres</a>
-    </div>
   </div>
 </header>
+
+<!-- Mobile menu overlay & container -->
+<div id="mobMenuOverlay" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,0.5);backdrop-filter:blur(4px);z-index:90;transition:opacity .25s ease;"></div>
+<div id="mobMenu" style="display:none;position:fixed;top:70px;left:0;width:100%;max-height:calc(100vh - 70px);overflow-y:auto;background:#fff;border-top:1px solid #f1f5f9;padding:12px 16px 20px;border-radius:0 0 20px 20px;box-shadow:0 12px 32px rgba(0,0,0,0.12);z-index:100;">
+  <a href="#nosotros"   style="display:block;padding:12px 16px;font-weight:700;color:#475569;border-radius:12px;" onfocus="this.style.background='#f8fafc'" onblur="this.style.background=''">Nosotros</a>
+  <a href="#programas"  style="display:block;padding:12px 16px;font-weight:700;color:#475569;border-radius:12px;" onfocus="this.style.background='#f8fafc'" onblur="this.style.background=''">Programas</a>
+  <a href="#app"        style="display:block;padding:12px 16px;font-weight:700;color:#475569;border-radius:12px;" onfocus="this.style.background='#f8fafc'" onblur="this.style.background=''">App</a>
+  <a href="#galeria"    style="display:block;padding:12px 16px;font-weight:700;color:#475569;border-radius:12px;" onfocus="this.style.background='#f8fafc'" onblur="this.style.background=''">Galería</a>
+  <a href="#donaciones" style="display:block;padding:12px 16px;font-weight:700;color:#475569;border-radius:12px;" onfocus="this.style.background='#f8fafc'" onblur="this.style.background=''">Donaciones</a>
+  <a href="#contacto"   style="display:block;padding:12px 16px;font-weight:700;color:#475569;border-radius:12px;" onfocus="this.style.background='#f8fafc'" onblur="this.style.background=''">Contacto</a>
+  <a href="login.html"  style="display:block;margin:10px 0 0;padding:14px;text-align:center;background:linear-gradient(135deg,#FF9800,#E91E63);color:white;font-weight:900;border-radius:14px;box-shadow:0 4px 16px rgba(255,152,0,.35);">Acceso Padres</a>
+</div>
 
 <!-- ════════════════════════════════════════════════════════════
      HERO — video background
@@ -300,6 +320,7 @@
 <section class="hero" id="inicio">
   <!-- Video background (muted, autoplay) -->
   <video class="hero-video" autoplay muted loop playsinline poster="img/karpus.jpg" aria-label="Video de fondo Karpus Kids">
+    <source src="img/14.mp4" type="video/mp4">
     <source src="img/video%20karpus%20kids.mp4" type="video/mp4">
     <track kind="captions" srclang="es" label="Español" default>
   </video>
@@ -1312,15 +1333,31 @@
   const mobBtn  = document.getElementById('mobBtn');
   const mobMenu = document.getElementById('mobMenu');
   const mobIcon = document.getElementById('mobIcon');
-  mobBtn.addEventListener('click', () => {
-    const open = mobMenu.style.display === 'block';
-    mobMenu.style.display = open ? 'none' : 'block';
-    mobIcon.className = open ? 'bi bi-list' : 'bi bi-x-lg';
-  });
-  mobMenu.querySelectorAll('a').forEach(a => a.addEventListener('click', () => {
+  const mobOverlay = document.getElementById('mobMenuOverlay');
+
+  function closeMobMenu() {
     mobMenu.style.display = 'none';
+    if (mobOverlay) mobOverlay.style.display = 'none';
     mobIcon.className = 'bi bi-list';
-  }));
+  }
+
+  function openMobMenu() {
+    mobMenu.style.display = 'block';
+    if (mobOverlay) mobOverlay.style.display = 'block';
+    mobIcon.className = 'bi bi-x-lg';
+  }
+
+  mobBtn.addEventListener('click', () => {
+    const isOpen = mobMenu.style.display === 'block';
+    if (isOpen) closeMobMenu();
+    else openMobMenu();
+  });
+
+  if (mobOverlay) {
+    mobOverlay.addEventListener('click', closeMobMenu);
+  }
+
+  mobMenu.querySelectorAll('a').forEach(a => a.addEventListener('click', closeMobMenu));
 
   // ── Lightbox ──────────────────────────────────────────────────────────────
   function openLb(src) {
