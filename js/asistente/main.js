@@ -34,6 +34,9 @@ async function getChatModule() {
 const _assistantContacts = {};
 let _assistantReply = null; // respuesta citada pendiente
 
+// Estado de los submenús colapsables del sidebar (compartido por navegación e init)
+const NAV_SUBMENU_KEY = 'karpus_asistente_submenu_state';
+
 /**
  * Restaura la vista inicial del chat (placeholder "Selecciona un contacto")
  */
@@ -480,8 +483,25 @@ async function submitNewPost() {
  */
 const loadedSections = new Set();
 
+/**
+ * Expande (y persiste) el submenú del sidebar que contiene al item activo,
+ * para que el indicador visual siempre sea visible.
+ */
+function expandSubmenu(key) {
+  if (!key) return;
+  const toggle = document.querySelector(`.kk-submenu-toggle[data-submenu="${key}"]`);
+  const items = document.getElementById('submenu-' + key);
+  if (toggle) { toggle.classList.add('active'); toggle.setAttribute('aria-expanded', 'true'); }
+  if (items) items.classList.remove('collapsed');
+  try {
+    const cur = JSON.parse(localStorage.getItem(NAV_SUBMENU_KEY) || '{}');
+    cur[key] = true;
+    localStorage.setItem(NAV_SUBMENU_KEY, JSON.stringify(cur));
+  } catch (_) {}
+}
+
 function initNavigation() {
-  const navLinks = document.querySelectorAll('[data-section]');
+  const navLinks = document.querySelectorAll('.kk-nav-item[data-section]');
   const sections = document.querySelectorAll('section[id]');
 
   const showSection = async (target, opts = {}) => {
@@ -500,19 +520,23 @@ function initNavigation() {
       loadedSections.delete('muro');
     }
 
-    // 1. Limpiar clases activas en botones de navegación
-    navLinks.forEach(l => {
-      l.classList.remove('bg-white/20', 'bg-teal-50', 'text-teal-600', 'active');
-      // Si el botón está en el sidebar y no es el activo, restaurar su estilo original de texto blanco
-      if (!l.classList.contains('active')) {
-        l.classList.add('text-white');
-      }
-    });
+    // Liberar recursos del módulo Operativo Diario al salir
+    if (prevSection === 'operativo-diario' && target !== 'operativo-diario') {
+      import('/js/shared/operativo-diario.js').then(m => m.OperativoDiarioModule.destroy?.()).catch(() => {});
+      loadedSections.delete('operativo-diario');
+    }
 
-    const activeLink = document.querySelector(`[data-section="${target}"]`);
+    // 1. Limpiar clases activas SOLO en los botones del sidebar (evita contaminar
+    //    tarjetas KPI / CTA que también llevan data-section)
+    navLinks.forEach(l => l.classList.remove('bg-white/20', 'bg-teal-50', 'text-teal-600', 'active'));
+    document.querySelectorAll('.kk-submenu-toggle').forEach(t => t.classList.remove('active'));
+
+    // 2. Marcar el botón activo y auto-expandir su submenú padre (indicador visible)
+    const activeLink = document.querySelector(`.kk-nav-item[data-section="${target}"]`);
     if (activeLink) {
       activeLink.classList.add('bg-white/20', 'active');
-      activeLink.classList.remove('text-white');
+      const parentMenu = activeLink.closest('.kk-submenu-items');
+      if (parentMenu) expandSubmenu(parentMenu.id.replace('submenu-', ''));
     }
 
     // Actualizar Bottom Nav
@@ -520,7 +544,7 @@ function initNavigation() {
       btn.classList.toggle('active', btn.dataset.section === target);
     });
     
-    // 2. Manejo de visibilidad de secciones (ESCENARIO)
+    // 3. Manejo de visibilidad de secciones (ESCENARIO)
     // Lógica de salida de sección (Limpieza)
     if (prevSection === 'accesos' && target !== 'accesos') {
       try {
@@ -564,6 +588,18 @@ function initNavigation() {
     if (!loadedSections.has(target)) {
       try {
         switch (target) {
+          case 'operativo-diario': {
+            const odProfile = AppState.get('profile') || {};
+            await import('/js/shared/operativo-diario.js').then(m => {
+              m.OperativoDiarioModule.init({
+                role: odProfile.role || 'asistente',
+                profile: odProfile,
+                user: AppState.get('user'),
+                container: 'odOperativoRoot',
+              });
+            }).catch(() => {});
+            break;
+          }
           case 'pagos':
             await import('./payments.js').then(m => m.PaymentsModule.init());
             import('../shared/payment-queue.js').then(m =>
@@ -673,7 +709,8 @@ function initNavigation() {
     }
   };
 
-  navLinks.forEach(link => {
+  // Todos los elementos con data-section (nav del sidebar + tarjetas KPI + CTAs)
+  document.querySelectorAll('[data-section]').forEach(link => {
     link.addEventListener('click', (e) => {
       e.preventDefault();
       navigateFromUser(link.dataset.section);
@@ -740,7 +777,7 @@ function initNavigation() {
   }
 
   // -- Submenús colapsables + persistencia (localStorage) --------------------
-  const SUBMENU_KEY = 'karpus_asistente_submenu_state';
+  const SUBMENU_KEY = NAV_SUBMENU_KEY;
   try {
     const saved = JSON.parse(localStorage.getItem(SUBMENU_KEY) || '{}');
     document.querySelectorAll('.kk-submenu-toggle').forEach(toggle => {

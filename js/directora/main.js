@@ -212,6 +212,11 @@ function _applySection(sectionId, opts = {}) {
     try { import('./attendance.module.js').then(m => m.AttendanceModule.destroy?.()).catch(() => {}); } catch (_) {}
   }
 
+  // Liberar recursos del módulo Operativo Diario al salir
+  if (prevSection === 'operativo-diario' && sectionId !== 'operativo-diario') {
+    try { import('/js/shared/operativo-diario.js').then(m => m.OperativoDiarioModule.destroy?.()).catch(() => {}); } catch (_) {}
+  }
+
   // Ocultar todas las secciones
   document.querySelectorAll('.section').forEach(sec => {
     sec.classList.remove('active');
@@ -235,6 +240,19 @@ function _applySection(sectionId, opts = {}) {
       case 'dashboard':
         DashboardService.getFullData(true).then(data => DirectorUI.renderDashboard(data));
         break;
+      case 'operativo-diario': {
+        const profile = AppState.get('profile');
+        import('/js/shared/operativo-diario.js').then(m => {
+          if (AppState.get('currentSection') !== 'operativo-diario') return;
+          m.OperativoDiarioModule.init({
+            role: profile?.role || 'directora',
+            profile: profile || {},
+            user: AppState.get('user'),
+            container: 'odOperativoRoot',
+          }).catch(() => {});
+        }).catch(() => {});
+        break;
+      }
       case 'maestros':
         import('./teachers.module.js').then(m => m.TeachersModule.init());
         break;
@@ -311,6 +329,7 @@ function _applySection(sectionId, opts = {}) {
     // Abrir automáticamente el grupo del sidebar al que pertenece la sección
     const GROUP_OF_SECTION = {
       dashboard: 'principal',
+      'operativo-diario': 'principal',
       maestros: 'gestion', estudiantes: 'gestion', inscripciones: 'gestion', aulas: 'gestion',
       evaluaciones: 'gestion',
       asistencia: 'academico', calificaciones: 'academico',

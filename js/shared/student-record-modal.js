@@ -41,6 +41,13 @@ const DOC_TYPES = [
 
 const LEVELS_FALLBACK = []; // Eliminado — solo usar aulas reales de la DB
 const RELATIONSHIPS = ['Padre', 'Madre', 'Tutor Legal'];
+
+// ── Credenciales de acceso (regla del centro) ──────────────────────────────
+// El correo de acceso se genera SOLO: primer nombre + primer apellido
+// en minúsculas, sin acentos ni espacios, + @karpuskis.com.
+// La contraseña temporal por defecto es siempre la misma.
+const LOGIN_EMAIL_DOMAIN = '@karpuskis.com';
+const DEFAULT_PARENT_PASSWORD = 'karpus123';
 const SCHEDULES = SCHEDULE_IDS;
 const CONSENT_DEFS = [
   { key: 'data_treatment', label: 'Autorizo el tratamiento de datos personales del menor según la política de privacidad.' },
@@ -105,6 +112,7 @@ export const StudentRecordModal = {
     this._student = null;
     this._parentId = null;
     this._parentPassword = null;
+    this._loginEmailAuto = false;
     this._charges = [];
     this._schoolYearOptions = [];
     this._authPeople = [];
@@ -197,6 +205,7 @@ export const StudentRecordModal = {
     this._consents = { data_treatment: false, correct_info: false, contact: false, regulations: false };
     this._signature = '';
     this._autofillConcepts();
+    this._ensureAccessFields();
   },
 
   async _loadStudent(id) {
@@ -292,6 +301,9 @@ export const StudentRecordModal = {
       due_day: student.due_day || 5,
       avatar_url: student.avatar_url || '',
     };
+    // En edición: solo generar el correo si aún no existe (nunca tocar la
+    // contraseña de una cuenta ya creada sin que la directora lo pida).
+    this._ensureAccessFields();
 
     const charges = await supabase
       .from('student_charges')
@@ -388,6 +400,7 @@ export const StudentRecordModal = {
       }
     }
     this._autofillConcepts();
+    this._ensureAccessFields();
   },
 
   _autofillConcepts() {
@@ -799,6 +812,46 @@ export const StudentRecordModal = {
     return p;
   },
 
+  // Normaliza un texto a un slug seguro para correo: minúsculas, sin acentos,
+  // sin espacios ni caracteres especiales.
+  _slugPart(value) {
+    return String(value || '')
+      .trim()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')  // quita acentos/diacríticos
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, '');
+  },
+
+  // Regla del centro: primer nombre + primer apellido → usuario@karpuskis.com
+  _deriveLoginEmail() {
+    const firstName = this._slugPart((this._form?.name || '').trim().split(/\s+/)[0] || '');
+    const lastName  = this._slugPart((this._form?.last_name || '').trim().split(/\s+/)[0] || '');
+    if (!firstName && !lastName) return '';
+    return firstName + lastName + LOGIN_EMAIL_DOMAIN;
+  },
+
+  // Rellena automáticamente usuario y contraseña de acceso.
+  // - El correo se genera solo cuando está vacío (o si force=true).
+  // - La contraseña por defecto solo se auto-rellena para altas/admisiones
+  //   (nunca en edición de una cuenta existente, para no resetearla sin querer).
+  _ensureAccessFields({ force = false } = {}) {
+    const canFillPassword = force || this._mode !== 'edit';
+    // Se regenera si está vacío, si se fuerza, o si sigue siendo el valor
+    // automático (para que refleje cambios de nombre hasta que se edite a mano).
+    if (force || !this._form.login_email || this._loginEmailAuto) {
+      const derived = this._deriveLoginEmail();
+      if (derived) {
+        this._form.login_email = derived;
+        this._form.username = derived;
+        this._loginEmailAuto = true;
+      }
+    }
+    if (canFillPassword && (force || !this._form.password)) {
+      this._form.password = DEFAULT_PARENT_PASSWORD;
+    }
+  },
+
   // Los correos de notificación (tutor 1 y 2) reciben las credenciales;
   // el correo de acceso (login) NO se usa como destino salvo fallback.
   _credentialsRecipients(src = this._form) {
@@ -833,11 +886,24 @@ export const StudentRecordModal = {
             '<tr><td style="padding:8px;color:#64748b;font-size:13px">Contraseña temporal:</td><td style="padding:8px;font-weight:bold">' + Helpers.escapeHTML(password || '') + '</td></tr>' +
             '<tr><td style="padding:8px;color:#64748b;font-size:13px">Enlace:</td><td style="padding:8px;font-weight:bold">' + Helpers.escapeHTML(window.location.origin + window.location.pathname.replace(/[^/]*$/, '') + 'login.html') + '</td></tr>' +
           '</table>' +
-          '<p style="font-size:13px;color:#64748b">Te recomendamos cambiar la contraseña en tu primer acceso. No compartas estas credenciales.</p>' +
+          '<p style="font-size:13px;color:#64748b"><strong>Importante:</strong> por seguridad, al ingresar por primera vez el sistema te pedirá cambiar la contraseña temporal. No compartas estas credenciales.</p>' +
           '<p style="font-size:13px;color:#64748b">Saludos,<br>Equipo Karpus Kids</p>' +
         '</div>' +
       '</div>';
     return sendEmail(to, subject, html, 'Accede con tu correo y la contraseña temporal: ' + (password || ''));
+  },
+
+  // Envía las credenciales a todos los destinatarios y devuelve un resumen
+  // { sent: [...], failed: [...] } para informar a la directora.
+  async _sendCredentialsToRecipients(recipients, password) {
+    const sent = [];
+    const failed = [];
+    for (const rcpt of recipients) {
+      let ok = false;
+      try { ok = !!(await this._sendCredentialsEmail(rcpt, password)); } catch (_) { ok = false; }
+      (ok ? sent : failed).push(rcpt);
+    }
+    return { sent, failed };
   },
 
   _authedField(key, label, placeholder, opts = {}) {
@@ -1094,6 +1160,20 @@ export const StudentRecordModal = {
       // Ya marcada al abrir → asegurar wiring de los campos del sibling
       this._wireSiblingWrap();
     }
+    // Mantener el correo de acceso sincronizado con el nombre mientras no
+    // haya sido editado manualmente (regla: nombre.apellido@karpuskis.com).
+    ['name', 'last_name'].forEach(key => {
+      const el = document.querySelector(`[data-f="${key}"]`);
+      if (el && !el.dataset.credsWired) {
+        el.dataset.credsWired = '1';
+        el.addEventListener('input', () => {
+          if (!this._loginEmailAuto && this._form.login_email) return;
+          this._ensureAccessFields();
+          const loginEl = document.querySelector('#srm-tab-content [data-f="login_email"]');
+          if (loginEl) loginEl.value = this._form.login_email || '';
+        });
+      }
+    });
     this._wireClassroomLevelSync();
     this._wireScheduleDefaults();
     document.getElementById('srm-qr-gen')?.addEventListener('click', () => this._generateQR());
@@ -1708,8 +1788,11 @@ export const StudentRecordModal = {
 
   // ---------------------------------------------------------------- ACCESOS (Pestaña 6)
   _renderAcceso() {
+    // Rellena automáticamente usuario/contraseña si aún están vacíos.
+    this._ensureAccessFields();
     const hasAccount = !!this._parentId && this._mode === 'edit';
     const notifEmails = [this._form.p1_email, this._form.p2_email].filter(Boolean);
+    const recipients = this._credentialsRecipients();
     return `
       <div class="grid grid-cols-1 gap-4">
         <div class="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
@@ -1719,19 +1802,25 @@ export const StudentRecordModal = {
             ${this._authedField('login_email', 'Correo de acceso (login)', 'correo@ejemplo.com', { type: 'email' })}
             <div>
               <label class="${LABEL}">Contraseña temporal (nueva cuenta)</label>
-              <input data-f="password" id="srm-password" type="text" placeholder="Mínimo 6 caracteres" class="${INPUT}">
+              <input data-f="password" id="srm-password" type="text" value="${Helpers.escapeHTML(String(this._form.password || ''))}" placeholder="Mínimo 6 caracteres" class="${INPUT}">
             </div>
+          </div>
+          <div class="mt-3 flex items-start gap-2 bg-purple-50 border border-purple-100 rounded-2xl p-3 text-[10px] font-bold text-purple-700">
+            <i data-lucide="wand-2" class="w-3.5 h-3.5 mt-0.5 shrink-0"></i>
+            <span>Generado automáticamente: <strong>primer nombre + primer apellido</strong> en minúsculas + <strong>@karpuskis.com</strong>, con la contraseña temporal <strong>${DEFAULT_PARENT_PASSWORD}</strong>. El padre deberá cambiarla en su primer ingreso. Puedes editar ambos campos si lo necesitas.</span>
           </div>
           <div class="mt-3 flex items-start gap-2 bg-sky-50 border border-sky-100 rounded-2xl p-3 text-[10px] font-bold text-sky-700">
             <i data-lucide="info" class="w-3.5 h-3.5 mt-0.5 shrink-0"></i>
-            <span>Regla del centro: el correo de acceso lo define la directora o asistente. Los correos del tutor 1 y 2 (pestaña Familia) son SOLO de notificación y NO se usan para iniciar sesión.</span>
+            <span>Los correos del tutor 1 y 2 (pestaña Familia) son SOLO de notificación y NO se usan para iniciar sesión.</span>
           </div>
-          ${notifEmails.length ? `<div class="mt-3 text-[10px] font-bold text-slate-400">Correos de notificación: ${notifEmails.map(e => `<span class="inline-block bg-slate-100 rounded-lg px-2 py-0.5 ml-1">${Helpers.escapeHTML(e)}</span>`).join('')}</div>` : ''}
+          ${recipients.length ? `<div class="mt-3 text-[10px] font-bold text-slate-500 flex items-center gap-1.5 flex-wrap"><i data-lucide="mail" class="w-3.5 h-3.5 text-blue-500"></i> Las credenciales se enviarán a: ${recipients.map(e => `<span class="inline-block bg-slate-100 rounded-lg px-2 py-0.5">${Helpers.escapeHTML(e)}</span>`).join('')}</div>`
+            : `<div class="mt-3 flex items-start gap-2 bg-amber-50 border border-amber-100 rounded-2xl p-3 text-[10px] font-bold text-amber-700"><i data-lucide="alert-triangle" class="w-3.5 h-3.5 mt-0.5 shrink-0"></i><span>No hay correo de notificación del tutor (tutor 1 / tutor 2). Agrega uno en la pestaña Familia para poder enviar las credenciales.</span></div>`}
           <div class="flex gap-2 mt-4">
             <button id="srm-send-creds" class="flex-1 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all flex items-center justify-center gap-2">
               <i data-lucide="mail" class="w-3.5 h-3.5"></i> ${hasAccount ? 'Reenviar credenciales' : 'Crear cuenta y enviar credenciales'}
             </button>
           </div>
+          <div id="srm-creds-status" class="mt-3 hidden"></div>
           ${hasAccount ? `<div class="mt-3 flex gap-2">
             <button id="srm-delete-auth" class="px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all flex items-center justify-center gap-2 border border-red-100">
               <i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Eliminar cuenta y recrear
@@ -1744,6 +1833,25 @@ export const StudentRecordModal = {
   _wireAcceso() {
     document.getElementById('srm-send-creds')?.addEventListener('click', () => this._sendCredentials());
     document.getElementById('srm-delete-auth')?.addEventListener('click', () => this._deleteAndRecreateAuth());
+    // Si la directora edita el correo a mano, dejamos de regenerarlo.
+    const emailEl = document.querySelector('#srm-tab-content [data-f="login_email"]');
+    if (emailEl && !emailEl.dataset.wired) {
+      emailEl.dataset.wired = '1';
+      emailEl.addEventListener('input', () => { this._loginEmailAuto = false; this._form.login_email = emailEl.value; });
+    }
+  },
+
+  // Muestra el resultado del envío de credenciales en la pestaña Acceso
+  // para que la directora/secretaria sepa siempre si el correo salió.
+  _setCredsStatus(ok, message, recipients = []) {
+    const el = document.getElementById('srm-creds-status');
+    if (!el) return;
+    el.className = 'mt-3 flex items-start gap-2 rounded-2xl p-3 text-[11px] font-bold border ' +
+      (ok ? 'bg-emerald-50 border-emerald-100 text-emerald-700' : 'bg-rose-50 border-rose-100 text-rose-700');
+    el.innerHTML = `<i data-lucide="${ok ? 'check-circle-2' : 'alert-circle'}" class="w-4 h-4 mt-0.5 shrink-0"></i>` +
+      `<span>${Helpers.escapeHTML(message)}${recipients.length ? ' — ' + recipients.map(r => Helpers.escapeHTML(r)).join(', ') : ''}` +
+      ` <span class="opacity-60">(${new Date().toLocaleString()})</span></span>`;
+    if (window.lucide) lucide.createIcons();
   },
 
   _previewMonthLabel(today) {
@@ -1899,12 +2007,18 @@ export const StudentRecordModal = {
     if (formPassword && formPassword.length >= 6) {
       this._parentPassword = formPassword;
     } else if (!this._parentPassword) {
-      this._parentPassword = this._genPassword();
+      this._parentPassword = DEFAULT_PARENT_PASSWORD;
       this._form.password = this._parentPassword;
       const input = document.getElementById('srm-password');
       if (input) input.value = this._parentPassword;
     }
     Helpers.toast('Creando cuenta y enviando credenciales…', 'info');
+    const recipients = this._credentialsRecipients();
+    if (!recipients.length) {
+      this._setCredsStatus(false, 'No hay correo de notificación del tutor. Agrégalo en la pestaña Familia antes de enviar.');
+      Helpers.toast('Agrega el correo del tutor (tutor 1 o 2) para enviar las credenciales', 'warning');
+      return;
+    }
     try {
       if (!this._parentId) {
         await this._createParentAccount(email, this._parentPassword);
@@ -1923,12 +2037,19 @@ export const StudentRecordModal = {
           console.warn('[Credentials] Password update failed:', error || data?.error);
         }
       }
-      const recipients = this._credentialsRecipients();
-      for (const rcpt of recipients) {
-        await this._sendCredentialsEmail(rcpt, this._parentPassword);
+      const { sent, failed } = await this._sendCredentialsToRecipients(recipients, this._parentPassword);
+      if (sent.length && !failed.length) {
+        this._setCredsStatus(true, 'Credenciales enviadas correctamente', sent);
+        Helpers.toast('Credenciales enviadas a: ' + sent.join(', '), 'success');
+      } else if (sent.length && failed.length) {
+        this._setCredsStatus(false, 'Enviado parcialmente. Falló el envío a', failed);
+        Helpers.toast('Enviado a ' + sent.join(', ') + '. No se pudo enviar a: ' + failed.join(', '), 'warning');
+      } else {
+        this._setCredsStatus(false, 'No se pudo enviar el correo. Revisa la configuración de correo del sistema.', recipients);
+        Helpers.toast('No se pudo enviar el correo de credenciales', 'error');
       }
-      Helpers.toast('Credenciales enviadas a: ' + recipients.join(', '), 'success');
     } catch (e) {
+      this._setCredsStatus(false, 'No se pudieron crear/enviar las credenciales: ' + (e.message || e), recipients);
       Helpers.toast('No se pudieron crear/enviar las credenciales: ' + (e.message || e), 'error');
     }
   },
@@ -2176,7 +2297,7 @@ export const StudentRecordModal = {
     const { data: authData, error: authError } = await tempClient.auth.signUp({
       email,
       password,
-      options: { data: { name, role: 'padre', phone } },
+      options: { data: { name, role: 'padre', phone, must_change_password: true } },
     });
 
     let parentId = null;
@@ -2264,12 +2385,13 @@ export const StudentRecordModal = {
   async _createStudent() {
     if (this._saving) return;
     this._saveForm();
+    this._ensureAccessFields();
     if (!this._validateBasics()) return;
     this._saving = true;
     _setLoading(true);
     try {
       const payload = this._collect();
-      const password = this._form.password || this._genPassword();
+      const password = this._form.password || DEFAULT_PARENT_PASSWORD;
       this._form.password = password;
       this._parentPassword = password;
 
@@ -2310,17 +2432,29 @@ export const StudentRecordModal = {
         login_email: payload.login_email,
       });
 
-      if (password) {
+      const recipients = this._credentialsRecipients(payload);
+      let mailFailed = [];
+      if (password && recipients.length) {
         try {
-          for (const rcpt of this._credentialsRecipients(payload)) {
-            await this._sendCredentialsEmail(rcpt, password);
+          const res = await this._sendCredentialsToRecipients(recipients, password);
+          mailFailed = res.failed;
+          if (res.sent.length && !mailFailed.length) {
+            Helpers.toast('Credenciales enviadas al padre: ' + res.sent.join(', '), 'success');
+          } else if (mailFailed.length) {
+            Helpers.toast('Estudiante creado, pero NO se pudo enviar el correo a: ' + mailFailed.join(', '), 'warning');
           }
         } catch (emailErr) {
           console.error('[CreateStudent] Email send error:', emailErr);
+          mailFailed = recipients;
+          Helpers.toast('Estudiante creado, pero falló el envío de credenciales', 'warning');
         }
+      } else if (password && !recipients.length) {
+        Helpers.toast('Estudiante creado. Agrega un correo de tutor para enviar las credenciales.', 'info');
       }
 
-      Helpers.toast(payload.monthly_fee > 0 || payload.inscription_fee > 0 ? 'Estudiante creado y cargos generados' : 'Estudiante creado', 'success');
+      if (!mailFailed.length) {
+        Helpers.toast(payload.monthly_fee > 0 || payload.inscription_fee > 0 ? 'Estudiante creado y cargos generados' : 'Estudiante creado', 'success');
+      }
       _closeModal();
       this._afterSave();
     } catch (e) {
@@ -2334,12 +2468,13 @@ export const StudentRecordModal = {
   async _approveAdmission() {
     if (this._saving) return;
     this._saveForm();
+    this._ensureAccessFields();
     if (!this._validateBasics()) return;
     this._saving = true;
     _setLoading(true);
     try {
       const payload = this._collect();
-      const password = this._form.password || this._genPassword();
+      const password = this._form.password || DEFAULT_PARENT_PASSWORD;
       this._form.password = password;
       this._parentPassword = password;
 
@@ -2399,18 +2534,29 @@ export const StudentRecordModal = {
         login_email: payload.login_email,
       });
 
-      if (password) {
+      const recipients = this._credentialsRecipients(payload);
+      let mailFailed = [];
+      if (password && recipients.length) {
         try {
-          for (const rcpt of this._credentialsRecipients(payload)) {
-            await this._sendCredentialsEmail(rcpt, password);
+          const res = await this._sendCredentialsToRecipients(recipients, password);
+          mailFailed = res.failed;
+          if (res.sent.length && !mailFailed.length) {
+            Helpers.toast('Admisión completada. Credenciales enviadas al padre: ' + res.sent.join(', '), 'success');
+          } else if (mailFailed.length) {
+            Helpers.toast('Estudiante admitido, pero NO se pudo enviar el correo a: ' + mailFailed.join(', '), 'warning');
           }
         } catch (emailErr) {
           console.error('[Admission] Email send error:', emailErr);
-          Helpers.toast('Advertencia: credenciales creadas pero no se pudo enviar el correo.', 'warning');
+          mailFailed = recipients;
+          Helpers.toast('Estudiante admitido, pero falló el envío de credenciales', 'warning');
         }
+      } else if (password && !recipients.length) {
+        Helpers.toast('Estudiante admitido. Agrega un correo de tutor para enviar las credenciales.', 'info');
       }
 
-      Helpers.toast('Estudiante admitido y cargos generados', 'success');
+      if (!mailFailed.length) {
+        Helpers.toast('Estudiante admitido y cargos generados', 'success');
+      }
       _closeModal();
       this._afterSave();
     } catch (e) {
@@ -2476,6 +2622,29 @@ export const StudentRecordModal = {
       const studentId = this._student?.id;
       if (!studentId) throw new Error('Estudiante no cargado');
 
+      // Si la directora definió/actualizó la contraseña temporal, provisionamos
+      // o revalidamos la cuenta de acceso antes de guardar.
+      const accessEmail = String(f.login_email || '').trim();
+      const accessPassword = String(f.password || '').trim();
+      const hasCreds = !!accessEmail && accessPassword.length >= 6;
+      if (hasCreds) {
+        if (!this._parentId) {
+          try { await this._createParentAccount(accessEmail, accessPassword); }
+          catch (authErr) {
+            console.error('[SaveChanges] Auth creation error:', authErr);
+            Helpers.toast('Advertencia: no se pudo crear la cuenta de acceso. ' + (authErr.message || authErr), 'warning');
+          }
+        } else {
+          try {
+            const { data, error } = await supabase.functions.invoke('admin-reset-password', {
+              body: { user_id: this._parentId, new_password: accessPassword }
+            });
+            if (error || data?.error) console.warn('[SaveChanges] Password update failed:', error || data?.error);
+          } catch (_) {}
+        }
+        if (this._parentId) payload.parent_id = this._parentId;
+      }
+
       const { error } = await supabase.from('students').update(payload).eq('id', studentId);
       if (error) throw error;
 
@@ -2489,7 +2658,27 @@ export const StudentRecordModal = {
         classroom_id: payload.classroom_id,
       });
 
-      Helpers.toast('Expediente actualizado', 'success');
+      // Enviar credenciales al padre si se definió una contraseña temporal.
+      if (hasCreds) {
+        const recipients = this._credentialsRecipients();
+        if (recipients.length) {
+          try {
+            const res = await this._sendCredentialsToRecipients(recipients, accessPassword);
+            if (res.sent.length && !res.failed.length) {
+              Helpers.toast('Expediente actualizado. Credenciales enviadas a: ' + res.sent.join(', '), 'success');
+            } else if (res.failed.length) {
+              Helpers.toast('Expediente actualizado, pero NO se pudo enviar el correo a: ' + res.failed.join(', '), 'warning');
+            }
+          } catch (emailErr) {
+            console.error('[SaveChanges] Email send error:', emailErr);
+            Helpers.toast('Expediente actualizado, pero falló el envío de credenciales', 'warning');
+          }
+        } else {
+          Helpers.toast('Expediente actualizado. Agrega un correo de tutor para enviar las credenciales.', 'info');
+        }
+      } else {
+        Helpers.toast('Expediente actualizado', 'success');
+      }
       _closeModal();
       this._afterSave();
     } catch (e) {

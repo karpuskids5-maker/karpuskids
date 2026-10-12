@@ -28,6 +28,7 @@
   <link rel="stylesheet" href="css/karpus-modern.css" />
   <link rel="stylesheet" href="css/karpus-tailwind.css">
   <link rel="stylesheet" href="css/premium-mobile.css">
+  <link rel="stylesheet" href="css/operativo-diario.css">
   <script src="js/shared/chart.min.js" defer></script>
   <!-- Fallback: si chart.min.js no carga, definir Chart como stub para evitar ReferenceError -->
   <script>
@@ -450,6 +451,11 @@
             <i data-lucide="layout-dashboard" class="text-blue-300"></i>
             <span class="label">Dashboard</span>
           </button>
+          <button data-section="operativo-diario" class="kk-nav-item relative" data-tooltip="Operativo Diario · Control de la Estancia">
+            <i data-lucide="clipboard-check" class="text-emerald-300"></i>
+            <span class="label">Operativo Diario</span>
+            <span id="badge-operativo-diario" class="hidden kk-badge">0</span>
+          </button>
         </div>
 
         <button type="button" class="kk-nav-section-toggle" data-section-toggle="gestion" aria-expanded="true">
@@ -745,6 +751,11 @@
           </div>
         </div>
 
+      </section>
+
+      <!-- OPERATIVO DIARIO · CONTROL DE LA ESTANCIA (módulo compartido) -->
+      <section id="operativo-diario" class="section">
+        <div id="odOperativoRoot"></div>
       </section>
 
       <!-- MAESTROS -->

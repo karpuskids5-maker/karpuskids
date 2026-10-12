@@ -27,6 +27,7 @@
   <link rel="stylesheet" href="css/karpus-modern.css" />
   <link rel="stylesheet" href="css/karpus-tailwind.css">
   <link rel="stylesheet" href="css/premium-mobile.css">
+  <link rel="stylesheet" href="css/operativo-diario.css">
   <script src="js/shared/chart.min.js" defer></script>
   <style>
     /* ================================================================
@@ -141,15 +142,16 @@
       background: rgba(255,255,255,0.07); color: #fff; transform: translateX(1px);
     }
     .kk-nav-item.active {
-      background: linear-gradient(135deg, rgba(34,211,238,0.18), rgba(16,185,129,0.12));
-      color: #fff; font-weight: 600;
-      box-shadow: inset 0 0 0 1px rgba(34,211,238,0.25);
+      background: linear-gradient(135deg, rgba(34,211,238,0.30), rgba(16,185,129,0.22));
+      color: #fff; font-weight: 700;
+      box-shadow: inset 0 0 0 1px rgba(34,211,238,0.45);
     }
     .kk-nav-item.active::before {
       content:''; position: absolute; left: -6px; top: 50%; transform: translateY(-50%);
-      width: 3px; height: 20px;
+      width: 3px; height: 22px;
       background: linear-gradient(180deg, var(--kk-brand-400), var(--kk-accent-500));
       border-radius: 3px;
+      box-shadow: 0 0 10px rgba(34,211,238,0.7);
     }
     .kk-nav-item [data-lucide] { width: 18px; height: 18px; flex-shrink: 0; }
     .kk-badge {
@@ -159,6 +161,7 @@
       display: inline-flex; align-items: center; justify-content: center;
       box-shadow: 0 2px 8px rgba(244,63,94,0.4);
     }
+    .kk-badge.hidden { display: none !important; }
     .kk-nav-section { padding: 0 4px; margin-top: 14px; margin-bottom: 4px; }
     .kk-submenu-toggle {
       display: flex; align-items: center; gap: 12px; width: 100%;
@@ -595,6 +598,13 @@
           <span class="label">Resumen</span>
         </button>
 
+        <!-- Operativo Diario · Control de la Estancia (módulo compartido) -->
+        <button data-section="operativo-diario" class="nav-btn kk-nav-item relative" data-tooltip="Operativo Diario · Control de la Estancia">
+          <i data-lucide="clipboard-check" class="text-emerald-300"></i>
+          <span class="label">Operativo Diario</span>
+          <span id="badge-operativo-diario" class="hidden kk-badge">0</span>
+        </button>
+
         <!-- SUBMENÚ: Gestión Académica -->
         <button type="button" class="kk-submenu-toggle kk-submenu-btn" data-submenu="gestion" aria-expanded="false">
           <i data-lucide="folder-tree" class="text-orange-300"></i>
@@ -801,8 +811,8 @@
                 <div class="p-1.5 bg-white/20 rounded-xl"><i data-lucide="alert-circle" class="w-4 h-4"></i></div>
                 <span class="text-[10px] font-black text-orange-100 uppercase tracking-wider">Por Cobrar</span>
               </div>
-              <p class="text-3xl font-black" id="statPayments">-</p>
-              <p class="text-xs text-orange-100 mt-0.5">Pagos pendientes</p>
+<p class="text-2xl font-black" id="statPayments">-</p>
+          <p class="text-xs text-orange-100 mt-0.5" id="statPaymentsPeriod">Monto pendiente del período</p>
             </div>
             <i data-lucide="wallet" class="absolute -bottom-4 -right-4 w-20 h-20 text-white/10 rotate-12 group-hover:scale-110 transition-transform duration-500"></i>
           </div>
@@ -820,42 +830,24 @@
           </div>
         </div>
 
-        <!-- Recent payments + chart -->
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
-          <!-- Recent payments -->
-          <div class="lg:col-span-2 bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-            <div class="flex items-center justify-between px-5 py-4 border-b border-slate-100">
-              <h3 class="text-sm font-black text-slate-700 flex items-center gap-2">
-                <span class="w-2 h-5 bg-teal-500 rounded-full"></span> Pagos Recientes
-              </h3>
-              <button data-section="pagos" class="text-xs font-black text-teal-600 hover:text-teal-800 uppercase tracking-wider transition-colors">Ver todos →</button>
-            </div>
-            <div id="dashRecentPayments" class="divide-y divide-slate-50">
-              <div class="px-5 py-8 text-center text-slate-400 text-sm">Cargando...</div>
-            </div>
-          </div>
-
-          <!-- Item #23: Mini-chart asistencia semanal (últimos 7 días) -->
-          <div class="bg-gradient-to-br from-teal-600 to-emerald-700 rounded-2xl p-5 text-white shadow-md relative overflow-hidden">
-            <div class="flex items-center justify-between mb-1 relative z-10">
-              <h3 class="text-sm font-black flex items-center gap-2">
-                <span class="w-2 h-5 bg-white/70 rounded-full"></span> Asistencia 7 días
-              </h3>
-              <span class="text-[10px] font-black uppercase tracking-widest text-white/70">presentes/día</span>
-            </div>
-            <div class="h-40 relative z-10"><canvas id="attendanceMiniChart"></canvas></div>
-            <i data-lucide="activity" class="absolute -bottom-6 -right-4 w-28 h-28 text-white/10 -rotate-12"></i>
-          </div>
-
-          <!-- Income chart -->
-          <div class="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
-            <h3 class="text-sm font-black text-slate-700 mb-4 flex items-center gap-2">
-              <span class="w-2 h-5 bg-violet-500 rounded-full"></span> Ingresos del Año
+        <!-- RESUMEN DE AULAS (centro de resumen de todos los salones) -->
+        <div class="mb-2">
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="text-sm font-black text-slate-700 flex items-center gap-2">
+              <span class="w-2 h-5 bg-teal-500 rounded-full"></span> Resumen de aulas
             </h3>
-            <div class="h-48"><canvas id="incomeChart"></canvas></div>
+            <button data-section="operativo-diario" class="text-xs font-black text-teal-600 hover:text-teal-800 uppercase tracking-wider transition-colors">Control diario →</button>
+          </div>
+          <div id="classroomsSummary">
+            <div class="bg-white rounded-2xl border border-slate-100 shadow-sm px-5 py-8 text-center text-slate-400 text-sm">Cargando aulas...</div>
           </div>
         </div>
 
+      </section>
+
+      <!-- OPERATIVO DIARIO · CONTROL DE LA ESTANCIA (módulo compartido) -->
+      <section id="operativo-diario" class="section">
+        <div id="odOperativoRoot"></div>
       </section>
 
       <!-- ESTUDIANTES -->
@@ -1489,6 +1481,7 @@
               Gestión Financiera
             </h1>
             <p class="text-slate-400 text-sm font-medium mt-0.5">Control de ingresos, mensualidades y cobros</p>
+            <p class="text-[10px] font-black text-teal-600 uppercase tracking-wider mt-1.5 inline-flex items-center gap-1.5" id="payPeriodBadge"><span class="w-1.5 h-1.5 bg-teal-500 rounded-full"></span> Período visible: —</p>
           </div>
           <div class="flex gap-2 shrink-0">
             <button id="btnGeneratePayments" class="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black text-xs uppercase tracking-wider shadow-sm transition-all active:scale-95">

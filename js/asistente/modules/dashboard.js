@@ -5,17 +5,53 @@ import { QueryCache } from '../../shared/query-cache.js';
 import { getBirthdayInfo } from '../../shared/birthday-utils.js';
 import { autoMarkAbsentStudents } from '../../shared/absent-service.js';
 
-const STATUS_MAP = {
-  paid:    { label: 'Aprobado',    cls: 'bg-emerald-100 text-emerald-700' },
-  pending: { label: 'Pendiente',   cls: 'bg-amber-100 text-amber-700' },
-  review:  { label: 'En Revisión', cls: 'bg-blue-100 text-blue-700' },
-  overdue: { label: 'Vencido',     cls: 'bg-rose-100 text-rose-700' }
-};
+const GEN_DAY = 25;
+const MONTH_NAMES_ES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+
+function visibleMonthKey() {
+  const genDay = Number(AppState.get('schoolSettings')?.generation_day) || GEN_DAY;
+  const d = new Date();
+  if (d.getDate() >= genDay) {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  }
+  const prevM = d.getMonth() === 0 ? 12 : d.getMonth();
+  const prevY = d.getMonth() === 0 ? d.getFullYear() - 1 : d.getFullYear();
+  return `${prevY}-${String(prevM).padStart(2, '0')}`;
+}
+
+function visibleMonthName() {
+  const m = Number(visibleMonthKey().split('-')[1] || '0') - 1;
+  return MONTH_NAMES_ES[m] || '';
+}
+
+function classroomCard(c, teacher, enrolledCount, present, attPct, taken, routinePublished, chip, chipCls, barCls) {
+  const name = Helpers.escapeHTML(c.name || 'Aula');
+  const teacherName = Helpers.escapeHTML(teacher?.name || 'Sin maestra asignada');
+  const barW = Math.max(0, Math.min(100, attPct));
+  return `
+    <div class="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
+      <div class="flex items-start justify-between gap-2 mb-3">
+        <div class="min-w-0">
+          <p class="font-black text-slate-800 text-sm truncate">${name}</p>
+          <p class="text-[10px] text-slate-400 font-bold uppercase truncate">${teacherName}</p>
+        </div>
+        <span class="text-[9px] font-black px-2 py-1 rounded-full shrink-0 ${chipCls}">${chip}</span>
+      </div>
+      <div class="flex items-center justify-between text-xs font-bold text-slate-500 mb-1">
+        <span>${present}/${enrolledCount} presentes</span>
+        <span>${attPct}%</span>
+      </div>
+      <div class="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+        <div class="h-full ${barCls}" style="width:${barW}%"></div>
+      </div>
+      <div class="flex items-center gap-3 mt-3 text-[10px] font-bold text-slate-400">
+        <span class="flex items-center gap-1"><i data-lucide="${taken ? 'calendar-check' : 'calendar-x'}" class="w-3 h-3"></i>${taken ? 'Lista tomada' : 'Sin lista'}</span>
+        <span class="flex items-center gap-1"><i data-lucide="book-open" class="w-3 h-3"></i>${routinePublished ? 'Rutina publicada' : 'Sin rutina'}</span>
+      </div>
+    </div>`;
+}
 
 export const DashboardModule = {
-  _chart: null,
-  _attChart: null,
-
   async init() {
     const dateEl = document.getElementById('dashboardDate');
     const updateDate = () => {
@@ -34,12 +70,8 @@ export const DashboardModule = {
     };
     setTimeout(() => { updateDate(); setInterval(updateDate, 86400000); }, msUntilMidnight());
 
-    await Promise.all([
-      this.loadStats(),
-      this.loadRecentPayments(),
-      this._loadMiniChart(),
-      this._loadAttendanceMiniChart(),
-    ]);
+    await this.loadStats();
+    await this._loadClassroomsSummary();
   },
 
   async loadStats() {
@@ -47,7 +79,7 @@ export const DashboardModule = {
         const today = new Date().toISOString().split('T')[0];
         const todayStart = today + 'T00:00:00.000Z';
         const todayEnd   = today + 'T23:59:59.999Z';
-        const monthKey = new Date().getFullYear() + '-' + String(new Date().getMonth() + 1).padStart(2, '0');
+        const visibleKey = visibleMonthKey();
 
         // Stale-while-revalidate: mostrar datos cacheados inmediatamente, revalidar en background
         const cachedStats = QueryCache.getStale(
@@ -56,23 +88,22 @@ export const DashboardModule = {
             // Auto-detección de ausentes (misma regla: check_in_end + 2h)
             try { await autoMarkAbsentStudents(); } catch (_) {}
 
-            const [studentsRes, attendanceRes, paymentsRes, incomeRes, todayPaidRes, absentNotifiedRes, overdueRes] = await Promise.allSettled([
+            const [studentsRes, attendanceRes, incomeRes, todayPaidRes, absentNotifiedRes, queueRes] = await Promise.allSettled([
               supabase.from('students').select('*', { count: 'exact', head: true })
                 .eq('is_active', true).not('classroom_id', 'is', null),
               supabase.from('attendance').select('*', { count: 'exact', head: true })
                 .eq('date', today).in('status', ['present', 'presente', 'late', 'tarde']),
-              supabase.from('payments').select('*', { count: 'exact', head: true })
-                .in('status', ['pending', 'review']),
               supabase.from('payments').select('amount')
-                .eq('status', 'paid').eq('month_paid', monthKey),
+                .eq('status', 'paid').eq('month_paid', visibleKey),
               supabase.from('payments').select('id, amount')
                 .eq('status', 'paid')
                 .gte('created_at', todayStart).lte('created_at', todayEnd),
               supabase.from('attendance').select('*', { count: 'exact', head: true })
-                .eq('date', today).in('status', ['absent', 'ausente'])
-                .not('notes', 'is', null),
-              supabase.from('payments').select('*', { count: 'exact', head: true })
-                .eq('status', 'overdue'),
+                .eq('date', today).eq('status', 'absent')
+                .not('absence_reason', 'is', null),
+              // Cobros del MES VISIBLE (regla del día de generación, igual que la
+              // directora): monto total_due y conteos por estado del período.
+              supabase.from('v_payments_with_mora').select('status,total_due').eq('month_paid', visibleKey),
             ]);
             const get = (r) => r.status === 'fulfilled' ? r.value : {};
             const activeCount = get(studentsRes).count || 0;
@@ -81,16 +112,25 @@ export const DashboardModule = {
             const absentCount = Math.max(0, activeCount - presentCount);
             const todayPaid = get(todayPaidRes).data || [];
             const todayPaidTotal = todayPaid.reduce((s,p)=>s+Number(p.amount||0), 0);
+            const queue = get(queueRes).data || [];
+            const isSt = (p, names) => names.includes(String(p.status || '').toLowerCase());
+            const isOpen = (p) => isSt(p, ['pending', 'pendiente', 'overdue', 'vencido', 'review', 'revision', 'revisión']);
+            const pendingCount = queue.filter(p => isSt(p, ['pending', 'pendiente'])).length;
+            const reviewCount  = queue.filter(p => isSt(p, ['review', 'revision', 'revisión'])).length;
+            const overdueCount = queue.filter(p => isSt(p, ['overdue', 'vencido'])).length;
+            // "Por cobrar" = solo cargos abiertos (sin cobrar, vencidos o en revisión)
+            const pendingAmount = queue.filter(isOpen).reduce((s, p) => s + Number(p.total_due || 0), 0);
             return {
               studentsCount:   activeCount,
               attendanceCount: presentCount,
               absentCount:     absentCount,
-              paymentsCount:   get(paymentsRes).count  || 0,
+              paymentsCount:   pendingCount + reviewCount,
               incomeTotal:     (get(incomeRes).data || []).reduce((s, p) => s + Number(p.amount || 0), 0),
               paymentsToday:   todayPaidTotal,
               paymentsTodayCount: todayPaid.length,
               absentNotified:  get(absentNotifiedRes).count || 0,
-              overdueCount:    get(overdueRes).count || 0,
+              overdueCount:    overdueCount,
+              pendingAmount:   pendingAmount,
               noPunchCount:    Math.max(0, absentCount - (get(absentNotifiedRes).count || 0)),
             };
           },
@@ -106,12 +146,13 @@ export const DashboardModule = {
     }
 ,
 
-  _applyStats({ studentsCount, attendanceCount, absentCount, paymentsCount, incomeTotal, paymentsToday, paymentsTodayCount, absentNotified, overdueCount, noPunchCount }) {
+  _applyStats({ studentsCount, attendanceCount, absentCount, paymentsCount, incomeTotal, paymentsToday, paymentsTodayCount, absentNotified, overdueCount, pendingAmount, noPunchCount }) {
     const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
     set('statStudents',   studentsCount);
     set('statAttendance', attendanceCount);
     set('statAbsent',     absentCount);
-    set('statPayments',   paymentsCount);
+    set('statPayments',   'RD$' + Number(pendingAmount || 0).toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+    set('statPaymentsPeriod', 'Monto pendiente de ' + visibleMonthName().toLowerCase() + ' (período)');
     set('statIncome',     incomeTotal.toLocaleString('es-DO', { minimumFractionDigits: 2 }));
     set('statPaymentsToday', 'RD$' + Number(paymentsToday || 0).toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
     set('statPaymentsTodayCount', `${paymentsTodayCount ?? 0} transaccion${paymentsTodayCount === 1 ? '':'es'}`);
@@ -140,7 +181,7 @@ export const DashboardModule = {
     if (overdue > 0) {
       alerts.push({
         title: `${overdue} pago${overdue===1?'':'s'} en mora`,
-        desc: 'Comprobantes vencidos requieren seguimiento inmediato.',
+        desc: 'Cargos vencidos del período requieren seguimiento inmediato.',
         icon: 'alert-octagon',
         color: 'rose',
         section: 'pagos'
@@ -149,8 +190,8 @@ export const DashboardModule = {
 
     if (paymentsReview > 0) {
       alerts.push({
-        title: `${paymentsReview} Pagos por validar`,
-        desc: 'Comprobantes pendientes de revisión bancaria.',
+        title: `${paymentsReview} pago${paymentsReview===1?'':'s'} por validar`,
+        desc: 'Cobros del período pendientes de revisión o cobro.',
         icon: 'credit-card',
         color: 'violet',
         section: 'pagos'
@@ -190,148 +231,76 @@ export const DashboardModule = {
     if (window.lucide) lucide.createIcons();
   },
 
-  async loadRecentPayments() {
-    const container = document.getElementById('dashRecentPayments');
+  async _loadClassroomsSummary() {
+    const container = document.getElementById('classroomsSummary');
     if (!container) return;
-
     try {
-      const { data, error } = await supabase
-        .from('payments')
-        .select('id, amount, status, month_paid, method, students:student_id(name)')
-        .order('created_at', { ascending: false })
-        .limit(6);
+      const today = new Date().toISOString().split('T')[0];
+      const [crRes, prRes, stRes, atRes, lgRes] = await Promise.all([
+        supabase.from('classrooms').select('id,name,level,capacity,teacher_id').order('name'),
+        supabase.from('profiles').select('id,name').in('role', ['maestra', 'asistente', 'directora']),
+        supabase.from('students').select('id,classroom_id').eq('is_active', true),
+        supabase.from('attendance').select('classroom_id,status').eq('date', today),
+        supabase.from('daily_logs').select('classroom_id,status').eq('date', today),
+      ]);
 
-      if (error) throw error;
+      const classrooms = crRes.data || [];
+      const teachers = {};
+      (prRes.data || []).forEach(p => { teachers[p.id] = p; });
+      const students = stRes.data || [];
+      const att = atRes.data || [];
+      const logs = lgRes.data || [];
+      const PRESENT = ['present', 'presente', 'late', 'tarde'];
 
-      if (!data?.length) {
-        container.innerHTML = '<div class="px-5 py-8 text-center text-slate-400 text-sm">Sin pagos recientes.</div>';
-        return;
-      }
+      let totalEnrolled = 0, totalPresent = 0, routinesPublished = 0;
 
-      container.innerHTML = data.map(p => {
-        const st  = STATUS_MAP[p.status] || { label: p.status, cls: 'bg-slate-100 text-slate-600' };
-        const amt = 'RD$' + Number(p.amount || 0).toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-        const ini = (p.students?.name || '?').charAt(0).toUpperCase();
-        return (
-          '<div class="flex items-center gap-3 px-5 py-3 hover:bg-slate-50 transition-colors">' +
-            '<div class="w-9 h-9 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center font-black text-sm shrink-0">' + ini + '</div>' +
-            '<div class="min-w-0 flex-1">' +
-              '<p class="font-bold text-slate-800 text-sm truncate">' + Helpers.escapeHTML(p.students?.name || 'Desconocido') + '</p>' +
-              '<p class="text-[10px] text-slate-400 font-bold uppercase">' + (p.month_paid || '-') + ' · ' + (p.method || '-') + '</p>' +
-            '</div>' +
-            '<div class="text-right shrink-0">' +
-              '<p class="font-black text-slate-800 text-sm">' + amt + '</p>' +
-              '<span class="text-[9px] font-black px-2 py-0.5 rounded-full ' + st.cls + '">' + st.label + '</span>' +
-            '</div>' +
-          '</div>'
-        );
-      }).join('');
+      const cards = classrooms.map(c => {
+        const enrolledCount = students.filter(s => s.classroom_id === c.id).length;
+        const clsAtt = att.filter(a => a.classroom_id === c.id);
+        const present = clsAtt.filter(a => PRESENT.includes((a.status || '').toLowerCase())).length;
+        const taken = clsAtt.length > 0;
+        const routinePublished = logs.some(l => l.classroom_id === c.id && l.status === 'published');
+        const teacher = c.teacher_id ? teachers[c.teacher_id] : null;
+        const attPct = enrolledCount ? Math.round((present / enrolledCount) * 100) : 0;
 
-    } catch (_) {
-      container.innerHTML = Helpers.errorState('Error al cargar pagos');
+        totalEnrolled += enrolledCount;
+        totalPresent += present;
+        if (routinePublished) routinesPublished++;
+
+        let state = 'ok', chip = 'Al día';
+        if (!teacher) { state = 'bad'; chip = 'Sin maestra'; }
+        else if (enrolledCount > 0 && !taken) { state = 'warn'; chip = 'Sin lista'; }
+        else if (enrolledCount > 0 && !routinePublished) { state = 'warn'; chip = 'Sin rutina'; }
+
+        const chipCls = state === 'bad' ? 'bg-rose-100 text-rose-700'
+          : state === 'warn' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700';
+        const barCls = attPct >= 85 ? 'bg-emerald-500' : attPct >= 60 ? 'bg-amber-500' : 'bg-rose-500';
+
+        return classroomCard(c, teacher, enrolledCount, present, attPct, taken, routinePublished, chip, chipCls, barCls);
+      });
+
+      const attPct = totalEnrolled ? Math.round((totalPresent / totalEnrolled) * 100) : 0;
+      const kpi = (label, value, color) => `
+        <div class="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
+          <p class="text-[10px] font-black uppercase tracking-wider text-slate-400">${label}</p>
+          <p class="text-2xl font-black ${color}">${value}</p>
+        </div>`;
+
+      container.innerHTML = `
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+          ${kpi('Aulas', classrooms.length, 'text-slate-800')}
+          ${kpi('Matrícula', totalEnrolled, 'text-slate-800')}
+          ${kpi('Asistencia hoy', attPct + '%', attPct >= 85 ? 'text-emerald-600' : attPct >= 60 ? 'text-amber-600' : 'text-rose-600')}
+          ${kpi('Rutinas publicadas', `${routinesPublished}/${classrooms.length}`, 'text-slate-800')}
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          ${cards.join('') || '<div class="col-span-full bg-white rounded-2xl border border-slate-100 px-5 py-8 text-center text-slate-400 text-sm">No hay aulas registradas.</div>'}
+        </div>`;
+
       if (window.lucide) lucide.createIcons();
-    }
-  },
-
-  async _loadMiniChart() {
-    const canvas = document.getElementById('incomeChart');
-    if (!canvas || !window.Chart) return;
-    try {
-      const year = new Date().getFullYear();
-      const { data } = await supabase
-        .from('payments').select('amount, month_paid')
-        .eq('status', 'paid')
-        .like('month_paid', year + '-%');
-
-      const vals = new Array(12).fill(0);
-      (data || []).forEach(p => {
-        const parts = (p.month_paid || '').split('-');
-        const m = parts.length >= 2 ? parseInt(parts[1], 10) - 1 : -1;
-        if (m >= 0 && m <= 11) vals[m] += Number(p.amount || 0);
-      });
-
-      if (this._chart) this._chart.destroy();
-      this._chart = new Chart(canvas, {
-        type: 'bar',
-        data: {
-          labels: ['E','F','M','A','M','J','J','A','S','O','N','D'],
-          datasets: [{
-            data: vals,
-            backgroundColor: 'rgba(139,92,246,0.75)',
-            borderRadius: 5,
-            borderSkipped: false
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: { legend: { display: false } },
-          scales: {
-            x: { grid: { display: false }, ticks: { font: { size: 9 } } },
-            y: {
-              beginAtZero: true,
-              grid: { color: 'rgba(0,0,0,0.04)' },
-              ticks: { font: { size: 9 }, callback: (v) => '$' + v }
-            }
-          }
-        }
-      });
     } catch (e) {
-      // Error intentionally ignored (chart render failure is non-critical)
-    }
-  },
-
-  async _loadAttendanceMiniChart() {
-    const canvas = document.getElementById('attendanceMiniChart');
-    if (!canvas || !window.Chart) return;
-    try {
-      const days = [];
-      const labels = [];
-      for (let i = 6; i >= 0; i--) {
-        const d = new Date();
-        d.setDate(d.getDate() - i);
-        days.push(d.toISOString().split('T')[0]);
-        labels.push(d.toLocaleDateString('es-DO', { weekday: 'short' }).substring(0,1).toUpperCase());
-      }
-      const { data, error } = await supabase
-        .from('attendance')
-        .select('date, status')
-        .gte('date', days[0])
-        .lte('date', days[6])
-        .in('status', ['present', 'presente', 'late', 'tarde']);
-      if (error) throw error;
-      const counts = new Array(7).fill(0);
-      (data || []).forEach(r => {
-        const idx = days.indexOf(r.date);
-        if (idx >= 0) counts[idx]++;
-      });
-      if (this._attChart) this._attChart.destroy();
-      Chart.defaults.font.family = 'Inter, ui-sans-serif, system-ui';
-      this._attChart = new Chart(canvas, {
-        type: 'bar',
-        data: {
-          labels,
-          datasets: [{
-            data: counts,
-            backgroundColor: 'rgba(255,255,255,0.9)',
-            borderRadius: 3,
-            borderSkipped: false,
-            barThickness: 5,
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          animation: { duration: 600 },
-          plugins: { legend: { display: false }, tooltip: { enabled: true, backgroundColor: 'rgba(15,23,42,0.92)', padding: 8, cornerRadius: 8, displayColors: false, callbacks: { title: () => 'Asistencia', label: (ctx) => `${ctx.parsed.y} presentes` } } },
-          scales: {
-            x: { display: false },
-            y: { display: false, beginAtZero: true, suggestedMax: Math.max(10, ...counts) },
-          }
-        }
-      });
-    } catch (e) {
-      Helpers.safeLog('warn', 'Attendance mini chart failed:', e?.message || e);
+      Helpers.safeLog('warn', 'Classrooms summary failed:', e?.message || e);
+      container.innerHTML = '<div class="bg-white rounded-2xl border border-slate-100 px-5 py-8 text-center text-slate-400 text-sm">No se pudo cargar el resumen de aulas.</div>';
     }
   },
 

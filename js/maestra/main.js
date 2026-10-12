@@ -19,6 +19,7 @@ import { UI } from './modules/ui.js';
 import { UIPremium } from '/js/shared/ui-premium.js';
 import { BackNavigation } from '/js/shared/back-navigation.js';
 import { loadFlags, isEnabled, onFlagsChange, MODULES } from '/js/shared/feature-flags.js';
+import { SupervisionMirror } from '/js/shared/supervision-mirror.js';
 
 window.safeToast = UI.safeToast;
 const { safeToast, safeEscapeHTML, Modal } = UI;
@@ -244,8 +245,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     window.location.href = 'login.html';
   });
 
-  const auth = await ensureRole(['maestra', 'admin']);
+  // Modo espejo de supervisión (directora/asistente entrando como observadora)
+  const spvMirror = SupervisionMirror.detect();
+  const auth = await ensureRole(spvMirror ? ['maestra', 'admin', 'directora', 'asistente', 'encargada'] : ['maestra', 'admin']);
   if (!auth) return;
+
+  if (spvMirror) SupervisionMirror.mount();
 
   // Hydrate QueryCache from IndexedDB for offline-first
   await QueryCache.hydrateFromIDB();
@@ -505,16 +510,26 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   try {
-    // Obtener TODAS las aulas asignadas a esta maestra
-    const { data: classrooms, error } = await supabase
-      .from('classrooms')
-      .select('id, name, level, capacity, teacher_id, is_live')
-      .eq('teacher_id', auth.user.id)
-      .order('name');
+    // Modo espejo: cargar el aula supervisada aunque no pertenezca al usuario.
+    let classrooms;
+    let error;
+    if (spvMirror && SupervisionMirror.ctx && SupervisionMirror.ctx.classroomId) {
+      ({ data: classrooms, error } = await supabase
+        .from('classrooms')
+        .select('id, name, level, capacity, teacher_id, is_live')
+        .eq('id', SupervisionMirror.ctx.classroomId));
+    } else {
+      // Obtener TODAS las aulas asignadas a esta maestra
+      ({ data: classrooms, error } = await supabase
+        .from('classrooms')
+        .select('id, name, level, capacity, teacher_id, is_live')
+        .eq('teacher_id', auth.user.id)
+        .order('name'));
+    }
 
     if (error) throw error;
     if (!classrooms || classrooms.length === 0) {
-      safeToast('No tienes un aula asignada.', 'warning');
+      safeToast(spvMirror ? 'No se encontró el aula supervisada.' : 'No tienes un aula asignada.', 'warning');
       return;
     }
 

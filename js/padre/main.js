@@ -143,6 +143,80 @@ async function _initPush(user) {
   }
 }
 
+// ── Cambio obligatorio de contraseña en el primer ingreso ──────────────────
+// Las cuentas creadas por la directora usan una contraseña temporal
+// (karpus123). Este guardia bloquea el panel hasta que el padre la cambie.
+async function _forcePasswordChange() {
+  return new Promise((resolve) => {
+    const html = `
+      <div class="bg-white rounded-3xl shadow-2xl overflow-hidden border border-slate-100">
+        <div class="bg-gradient-to-r from-emerald-500 to-teal-600 p-6 text-white">
+          <div class="flex items-center gap-3">
+            <div class="w-11 h-11 rounded-2xl bg-white/20 border border-white/20 flex items-center justify-center">
+              <i data-lucide="shield-check" class="w-5 h-5"></i>
+            </div>
+            <div>
+              <h3 class="text-lg font-black leading-tight">Cambia tu contraseña</h3>
+              <p class="text-[11px] text-white/80 font-bold uppercase tracking-widest">Primer ingreso</p>
+            </div>
+          </div>
+        </div>
+        <form id="kpc-form" class="p-6 space-y-4">
+          <p class="text-sm text-slate-600 font-medium leading-relaxed">
+            Por seguridad, debes reemplazar la contraseña temporal antes de usar el portal de padres.
+          </p>
+          <div>
+            <label class="block text-[11px] font-black text-slate-400 uppercase tracking-wider mb-1.5 ml-1">Nueva contraseña</label>
+            <input id="kpc-pass1" type="password" autocomplete="new-password" minlength="6" required
+              class="w-full px-4 py-3 border-2 border-slate-100 rounded-2xl outline-none focus:ring-4 focus:ring-emerald-100 focus:border-emerald-400 bg-slate-50/50 text-sm font-medium"
+              placeholder="Mínimo 6 caracteres">
+          </div>
+          <div>
+            <label class="block text-[11px] font-black text-slate-400 uppercase tracking-wider mb-1.5 ml-1">Confirmar contraseña</label>
+            <input id="kpc-pass2" type="password" autocomplete="new-password" minlength="6" required
+              class="w-full px-4 py-3 border-2 border-slate-100 rounded-2xl outline-none focus:ring-4 focus:ring-emerald-100 focus:border-emerald-400 bg-slate-50/50 text-sm font-medium"
+              placeholder="Repite la nueva contraseña">
+          </div>
+          <p id="kpc-error" class="hidden text-xs font-bold text-rose-600"></p>
+          <button id="kpc-submit" type="submit"
+            class="w-full py-3.5 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-emerald-200 hover:-translate-y-0.5 transition-all active:scale-95">
+            Guardar y continuar
+          </button>
+        </form>
+      </div>`;
+
+    window.openGlobalModal(html);
+    const gc = document.getElementById('globalModalContainer');
+    if (gc) gc.onclick = null; // No permitir cerrar sin cambiar la contraseña
+    const errorEl = document.getElementById('kpc-error');
+    const show = (msg) => { if (errorEl) { errorEl.textContent = msg; errorEl.classList.remove('hidden'); } };
+    const form = document.getElementById('kpc-form');
+    form?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const p1 = document.getElementById('kpc-pass1')?.value || '';
+      const p2 = document.getElementById('kpc-pass2')?.value || '';
+      if (p1.length < 6) return show('La contraseña debe tener al menos 6 caracteres.');
+      if (p1 !== p2) return show('Las contraseñas no coinciden.');
+      if (p1.toLowerCase() === 'karpus123') return show('No puedes usar la contraseña temporal.');
+      const btn = document.getElementById('kpc-submit');
+      if (btn) { btn.disabled = true; btn.textContent = 'Guardando...'; }
+      try {
+        const { error } = await supabase.auth.updateUser({
+          password: p1,
+          data: { must_change_password: false },
+        });
+        if (error) throw error;
+        if (window.App?.ui?.closeModal) window.App.ui.closeModal();
+        else window.closeGlobalModal?.();
+        resolve(true);
+      } catch (err) {
+        if (btn) { btn.disabled = false; btn.textContent = 'Guardar y continuar'; }
+        show('No se pudo cambiar la contraseña: ' + (err?.message || err));
+      }
+    });
+  });
+}
+
 function _pickDeepLinkStudent(students, deepBoletin) {
   if (!deepBoletin) return null;
   return students.find(s => String(s.id) === String(deepBoletin));
@@ -198,6 +272,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     AppState.set('user', auth.user);
     AppState.set('profile', auth.profile);
+
+    // 🔐 Primer ingreso: obligar a cambiar la contraseña temporal.
+    if (auth.user?.user_metadata?.must_change_password) {
+      await _forcePasswordChange();
+    }
 
     // ⬅️ Historial base para ATRÁS físico (PWA) + breadcrumb
     BackNavigation.init();

@@ -69,9 +69,18 @@ Deno.serve(async (req) => {
       return json({ error: 'La contraseña debe tener al menos 6 caracteres.' }, 400, req);
     }
 
+    // Conservar los metadatos existentes y marcar que debe cambiar la
+    // contraseña temporal en su próximo ingreso.
+    let mergedMetadata: Record<string, unknown> = { must_change_password: true };
+    try {
+      const { data: existing } = await adminClient.auth.admin.getUserById(user_id);
+      mergedMetadata = { ...(existing?.user?.user_metadata || {}), must_change_password: true };
+    } catch (_) { /* si falla, usamos solo el flag */ }
+
     // Update password using service role (admin API)
     const { data: updateData, error: updateErr } = await adminClient.auth.admin.updateUserById(user_id, {
-      password: new_password
+      password: new_password,
+      user_metadata: mergedMetadata,
     });
 
     if (updateErr) {

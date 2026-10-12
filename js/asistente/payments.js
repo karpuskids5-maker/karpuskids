@@ -7,6 +7,8 @@ import { QueryCache } from '../shared/query-cache.js';
 const MONTH_NAMES_ES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
 const MONTH_LABELS   = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 const FILTER_KEY = 'asistente_pagos_filters_v1';
+// Nunca mostrar meses anteriores a este piso (igual que la directora).
+const PAYMENT_FLOOR = '2026-08';
 
 // Delegar en normalizeStatus para no duplicar (y desincronizar) los alias de estado:
 // paid/approved/pagado/confirmado → 'paid', rejected/rechazado → 'rejected', etc.
@@ -19,8 +21,8 @@ export const PaymentsModule = {
   settings: { due_day: 5, generation_day: 25 },
 
   async init() {
-    this._initPeriodSelectors();
     await this._loadSettings();
+    this._initPeriodSelectors();
 
     this._applyPersistedFilters();
 
@@ -83,7 +85,12 @@ export const PaymentsModule = {
     const mSel = document.getElementById('filterPaymentMonth');
     const ySel = document.getElementById('filterPaymentYear');
     const sSel = document.getElementById('filterPaymentStatus');
-    if (mSel && saved.month) mSel.value = saved.month;
+    if (mSel && saved.month) {
+      const yr = saved.year || String(new Date().getFullYear());
+      const key = `${yr}-${String(saved.month).padStart(2, '0')}`;
+      // No restaurar un mes futuro (aún sin generar).
+      if (/^\d{4}-\d{2}$/.test(key) && key <= this._visibleMonthKey()) mSel.value = saved.month;
+    }
     if (ySel && saved.year)  ySel.value = saved.year;
     if (sSel && saved.status) sSel.value = saved.status;
     this._updatePillsUI(saved.status || 'all');
@@ -112,21 +119,42 @@ export const PaymentsModule = {
   },
 
   _initPeriodSelectors() {
-    const now = new Date();
-    const m = String(now.getMonth() + 1).padStart(2, '0');
-    const y = String(now.getFullYear());
+    // Sin mes fijo: la lista muestra desde el piso (agosto) hasta el mes visible
+    // (regla del día de generación) y nunca meses futuros aún sin generar.
     const ms = document.getElementById('filterPaymentMonth');
     const ys = document.getElementById('filterPaymentYear');
-    if (ms) ms.value = m;
-    if (ys) ys.value = y;
+    if (ms) ms.value = '';
+    if (ys) ys.value = String(new Date().getFullYear());
     const cy = document.getElementById('chartYear');
-    if (cy) cy.value = y;
+    if (cy) cy.value = String(new Date().getFullYear());
+  },
+
+  /** Último mes visible según el día de generación (con piso aplicado). */
+  _visibleMonthKey() {
+    const genDay = Number(this.settings.generation_day) || 25;
+    const now = new Date();
+    let m = now.getMonth() + 1, y = now.getFullYear();
+    if (now.getDate() < genDay) { m -= 1; if (m < 1) { m = 12; y -= 1; } }
+    const key = `${y}-${String(m).padStart(2, '0')}`;
+    return key < PAYMENT_FLOOR ? PAYMENT_FLOOR : key;
+  },
+
+  /** Normaliza month_paid ('2026-09' o 'septiembre') a clave 'YYYY-MM'. */
+  _monthKeyOf(mp) {
+    const s = String(mp || '').toLowerCase().trim();
+    const ymd = s.match(/^(\d{4})-(\d{1,2})$/);
+    if (ymd) return ymd[1] + '-' + ymd[2].padStart(2, '0');
+    const i = MONTH_NAMES_ES.indexOf(s);
+    if (i === -1) return null;
+    return String(new Date().getFullYear()) + '-' + String(i + 1).padStart(2, '0');
   },
 
   async _loadSettings() {
     try {
       const { data } = await supabase.from('school_settings').select('id, generation_day, due_day').eq('id', 1).maybeSingle();
       if (data) { this.settings.generation_day = data.generation_day || 25; this.settings.due_day = data.due_day || 5; }
+      // Compartir con el resto de módulos (p. ej. el home).
+      AppState.set('schoolSettings', { ...this.settings });
     } catch (error_) { Helpers.safeLog?.(error_); }
   },
 
@@ -172,9 +200,22 @@ export const PaymentsModule = {
     if (error) throw error;
 
     let list = payments || [];
+    const maxKey = this._visibleMonthKey();
+
+    // Nunca mostrar meses futuros (p. ej. octubre aún sin generar).
+    list = list.filter(p => {
+      const key = this._monthKeyOf(p.month_paid);
+      return key != null && key <= maxKey;
+    });
 
     if (monthVal) {
       list = this._filterByMonth(list, monthVal, yearVal);
+    } else {
+      // Sin filtro de mes: mostrar desde el piso (agosto) hasta el mes visible.
+      list = list.filter(p => {
+        const key = this._monthKeyOf(p.month_paid);
+        return key != null && key >= PAYMENT_FLOOR && key <= maxKey;
+      });
     }
 
     if (search) {
@@ -453,11 +494,19 @@ export const PaymentsModule = {
   async loadStats() {
     try {
       const mv  = document.getElementById('filterPaymentMonth')?.value;
-      const yv  = document.getElementById('filterPaymentYear')?.value || String(new Date().getFullYear());
-      const y   = String(yv);
-      // Sin mes seleccionado se usa el actual: antes el KPI "Ingresos Mes"
-      // sumaba el AÑO entero cuando el filtro venía vacío.
-      const mo  = mv ? String(mv).padStart(2, '0') : String(new Date().getMonth() + 1).padStart(2, '0');
+      const yv  = document.getElementById('filterPaymentYear')?.value;
+      // Sin mes seleccionado se usa el MES VISIBLE del sistema (regla del día de
+      // generación). Antes usaba el mes corriente, que antes del día 25 aún no
+      // se ha generado, y por eso el conteo no coincidía con la directora.
+      const genDay = Number(this.settings.generation_day) || 25;
+      const now = new Date();
+      let defM = now.getMonth() + 1, defY = now.getFullYear();
+      if (now.getDate() < genDay) { defM -= 1; if (defM < 1) { defM = 12; defY -= 1; } }
+      const y   = String(yv || defY);
+      const mo  = mv ? String(mv).padStart(2, '0') : String(defM).padStart(2, '0');
+
+      const badge = document.getElementById('payPeriodBadge');
+      if (badge) badge.textContent = 'Período: ' + MONTH_LABELS[Number.parseInt(mo, 10) - 1] + ' ' + y;
 
       const { data: pays } = await supabase.from('payments')
         .select('id, student_id, amount, status, due_date, month_paid, paid_date, created_at, evidence_url')

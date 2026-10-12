@@ -19,6 +19,105 @@ const SLIDE_INTERVAL = 6000;
 let _qualityStatus = null;
 // Tareas pendientes cacheadas para el banner
 let _taskStatus = null; // { urgentCount, overdueCount, nearestDue, nearestTitle }
+
+// ── Alerta urgente fija de tareas ────────────────────────────────────────────
+
+function _taskAlertConfig({ total, overdueCount, daysLeft, nearestTitle }) {
+  const name = Helpers.escapeHTML(nearestTitle);
+  const isOverdue = overdueCount > 0;
+
+  let bg, icon, titleText;
+
+  if (isOverdue) {
+    bg        = 'linear-gradient(135deg,#dc2626,#b91c1c,#7f1d1d)';
+    icon      = '🚨';
+    titleText = overdueCount === 1 ? '¡Tarea vencida sin entregar!' : `¡${overdueCount} tareas vencidas!`;
+  } else if (daysLeft <= 0) {
+    bg        = 'linear-gradient(135deg,#ea580c,#c2410c,#9a3412)';
+    icon      = '⏰';
+    titleText = '¡La tarea vence hoy!';
+  } else if (daysLeft === 1) {
+    bg        = 'linear-gradient(135deg,#ea580c,#c2410c,#9a3412)';
+    icon      = '⏰';
+    titleText = '¡La tarea vence mañana!';
+  } else {
+    bg        = 'linear-gradient(135deg,#d97706,#b45309,#92400e)';
+    icon      = '📚';
+    titleText = `Tarea pendiente — ${daysLeft} días`;
+  }
+
+  const pulse    = (isOverdue || daysLeft <= 1) ? 'animation:kk-task-pulse 1.5s ease-in-out infinite;' : '';
+  const msgText  = isOverdue
+    ? `"${name}" ya venció. Entregala ahora para no perder la calificación.`
+    : `"${name}" vence pronto. No esperes al último momento.`;
+  const extra    = total > 1 ? `<span style="background:rgba(255,255,255,0.2);color:#fff;font-size:9px;font-weight:900;padding:2px 8px;border-radius:999px;margin-left:6px;">${total} tareas</span>` : '';
+  const btnLabel = isOverdue ? 'Entregar' : 'Ver tarea';
+
+  return { bg, icon, titleText, pulse, msgText, extra, btnLabel };
+}
+
+function _renderTaskUrgentAlert(status) {
+  const el = document.getElementById('taskUrgentAlert');
+  if (!el) return;
+
+  if (!status || status.total === 0) {
+    el.classList.add('hidden');
+    el.innerHTML = '';
+    _updateTaskBadge(0);
+    return;
+  }
+
+  const { bg, icon, titleText, pulse, msgText, extra, btnLabel } = _taskAlertConfig(status);
+
+  el.innerHTML = `
+    <div style="background:${bg};border-radius:1.25rem;padding:1rem 1.25rem;display:flex;align-items:center;gap:12px;box-shadow:0 8px 32px rgba(0,0,0,0.25);${pulse}">
+      <div style="width:48px;height:48px;background:rgba(255,255,255,0.2);border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0;">${icon}</div>
+      <div style="flex:1;min-width:0;">
+        <div style="display:flex;align-items:center;flex-wrap:wrap;margin-bottom:3px;">
+          <p style="font-size:13px;font-weight:900;color:#fff;line-height:1.2;">${titleText}${extra}</p>
+        </div>
+        <p style="font-size:11px;font-weight:700;color:rgba(255,255,255,0.85);line-height:1.4;">${msgText}</p>
+      </div>
+      <button id="kk-task-alert-btn"
+        style="flex-shrink:0;background:#fff;color:#b91c1c;font-size:10px;font-weight:900;padding:8px 14px;border-radius:12px;border:none;cursor:pointer;text-transform:uppercase;letter-spacing:0.05em;box-shadow:0 2px 8px rgba(0,0,0,0.2);">
+        ${btnLabel}
+      </button>
+    </div>`;
+
+  // Navega a tareas con filtro pending (no overdue) al venir del banner
+  const alertBtn = document.getElementById('kk-task-alert-btn');
+  if (alertBtn) {
+    alertBtn.addEventListener('click', () => {
+      import('./tasks.js').then(m => { m.TasksModule._activeFilter = 'pending'; }).catch(() => {});
+      window.App?.navigateTo?.('tasks');
+    });
+  }
+
+  _updateTaskBadge(status.total);
+  el.classList.remove('hidden');
+}
+
+// Inyectar animación de pulso una sola vez
+(function _injectTaskAlertStyles() {
+  if (document.getElementById('kk-task-alert-style')) return;
+  const s = document.createElement('style');
+  s.id = 'kk-task-alert-style';
+  s.textContent = `@keyframes kk-task-pulse{0%,100%{transform:scale(1);box-shadow:0 8px 32px rgba(0,0,0,.25)}50%{transform:scale(1.015);box-shadow:0 12px 40px rgba(0,0,0,.35)}}`;
+  document.head.appendChild(s);
+})();
+
+// ── Badge del botón de navegación de tareas ──────────────────────────────────
+function _updateTaskBadge(count) {
+  const badge = document.getElementById('badge-tasks');
+  if (!badge) return;
+  if (!count || count <= 0) {
+    badge.classList.add('hidden');
+    badge.textContent = '0';
+  } else {
+    badge.textContent = count > 9 ? '9+' : String(count);
+    badge.classList.remove('hidden');
+  }
+}
 const GRADIENTS = {
   exit_urgent:  'linear-gradient(135deg,#ef4444,#dc2626,#b91c1c)',
   exit_warning: 'linear-gradient(135deg,#fbbf24,#f59e0b,#d97706)',
@@ -89,6 +188,7 @@ const DynamicBanner = {
     if (this._onTaskSubmitted) document.removeEventListener('task:submitted', this._onTaskSubmitted);
     this._onTaskSubmitted = () => {
       _taskStatus = null;
+      _renderTaskUrgentAlert(null); // ocultar inmediatamente al entregar
       void this._checkPendingTasks();
     };
     document.addEventListener('task:submitted', this._onTaskSubmitted);
@@ -110,6 +210,7 @@ const DynamicBanner = {
     }
     _qualityStatus = null;
     _taskStatus = null;
+    _renderTaskUrgentAlert(null);
   },
 
   /**
@@ -152,6 +253,7 @@ const DynamicBanner = {
 
       if (!tasks?.length) {
         if (_taskStatus !== null) { _taskStatus = null; this.refresh(); }
+        _renderTaskUrgentAlert(null);
         return;
       }
 
@@ -168,6 +270,7 @@ const DynamicBanner = {
       const pending = tasks.filter(t => !deliveredIds.has(t.id));
       if (!pending.length) {
         if (_taskStatus !== null) { _taskStatus = null; this.refresh(); }
+        _renderTaskUrgentAlert(null);
         return;
       }
 
@@ -194,6 +297,7 @@ const DynamicBanner = {
 
       _taskStatus = next;
       if (changed) this.refresh();
+      _renderTaskUrgentAlert(next);
     } catch {
       // Fallo silencioso — el banner no se rompe
     }

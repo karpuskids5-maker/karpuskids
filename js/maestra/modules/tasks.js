@@ -436,7 +436,7 @@ function _injectPaneStyles() {
   const style = document.createElement('style');
   style.id = 'kk-sub-pane-styles';
   style.textContent = `
-    .kk-pane{background:#f8fafc;border:1px solid #e2e8f0;border-radius:1.25rem;overflow:hidden;display:flex;flex-direction:column}
+    .kk-pane{background:#f8fafc;border:1px solid #e2e8f0;border-radius:1.25rem;overflow:hidden}
     .kk-pane-head{display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid #e2e8f0;background:#fff;flex:0 0 auto}
     .kk-pane-title{font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:0.08em;color:#64748b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     .kk-pane-nav{width:30px;height:30px;border-radius:8px;border:1px solid #e2e8f0;background:#fff;color:#475569;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all 0.15s;flex:0 0 auto}
@@ -673,8 +673,8 @@ export async function viewTaskSubmissions(taskId) {
             <button onclick="App._bulkGradeAll('${taskId}','iniciado')" class="px-3 py-1.5 bg-sky-100 hover:bg-sky-200 border border-sky-300 rounded-xl text-[9px] font-black text-sky-700 transition-all active:scale-95">🚀 Iniciado</button>
           </div>
         </div>` : ''}
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 flex-1 min-h-0">
-          <div class="space-y-4 overflow-y-auto pr-1 md:pr-2 min-h-0">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 flex-1 min-h-0 overflow-hidden" style="grid-template-rows:minmax(0,1fr);min-height:0">
+          <div class="space-y-4 overflow-y-auto overscroll-contain pr-1 md:pr-2 min-h-0">
             ${students.length > 0 ? students.map(s => _buildStudentRow(s, subMap[s.id], taskId, periodOpen)).join('') : '<div class="text-center p-4 text-slate-400">No hay alumnos en la clase.</div>'}
           </div>
           <!-- Panel de evidencia: split-screen en escritorio -->

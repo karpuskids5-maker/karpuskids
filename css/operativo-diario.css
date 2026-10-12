@@ -1,0 +1,399 @@
+/* ==========================================================================
+   KARPUS KIDS · OPERATIVO DIARIO · CONTROL DE LA ESTANCIA
+   Hoja de estilos COMPARTIDA por los paneles de Directora y Asistente.
+   Prefijo de clases: .od-  (operativo-diario)
+   Todas las clases son autocontenidas para no depender del build de Tailwind.
+   ========================================================================== */
+
+/* Variables en :root para que también las apliquen los overlays que se
+   montan fuera de .od-wrap (modal de aula, barra de supervisión, toasts). */
+:root {
+  --od-bg: #f6f7fb;
+  --od-card: #ffffff;
+  --od-line: #e7e9f2;
+  --od-ink: #1e2436;
+  --od-ink-soft: #6b7290;
+  --od-ink-mute: #98a0bc;
+  --od-brand: #6d5bd0;
+  --od-brand-dark: #5546b5;
+  --od-brand-soft: #efedfb;
+  --od-ok: #16a34a;
+  --od-ok-soft: #e8f7ee;
+  --od-warn: #f59e0b;
+  --od-warn-soft: #fef4e2;
+  --od-danger: #e11d48;
+  --od-danger-soft: #fdeaef;
+  --od-info: #0ea5e9;
+  --od-info-soft: #e7f5fd;
+  --od-radius: 20px;
+  --od-shadow: 0 10px 30px -18px rgba(30, 36, 54, .35);
+}
+
+.od-wrap {
+  color: var(--od-ink);
+  display: block;
+  animation: od-fade-in .35s ease both;
+}
+
+@keyframes od-fade-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ---- Encabezado / Hero --------------------------------------------------- */
+.od-hero {
+  position: relative;
+  overflow: hidden;
+  border-radius: 26px;
+  padding: 26px 28px;
+  color: #fff;
+  background:
+    radial-gradient(120% 160% at 92% -20%, rgba(255,255,255,.28) 0%, transparent 45%),
+    linear-gradient(135deg, #5b4bc4 0%, #7c5cf0 48%, #9d6ff0 100%);
+  box-shadow: 0 18px 40px -22px rgba(93, 76, 200, .75);
+}
+.od-hero::after {
+  content: "";
+  position: absolute;
+  right: -60px; bottom: -80px;
+  width: 240px; height: 240px;
+  border-radius: 50%;
+  background: rgba(255,255,255,.10);
+}
+.od-hero-top { display: flex; flex-wrap: wrap; gap: 18px; align-items: center; justify-content: space-between; position: relative; z-index: 2; }
+.od-hero-eyebrow { font-size: 11px; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; opacity: .82; }
+.od-hero-title { font-size: 26px; line-height: 1.15; font-weight: 900; margin: 6px 0 4px; }
+.od-hero-sub { font-size: 13px; opacity: .9; max-width: 620px; }
+.od-hero-actions { display: flex; flex-wrap: wrap; gap: 10px; position: relative; z-index: 2; }
+
+.od-clock {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: rgba(255,255,255,.16);
+  border: 1px solid rgba(255,255,255,.28);
+  padding: 8px 14px; border-radius: 999px;
+  font-size: 13px; font-weight: 700; letter-spacing: .02em;
+  backdrop-filter: blur(4px);
+}
+
+/* ---- Semáforo ------------------------------------------------------------ */
+.od-sem {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 8px 14px; border-radius: 999px;
+  font-size: 12px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase;
+  background: rgba(255,255,255,.16); border: 1px solid rgba(255,255,255,.3);
+}
+.od-sem-dot { width: 12px; height: 12px; border-radius: 50%; position: relative; }
+.od-sem-dot::after {
+  content: ""; position: absolute; inset: -4px; border-radius: 50%;
+  animation: od-pulse 1.8s ease-out infinite;
+}
+.od-sem.ok    .od-sem-dot { background: #4ade80; box-shadow: 0 0 10px #4ade80; }
+.od-sem.ok    .od-sem-dot::after { background: rgba(74,222,128,.55); }
+.od-sem.warn  .od-sem-dot { background: #fbbf24; box-shadow: 0 0 10px #fbbf24; }
+.od-sem.warn  .od-sem-dot::after { background: rgba(251,191,36,.55); }
+.od-sem.bad   .od-sem-dot { background: #fb7185; box-shadow: 0 0 10px #fb7185; }
+.od-sem.bad   .od-sem-dot::after { background: rgba(251,113,133,.6); }
+@keyframes od-pulse { 0% { transform: scale(.5); opacity: .9; } 100% { transform: scale(1.6); opacity: 0; } }
+
+/* variante de semáforo sobre fondo claro */
+.od-sem.plain { background: var(--od-bg); border-color: var(--od-line); color: var(--od-ink); }
+
+/* ---- Tarjetas KPI -------------------------------------------------------- */
+.od-kpis { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); margin-top: 20px; }
+.od-kpi {
+  background: var(--od-card); border: 1px solid var(--od-line);
+  border-radius: 18px; padding: 16px 18px; box-shadow: var(--od-shadow);
+  display: flex; flex-direction: column; gap: 6px; position: relative; overflow: hidden;
+  /* Las tarjetas se montan dentro del hero (texto blanco); el número debe
+     quedar oscuro sobre el fondo blanco de la propia tarjeta. */
+  color: var(--od-ink);
+}
+.od-kpi::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--od-brand); }
+.od-kpi.ok::before   { background: var(--od-ok); }
+.od-kpi.warn::before { background: var(--od-warn); }
+.od-kpi.bad::before  { background: var(--od-danger); }
+.od-kpi-label { font-size: 10.5px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--od-ink-mute); }
+.od-kpi-value { font-size: 28px; font-weight: 900; line-height: 1; }
+.od-kpi-foot { font-size: 11.5px; color: var(--od-ink-soft); font-weight: 600; }
+
+/* ---- Barra de herramientas ---------------------------------------------- */
+.od-toolbar {
+  display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+  margin: 22px 0 6px; padding: 12px; border-radius: 16px;
+  background: var(--od-card); border: 1px solid var(--od-line); box-shadow: var(--od-shadow);
+}
+.od-toolbar .od-grow { flex: 1 1 220px; }
+
+.od-search {
+  display: flex; align-items: center; gap: 8px;
+  background: var(--od-bg); border: 1px solid var(--od-line);
+  border-radius: 12px; padding: 9px 12px;
+}
+.od-search input { border: 0; background: transparent; outline: none; font-size: 13.5px; width: 100%; color: var(--od-ink); font-weight: 600; }
+.od-search svg { width: 16px; height: 16px; color: var(--od-ink-mute); }
+
+.od-select {
+  border: 1px solid var(--od-line); background: var(--od-bg); border-radius: 12px;
+  padding: 9px 12px; font-size: 13px; font-weight: 700; color: var(--od-ink); outline: none; cursor: pointer;
+}
+
+/* ---- Botones ------------------------------------------------------------- */
+.od-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  border: 0; cursor: pointer; border-radius: 13px;
+  padding: 10px 16px; font-size: 12.5px; font-weight: 800; letter-spacing: .02em;
+  background: var(--od-bg); color: var(--od-ink); transition: transform .12s ease, filter .12s ease, box-shadow .12s ease;
+}
+.od-btn:hover { filter: brightness(.97); }
+.od-btn:active { transform: scale(.96); }
+.od-btn svg { width: 16px; height: 16px; }
+.od-btn.primary { background: linear-gradient(135deg, var(--od-brand), #8b6ef2); color: #fff; box-shadow: 0 10px 22px -14px rgba(109,91,208,.9); }
+.od-btn.ok      { background: var(--od-ok); color: #fff; }
+.od-btn.warn    { background: var(--od-warn); color: #fff; }
+.od-btn.danger  { background: var(--od-danger); color: #fff; }
+.od-btn.ghost   { background: transparent; border: 1px solid var(--od-line); }
+.od-btn.sm      { padding: 7px 11px; font-size: 11.5px; border-radius: 10px; }
+.od-btn[disabled] { opacity: .55; cursor: not-allowed; }
+
+/* ---- Pestañas ------------------------------------------------------------ */
+.od-tabs {
+  display: flex; gap: 6px; flex-wrap: wrap;
+  margin: 18px 0 4px; padding: 6px; border-radius: 16px;
+  background: var(--od-card); border: 1px solid var(--od-line); box-shadow: var(--od-shadow);
+}
+.od-tab {
+  border: 0; cursor: pointer; background: transparent; color: var(--od-ink-soft);
+  padding: 10px 16px; border-radius: 12px; font-size: 12.5px; font-weight: 800;
+  display: inline-flex; align-items: center; gap: 8px; transition: all .15s ease;
+}
+.od-tab svg { width: 16px; height: 16px; }
+.od-tab:hover { background: var(--od-bg); color: var(--od-ink); }
+.od-tab.active { background: linear-gradient(135deg, var(--od-brand), #8b6ef2); color: #fff; box-shadow: 0 10px 20px -14px rgba(109,91,208,.95); }
+
+/* ---- Paneles y tarjetas -------------------------------------------------- */
+.od-panel { display: none; margin-top: 18px; }
+.od-panel.active { display: block; }
+
+.od-card {
+  background: var(--od-card); border: 1px solid var(--od-line);
+  border-radius: var(--od-radius); padding: 20px; box-shadow: var(--od-shadow);
+}
+.od-card + .od-card { margin-top: 16px; }
+.od-card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.od-card-title { font-size: 15px; font-weight: 900; display: flex; align-items: center; gap: 9px; }
+.od-card-title svg { width: 18px; height: 18px; color: var(--od-brand); }
+.od-card-sub { font-size: 12px; color: var(--od-ink-soft); font-weight: 600; }
+.od-section-label { font-size: 11px; font-weight: 900; letter-spacing: .14em; text-transform: uppercase; color: var(--od-ink-mute); margin: 26px 0 12px; display: flex; align-items: center; gap: 10px; }
+.od-section-label::after { content: ""; flex: 1; height: 1px; background: var(--od-line); }
+
+/* ---- Grid de aulas ------------------------------------------------------- */
+.od-grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); }
+.od-aula {
+  background: var(--od-card); border: 1px solid var(--od-line); border-radius: 18px;
+  padding: 16px; box-shadow: var(--od-shadow); cursor: pointer;
+  transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
+  position: relative; overflow: hidden;
+}
+.od-aula:hover { transform: translateY(-3px); border-color: #d9d3f6; box-shadow: 0 18px 34px -20px rgba(109,91,208,.5); }
+.od-aula.is-supervised { border-color: var(--od-brand); box-shadow: 0 0 0 2px var(--od-brand-soft), var(--od-shadow); }
+.od-aula-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.od-aula-name { font-size: 15px; font-weight: 900; }
+.od-aula-level { font-size: 11px; font-weight: 700; color: var(--od-ink-soft); margin-top: 2px; }
+.od-aula-teacher { display: flex; align-items: center; gap: 8px; margin: 12px 0; }
+.od-avatar { width: 34px; height: 34px; border-radius: 50%; object-fit: cover; background: var(--od-brand-soft); display: grid; place-items: center; font-weight: 900; color: var(--od-brand); font-size: 13px; flex: none; border: 2px solid #fff; box-shadow: 0 0 0 1px var(--od-line); }
+.od-avatar.sm { width: 26px; height: 26px; font-size: 11px; }
+.od-teacher-name { font-size: 12.5px; font-weight: 800; }
+.od-teacher-role { font-size: 10.5px; color: var(--od-ink-mute); font-weight: 700; text-transform: uppercase; letter-spacing: .06em; }
+
+.od-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.od-chip {
+  font-size: 10.5px; font-weight: 800; letter-spacing: .03em;
+  padding: 4px 9px; border-radius: 999px; background: var(--od-bg); color: var(--od-ink-soft);
+  display: inline-flex; align-items: center; gap: 5px;
+}
+.od-chip.ok   { background: var(--od-ok-soft); color: var(--od-ok); }
+.od-chip.warn { background: var(--od-warn-soft); color: #b45309; }
+.od-chip.bad  { background: var(--od-danger-soft); color: var(--od-danger); }
+.od-chip.info { background: var(--od-info-soft); color: #0369a1; }
+
+/* ---- Barra de progreso --------------------------------------------------- */
+.od-bar { height: 8px; border-radius: 999px; background: var(--od-line); overflow: hidden; margin: 8px 0 4px; }
+.od-bar > span { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--od-brand), #8b6ef2); transition: width .5s ease; }
+.od-bar.ok  > span { background: linear-gradient(90deg, #22c55e, #4ade80); }
+.od-bar.warn> span { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
+.od-bar.bad > span { background: linear-gradient(90deg, #e11d48, #fb7185); }
+.od-bar-row { display: flex; align-items: center; justify-content: space-between; font-size: 11px; font-weight: 800; color: var(--od-ink-soft); }
+
+/* ---- Tabla --------------------------------------------------------------- */
+.od-table-wrap { overflow-x: auto; border-radius: 14px; border: 1px solid var(--od-line); }
+.od-table { width: 100%; border-collapse: collapse; min-width: 640px; font-size: 12.5px; }
+.od-table thead th {
+  text-align: left; padding: 11px 14px; background: var(--od-bg);
+  font-size: 10.5px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; color: var(--od-ink-mute);
+  white-space: nowrap;
+}
+.od-table tbody td { padding: 11px 14px; border-top: 1px solid var(--od-line); font-weight: 600; vertical-align: middle; }
+.od-table tbody tr:hover { background: #fafaff; }
+.od-table .od-cell-name { display: flex; align-items: center; gap: 9px; font-weight: 800; }
+.od-table.od-table-wide { min-width: 1020px; }
+.od-table tbody tr.od-row-sup { background: var(--od-info-soft); box-shadow: inset 3px 0 0 var(--od-info); }
+.od-table tbody tr.od-row-sup:hover { background: var(--od-info-soft); }
+
+/* ---- Alertas ------------------------------------------------------------- */
+.od-alert {
+  display: flex; gap: 12px; padding: 14px 16px; border-radius: 16px;
+  background: var(--od-card); border: 1px solid var(--od-line); box-shadow: var(--od-shadow);
+  align-items: flex-start;
+}
+.od-alert .od-alert-icon { width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center; flex: none; }
+.od-alert .od-alert-icon svg { width: 19px; height: 19px; }
+.od-alert.ok   .od-alert-icon { background: var(--od-ok-soft); color: var(--od-ok); }
+.od-alert.warn .od-alert-icon { background: var(--od-warn-soft); color: #b45309; }
+.od-alert.bad  .od-alert-icon { background: var(--od-danger-soft); color: var(--od-danger); }
+.od-alert-body { flex: 1; }
+.od-alert-title { font-size: 13px; font-weight: 900; }
+.od-alert-text { font-size: 12px; color: var(--od-ink-soft); font-weight: 600; margin-top: 2px; }
+.od-alert-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.od-alert-list { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 8px; }
+.od-alert-list li { display: grid; gap: 1px; }
+.od-li-title { display: flex; align-items: center; gap: 5px; font-size: 12.5px; font-weight: 800; color: var(--od-ink); }
+.od-li-title svg { width: 14px; height: 14px; flex: none; color: var(--od-ink-mute); }
+.od-li-text { font-size: 12px; color: var(--od-ink-soft); font-weight: 600; padding-left: 19px; }
+.od-alerts { display: grid; gap: 12px; }
+
+/* ---- Estado vacío -------------------------------------------------------- */
+.od-empty { text-align: center; padding: 44px 20px; color: var(--od-ink-mute); }
+.od-empty svg { width: 42px; height: 42px; margin-bottom: 10px; opacity: .5; }
+.od-empty p { font-weight: 700; font-size: 13.5px; }
+
+/* ---- Skeleton ------------------------------------------------------------ */
+.od-skel { border-radius: 16px; background: linear-gradient(90deg, #eef0f7 25%, #f6f7fb 37%, #eef0f7 63%); background-size: 400% 100%; animation: od-skel 1.2s ease infinite; }
+@keyframes od-skel { 0% { background-position: 100% 0; } 100% { background-position: 0 0; } }
+.od-skel.kpi { height: 92px; }
+.od-skel.card { height: 150px; }
+
+/* ---- Modal --------------------------------------------------------------- */
+.od-modal {
+  position: fixed; inset: 0; z-index: 9998; display: none;
+  align-items: center; justify-content: center; padding: 18px;
+  background: rgba(20, 24, 40, .55); backdrop-filter: blur(4px);
+}
+.od-modal.open { display: flex; animation: od-fade-in .2s ease both; }
+.od-modal-box {
+  background: #fff; border-radius: 24px; width: 100%; max-width: 820px;
+  max-height: 90vh; overflow: hidden; display: flex; flex-direction: column;
+  box-shadow: 0 30px 70px -30px rgba(20,24,40,.7);
+}
+.od-modal-head { padding: 20px 22px; display: flex; align-items: center; justify-content: space-between; gap: 12px; border-bottom: 1px solid var(--od-line); }
+.od-modal-head h3 { font-size: 17px; font-weight: 900; }
+.od-modal-head .od-modal-sub { font-size: 12px; color: var(--od-ink-soft); font-weight: 600; }
+.od-modal-x { border: 0; background: var(--od-bg); width: 34px; height: 34px; border-radius: 10px; cursor: pointer; display: grid; place-items: center; color: var(--od-ink-soft); }
+.od-modal-x:hover { background: var(--od-danger-soft); color: var(--od-danger); }
+.od-modal-tabs { display: flex; gap: 6px; padding: 12px 22px 0; flex-wrap: wrap; border-bottom: 1px solid var(--od-line); }
+.od-modal-tab { border: 0; background: transparent; cursor: pointer; padding: 10px 14px; font-size: 12.5px; font-weight: 800; color: var(--od-ink-soft); border-bottom: 3px solid transparent; margin-bottom: -1px; }
+.od-modal-tab.active { color: var(--od-brand); border-bottom-color: var(--od-brand); }
+.od-modal-body { padding: 20px 22px; overflow-y: auto; }
+.od-modal-foot { padding: 14px 22px; border-top: 1px solid var(--od-line); display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; }
+
+.od-kv { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+.od-kv-item { background: var(--od-bg); border-radius: 12px; padding: 12px 14px; }
+.od-kv-item .k { font-size: 10px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; color: var(--od-ink-mute); display: block; margin-bottom: 4px; }
+.od-kv-item .v { font-size: 14px; font-weight: 800; }
+
+/* ---- Formularios --------------------------------------------------------- */
+.od-field { margin-bottom: 14px; }
+.od-field label { display: block; font-size: 11px; font-weight: 900; letter-spacing: .06em; text-transform: uppercase; color: var(--od-ink-mute); margin-bottom: 6px; }
+.od-field input, .od-field select, .od-field textarea {
+  width: 100%; border: 1px solid var(--od-line); border-radius: 12px; padding: 11px 13px;
+  font-size: 13.5px; font-weight: 600; color: var(--od-ink); outline: none; background: #fff;
+  font-family: inherit; transition: border-color .15s ease, box-shadow .15s ease;
+}
+.od-field input:focus, .od-field select:focus, .od-field textarea:focus { border-color: var(--od-brand); box-shadow: 0 0 0 3px var(--od-brand-soft); }
+.od-field textarea { resize: vertical; min-height: 84px; }
+.od-field-row { display: grid; gap: 12px; grid-template-columns: 1fr 1fr; }
+.od-pri { display: flex; gap: 8px; }
+.od-pri input { position: absolute; opacity: 0; pointer-events: none; }
+.od-pri label { flex: 1; text-align: center; padding: 9px; border-radius: 11px; border: 1px solid var(--od-line); font-size: 12px; font-weight: 800; cursor: pointer; text-transform: none; letter-spacing: 0; color: var(--od-ink-soft); }
+.od-pri input:checked + label { border-color: var(--od-brand); background: var(--od-brand-soft); color: var(--od-brand); }
+
+/* ---- Barra de supervisión (flotante persistente) ------------------------- */
+#odSupervisionBar {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 9999;
+  display: none; align-items: center; gap: 14px;
+  padding: 9px 18px; color: #fff;
+  background: linear-gradient(90deg, #5b4bc4, #8b6ef2);
+  box-shadow: 0 12px 30px -16px rgba(0,0,0,.6);
+  font-size: 12.5px; font-weight: 800;
+  animation: od-slide-down .3s ease both;
+}
+#odSupervisionBar.active { display: flex; flex-wrap: wrap; }
+@keyframes od-slide-down { from { transform: translateY(-100%); } to { transform: translateY(0); } }
+#odSupervisionBar .od-sup-live {
+  display: inline-flex; align-items: center; gap: 7px;
+  background: rgba(255,255,255,.16); padding: 5px 11px; border-radius: 999px;
+}
+#odSupervisionBar .od-sup-live .dot { width: 8px; height: 8px; border-radius: 50%; background: #fff; animation: od-blink 1.1s steps(2, start) infinite; }
+@keyframes od-blink { 50% { opacity: .25; } }
+#odSupervisionBar .od-sup-meta { opacity: .92; font-weight: 700; }
+#odSupervisionBar .od-sup-spacer { flex: 1; }
+#odSupervisionBar .od-btn { background: rgba(255,255,255,.18); color: #fff; }
+#odSupervisionBar .od-btn:hover { background: rgba(255,255,255,.3); filter: none; }
+
+/* ---- Toast --------------------------------------------------------------- */
+#odToastWrap { position: fixed; right: 18px; bottom: 18px; z-index: 10000; display: flex; flex-direction: column; gap: 10px; }
+.od-toast {
+  background: #1e2436; color: #fff; border-radius: 14px; padding: 13px 16px;
+  font-size: 13px; font-weight: 700; box-shadow: 0 18px 40px -20px rgba(0,0,0,.7);
+  display: flex; align-items: center; gap: 10px; max-width: 340px;
+  animation: od-fade-in .25s ease both;
+}
+.od-toast.ok   { background: #15803d; }
+.od-toast.warn { background: #b45309; }
+.od-toast.bad  { background: #be123c; }
+
+/* ---- Utilidades ---------------------------------------------------------- */
+.od-muted { color: var(--od-ink-soft); }
+.od-mt { margin-top: 16px; }
+.od-flex { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.od-split { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.od-hide { display: none !important; }
+.od-scroll-x { overflow-x: auto; padding-bottom: 4px; }
+
+/* ---- Responsive ---------------------------------------------------------- */
+@media (max-width: 720px) {
+  .od-hero { padding: 22px 20px; }
+  .od-hero-title { font-size: 21px; }
+  .od-kpi-value { font-size: 24px; }
+  .od-field-row { grid-template-columns: 1fr; }
+  .od-card { padding: 16px; }
+  .od-modal-body, .od-modal-head, .od-modal-foot { padding-left: 16px; padding-right: 16px; }
+}
+
+/* ---- Impresión: Reporte Diario ------------------------------------------- */
+@media print {
+  #sidebar, .header, #odSupervisionBar, .od-tabs, .od-toolbar, .od-hero-actions, #odToastWrap { display: none !important; }
+  .od-hero { color: #000; background: #fff; box-shadow: none; border: 2px solid #000; }
+  .od-hero::after { display: none; }
+  .od-card, .od-kpi, .od-aula, .od-alert { box-shadow: none; border-color: #999; break-inside: avoid; }
+  .od-panel { display: block !important; }
+  body { background: #fff; }
+}
+
+/* ---- Modo oscuro opcional (respeta preferencia del sistema) -------------- */
+@media (prefers-color-scheme: dark) {
+  .od-wrap.od-dark {
+    --od-bg: #1a1f30;
+    --od-card: #232a40;
+    --od-line: #313a55;
+    --od-ink: #eef1fb;
+    --od-ink-soft: #a9b1cf;
+    --od-ink-mute: #7c85a8;
+    --od-brand-soft: #2c2a52;
+  }
+  .od-wrap.od-dark .od-table tbody tr:hover { background: #262d45; }
+  .od-wrap.od-dark .od-field input,
+  .od-wrap.od-dark .od-field select,
+  .od-wrap.od-dark .od-field textarea { background: #1a1f30; color: var(--od-ink); }
+  .od-wrap.od-dark .od-modal-box { background: #232a40; color: var(--od-ink); }
+  .od-wrap.od-dark .od-modal-x { background: #1a1f30; }
+}
