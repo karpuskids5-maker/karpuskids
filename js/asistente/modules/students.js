@@ -183,8 +183,8 @@ export const StudentsModule = {
 
     tbody.innerHTML = page.map(s => {
       const grad = this._avatarGradientClass(s.id || s.name);
-      const emergName = Helpers.escapeHTML(s.emergency_contact || '—');
-      const emergRel = Helpers.escapeHTML(s.emergency_relationship || '');
+      const emergName = Helpers.escapeHTML(s.p1_emergency_contact || s.p2_emergency_contact || '—');
+      const emergRel = '';
       return `
       <tr class="hover:bg-slate-50 transition-all group cursor-pointer" ondblclick="window.App._openStudentModal('${s.id}')">
         <td data-label="Estudiante / ID" class="px-6 py-4">
@@ -304,7 +304,7 @@ export const StudentsModule = {
       return;
     }
     try {
-      const headers = ['ID', 'Matrícula', 'Nombre', 'Estado', 'Aula', 'Padre/Madre', 'Tel. Padre', 'Contacto Emergencia', 'Parentesco Emergencia'];
+      const headers = ['ID', 'Matrícula', 'Nombre', 'Estado', 'Aula', 'Padre/Madre', 'Tel. Padre', 'Contacto Emergencia P1', 'Contacto Emergencia P2'];
       const rows = list.map(s => [
         s.id,
         s.matricula || '',
@@ -313,8 +313,8 @@ export const StudentsModule = {
         s.classrooms?.name || '',
         s.p1_name || '',
         s.p1_phone || '',
-        s.emergency_contact || '',
-        s.emergency_relationship || '',
+        s.p1_emergency_contact || '',
+        s.p2_emergency_contact || '',
       ]);
       const csv = [
         headers.join(','),
@@ -355,7 +355,7 @@ export const StudentsModule = {
     try {
       const { data: students, error } = await supabase
         .from('students')
-        .select('id, name, is_active, p1_name, p1_phone, classroom_id, matricula, avatar_url, emergency_contact, emergency_relationship, classrooms:classroom_id(name)')
+        .select('id, name, is_active, p1_name, p1_phone, classroom_id, matricula, avatar_url, p1_emergency_contact, p2_emergency_contact, classrooms:classroom_id(name)')
         .order('name')
         .limit(500);
       if (error) throw error;
