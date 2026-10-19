@@ -21,7 +21,7 @@
     "@type": "ChildCare",
     "name": "Karpus Kids",
     "description": "Estancia infantil segura y amorosa en San Cristóbal. Cuidado experto, educación integral y app exclusiva para padres.",
-    "url": "https://karpuskids.com",
+    "url": "https://karpuskids.com/",
     "telephone": "+18298038424",
     "image": "https://karpuskids.com/img/karpus.jpg",
     "address": {
@@ -45,6 +45,28 @@
   </script>
   <link rel="icon" href="logo/favicon.ico" sizes="any">
   <link rel="apple-touch-icon" href="logo/apple-touch-icon.png">
+  <link rel="manifest" href="manifest.json">
+  <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/OneSignalSDKWorker.js', { scope: '/' }).catch(function () {});
+      navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(function () {});
+    }
+    window.OneSignalDeferred = window.OneSignalDeferred || [];
+    window.OneSignalDeferred.push(async function(OneSignal) {
+      try {
+        await OneSignal.init({
+          appId: "47ce2d1e-152e-4ea7-9ddc-8e2142992989",
+          safari_web_id: "web.onesignal.auto.63402434-7a0e-473d-9d21-f095166311e9",
+          serviceWorkerPath: 'OneSignalSDKWorker.js',
+          serviceWorkerParam: { scope: '/' },
+          notifyButton: { enable: false }
+        });
+      } catch (e) {
+        console.warn('OneSignal init:', e);
+      }
+    });
+  </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Poppins:wght@700;800;900&display=swap" rel="stylesheet">
@@ -275,31 +297,35 @@
           <i class="bi bi-person-circle"></i> Acceso
         </a>
         <button id="mobBtn" class="mob-btn"
-          style="display:flex;align-items:center;justify-content:center;width:42px;height:42px;border:none;background:#f1f5f9;border-radius:10px;cursor:pointer;">
+          style="display:flex;align-items:center;justify-content:center;width:42px;height:42px;border:none;background:#f1f5f9;border-radius:10px;cursor:pointer;" aria-label="Abrir menú de navegación">
           <i class="bi bi-list" id="mobIcon" style="font-size:20px;color:#475569;"></i>
         </button>
       </div>
     </nav>
-
-    <!-- Mobile menu -->
-    <div id="mobMenu" style="display:none;background:#fff;border-top:1px solid #f1f5f9;padding:10px 0 14px;border-radius:0 0 16px 16px;box-shadow:0 8px 24px rgba(0,0,0,0.08);">
-      <a href="#nosotros"  style="display:block;padding:12px 16px;font-weight:700;color:#475569;border-radius:10px;" onfocus="this.style.background='#f8fafc'" onblur="this.style.background=''">Nosotros</a>
-      <a href="#programas" style="display:block;padding:12px 16px;font-weight:700;color:#475569;border-radius:10px;" onfocus="this.style.background='#f8fafc'" onblur="this.style.background=''">Programas</a>
-      <a href="#app"       style="display:block;padding:12px 16px;font-weight:700;color:#475569;border-radius:10px;" onfocus="this.style.background='#f8fafc'" onblur="this.style.background=''">App</a>
-      <a href="#galeria"   style="display:block;padding:12px 16px;font-weight:700;color:#475569;border-radius:10px;" onfocus="this.style.background='#f8fafc'" onblur="this.style.background=''">Galería</a>
-      <a href="#donaciones" style="display:block;padding:12px 16px;font-weight:700;color:#475569;border-radius:10px;" onfocus="this.style.background='#f8fafc'" onblur="this.style.background=''">Donaciones</a>
-      <a href="#contacto"  style="display:block;padding:12px 16px;font-weight:700;color:#475569;border-radius:10px;" onfocus="this.style.background='#f8fafc'" onblur="this.style.background=''">Contacto</a>
-      <a href="login.html" style="display:block;margin:8px 16px 0;padding:12px;text-align:center;background:linear-gradient(135deg,#FF9800,#E91E63);color:white;font-weight:900;border-radius:14px;">Acceso Padres</a>
-    </div>
   </div>
 </header>
+
+<!-- Mobile menu overlay -->
+<div id="mobMenuOverlay" onclick="toggleMobMenu(false)" style="position:fixed;top:70px;left:0;width:100%;height:calc(100vh - 70px);background:rgba(0,0,0,0.5);z-index:90;display:none;backdrop-filter:blur(2px);"></div>
+
+<!-- Mobile menu container -->
+<div id="mobMenu" style="position:fixed;top:70px;left:0;width:100%;max-height:calc(100vh - 70px);overflow-y:auto;background:#fff;z-index:100;display:none;border-top:1px solid #f1f5f9;padding:10px 0 14px;border-radius:0 0 16px 16px;box-shadow:0 8px 24px rgba(0,0,0,0.12);">
+  <a href="#nosotros"  style="display:block;padding:12px 20px;font-weight:700;color:#475569;border-radius:10px;" onfocus="this.style.background='#f8fafc'" onblur="this.style.background=''">Nosotros</a>
+  <a href="#programas" style="display:block;padding:12px 20px;font-weight:700;color:#475569;border-radius:10px;" onfocus="this.style.background='#f8fafc'" onblur="this.style.background=''">Programas</a>
+  <a href="#app"       style="display:block;padding:12px 20px;font-weight:700;color:#475569;border-radius:10px;" onfocus="this.style.background='#f8fafc'" onblur="this.style.background=''">App</a>
+  <a href="#galeria"   style="display:block;padding:12px 20px;font-weight:700;color:#475569;border-radius:10px;" onfocus="this.style.background='#f8fafc'" onblur="this.style.background=''">Galería</a>
+  <a href="#donaciones" style="display:block;padding:12px 20px;font-weight:700;color:#475569;border-radius:10px;" onfocus="this.style.background='#f8fafc'" onblur="this.style.background=''">Donaciones</a>
+  <a href="#contacto"  style="display:block;padding:12px 20px;font-weight:700;color:#475569;border-radius:10px;" onfocus="this.style.background='#f8fafc'" onblur="this.style.background=''">Contacto</a>
+  <a href="login.html" style="display:block;margin:8px 16px 0;padding:12px;text-align:center;background:linear-gradient(135deg,#FF9800,#E91E63);color:white;font-weight:900;border-radius:14px;">Acceso Padres</a>
+</div>
 
 <!-- ════════════════════════════════════════════════════════════
      HERO — video background
 ════════════════════════════════════════════════════════════ -->
 <section class="hero" id="inicio">
   <!-- Video background (muted, autoplay) -->
-  <video class="hero-video" autoplay muted loop playsinline poster="img/karpus.jpg" aria-label="Video de fondo Karpus Kids">
+  <video class="hero-video video-bg" autoplay muted loop playsinline poster="img/karpus.jpg" aria-label="Video de fondo Karpus Kids">
+    <source src="img/video karpus kids.mp4" type="video/mp4">
     <source src="img/video%20karpus%20kids.mp4" type="video/mp4">
     <track kind="captions" srclang="es" label="Español" default>
   </video>
@@ -930,17 +956,17 @@
   <!-- Row 1 — left to right -->
   <div style="overflow:hidden;padding:4px 0;margin-bottom:14px;">
     <div class="film-strip">
-      <button class="film-btn" onclick="openLb('img/2.jpg')"  aria-label="Ver foto 2"><img src="img/2.jpg"  loading="lazy" alt=""></button>
-      <button class="film-btn" onclick="openLb('img/3.jpg')"  aria-label="Ver foto 3"><img src="img/3.jpg"  loading="lazy" alt=""></button>
-      <button class="film-btn" onclick="openLb('img/4.jpg')"  aria-label="Ver foto 4"><img src="img/4.jpg"  loading="lazy" alt=""></button>
-      <button class="film-btn" onclick="openLb('img/5.jpg')"  aria-label="Ver foto 5"><img src="img/5.jpg"  loading="lazy" alt=""></button>
-      <button class="film-btn" onclick="openLb('img/6.jpg')"  aria-label="Ver foto 6"><img src="img/6.jpg"  loading="lazy" alt=""></button>
-      <button class="film-btn" onclick="openLb('img/7.jpg')"  aria-label="Ver foto 7"><img src="img/7.jpg"  loading="lazy" alt=""></button>
-      <button class="film-btn" onclick="openLb('img/8.jpg')"  aria-label="Ver foto 8"><img src="img/8.jpg"  loading="lazy" alt=""></button>
-      <button class="film-btn" onclick="openLb('img/9.jpg')"  aria-label="Ver foto 9"><img src="img/9.jpg"  loading="lazy" alt=""></button>
-      <button class="film-btn" onclick="openLb('img/10.jpg')" aria-label="Ver foto 10"><img src="img/10.jpg" loading="lazy" alt=""></button>
-      <button class="film-btn" onclick="openLb('img/11.jpg')" aria-label="Ver foto 11"><img src="img/11.jpg" loading="lazy" alt=""></button>
-      <button class="film-btn" onclick="openLb('img/12.jpg')" aria-label="Ver foto 12"><img src="img/12.jpg" loading="lazy" alt=""></button>
+      <button class="film-btn" onclick="openLb('img/2.jpg')"  aria-label="Ver foto 2"><img src="img/2.jpg"  loading="lazy" alt="Actividad de caminadores Karpus Kids"></button>
+      <button class="film-btn" onclick="openLb('img/3.jpg')"  aria-label="Ver foto 3"><img src="img/3.jpg"  loading="lazy" alt="Grupo exploradores Karpus Kids"></button>
+      <button class="film-btn" onclick="openLb('img/4.jpg')"  aria-label="Ver foto 4"><img src="img/4.jpg"  loading="lazy" alt="Aulas y actividades preescolar"></button>
+      <button class="film-btn" onclick="openLb('img/5.jpg')"  aria-label="Ver foto 5"><img src="img/5.jpg"  loading="lazy" alt="Instalaciones pre-K Karpus Kids"></button>
+      <button class="film-btn" onclick="openLb('img/6.jpg')"  aria-label="Ver foto 6"><img src="img/6.jpg"  loading="lazy" alt="Espacio de sala de tareas"></button>
+      <button class="film-btn" onclick="openLb('img/7.jpg')"  aria-label="Ver foto 7"><img src="img/7.jpg"  loading="lazy" alt="Cursos extracurriculares en Karpus Kids"></button>
+      <button class="film-btn" onclick="openLb('img/8.jpg')"  aria-label="Ver foto 8"><img src="img/8.jpg"  loading="lazy" alt="Campamento de verano Karpus Kids"></button>
+      <button class="film-btn" onclick="openLb('img/9.jpg')"  aria-label="Ver foto 9"><img src="img/9.jpg"  loading="lazy" alt="Actividad recreativa Karpus Kids"></button>
+      <button class="film-btn" onclick="openLb('img/10.jpg')" aria-label="Ver foto 10"><img src="img/10.jpg" loading="lazy" alt="Instalaciones seguras y limpias"></button>
+      <button class="film-btn" onclick="openLb('img/11.jpg')" aria-label="Ver foto 11"><img src="img/11.jpg" loading="lazy" alt="Área de juegos Karpus Kids"></button>
+      <button class="film-btn" onclick="openLb('img/12.jpg')" aria-label="Ver foto 12"><img src="img/12.jpg" loading="lazy" alt="Momento educativo Karpus Kids"></button>
       <!-- duplicate for seamless loop -->
       <img src="img/2.jpg"  loading="lazy" alt="Karpus Kids" aria-hidden="true">
       <img src="img/3.jpg"  loading="lazy" alt="Karpus Kids" aria-hidden="true">
@@ -958,15 +984,15 @@
   <!-- Row 2 — right to left (reverse) -->
   <div style="overflow:hidden;padding:4px 0;">
     <div style="display:flex;width:max-content;animation:scrollLeft 50s linear infinite reverse;gap:14px;">
-      <button class="film-btn" onclick="openLb('img/1.jpg')"  aria-label="Ver foto 1"  style="height:180px;"><img src="img/1.jpg"  loading="lazy" alt="" style="height:180px;width:auto;object-fit:cover;border-radius:16px;"></button>
-      <button class="film-btn" onclick="openLb('img/5.jpg')"  aria-label="Ver foto 5"  style="height:180px;"><img src="img/5.jpg"  loading="lazy" alt="" style="height:180px;width:auto;object-fit:cover;border-radius:16px;"></button>
-      <button class="film-btn" onclick="openLb('img/8.jpg')"  aria-label="Ver foto 8"  style="height:180px;"><img src="img/8.jpg"  loading="lazy" alt="" style="height:180px;width:auto;object-fit:cover;border-radius:16px;"></button>
-      <button class="film-btn" onclick="openLb('img/11.jpg')" aria-label="Ver foto 11" style="height:180px;"><img src="img/11.jpg" loading="lazy" alt="" style="height:180px;width:auto;object-fit:cover;border-radius:16px;"></button>
-      <button class="film-btn" onclick="openLb('img/3.jpg')"  aria-label="Ver foto 3"  style="height:180px;"><img src="img/3.jpg"  loading="lazy" alt="" style="height:180px;width:auto;object-fit:cover;border-radius:16px;"></button>
-      <button class="film-btn" onclick="openLb('img/6.jpg')"  aria-label="Ver foto 6"  style="height:180px;"><img src="img/6.jpg"  loading="lazy" alt="" style="height:180px;width:auto;object-fit:cover;border-radius:16px;"></button>
-      <button class="film-btn" onclick="openLb('img/9.jpg')"  aria-label="Ver foto 9"  style="height:180px;"><img src="img/9.jpg"  loading="lazy" alt="" style="height:180px;width:auto;object-fit:cover;border-radius:16px;"></button>
-      <button class="film-btn" onclick="openLb('img/12.jpg')" aria-label="Ver foto 12" style="height:180px;"><img src="img/12.jpg" loading="lazy" alt="" style="height:180px;width:auto;object-fit:cover;border-radius:16px;"></button>
-      <button class="film-btn" onclick="openLb('img/2.jpg')"  aria-label="Ver foto 2"  style="height:180px;"><img src="img/2.jpg"  loading="lazy" alt="" style="height:180px;width:auto;object-fit:cover;border-radius:16px;"></button>
+      <button class="film-btn" onclick="openLb('img/1.jpg')"  aria-label="Ver foto 1"  style="height:180px;"><img src="img/1.jpg"  loading="lazy" alt="Bebés en área de cuidado" style="height:180px;width:auto;object-fit:cover;border-radius:16px;"></button>
+      <button class="film-btn" onclick="openLb('img/5.jpg')"  aria-label="Ver foto 5"  style="height:180px;"><img src="img/5.jpg"  loading="lazy" alt="Instalaciones pre-K" style="height:180px;width:auto;object-fit:cover;border-radius:16px;"></button>
+      <button class="film-btn" onclick="openLb('img/8.jpg')"  aria-label="Ver foto 8"  style="height:180px;"><img src="img/8.jpg"  loading="lazy" alt="Campamento Karpus Kids" style="height:180px;width:auto;object-fit:cover;border-radius:16px;"></button>
+      <button class="film-btn" onclick="openLb('img/11.jpg')" aria-label="Ver foto 11" style="height:180px;"><img src="img/11.jpg" loading="lazy" alt="Área de estimulación temprana" style="height:180px;width:auto;object-fit:cover;border-radius:16px;"></button>
+      <button class="film-btn" onclick="openLb('img/3.jpg')"  aria-label="Ver foto 3"  style="height:180px;"><img src="img/3.jpg"  loading="lazy" alt="Exploradores aprendiendo" style="height:180px;width:auto;object-fit:cover;border-radius:16px;"></button>
+      <button class="film-btn" onclick="openLb('img/6.jpg')"  aria-label="Ver foto 6"  style="height:180px;"><img src="img/6.jpg"  loading="lazy" alt="Sala de tareas Karpus Kids" style="height:180px;width:auto;object-fit:cover;border-radius:16px;"></button>
+      <button class="film-btn" onclick="openLb('img/9.jpg')"  aria-label="Ver foto 9"  style="height:180px;"><img src="img/9.jpg"  loading="lazy" alt="Aventura al aire libre" style="height:180px;width:auto;object-fit:cover;border-radius:16px;"></button>
+      <button class="film-btn" onclick="openLb('img/12.jpg')" aria-label="Ver foto 12" style="height:180px;"><img src="img/12.jpg" loading="lazy" alt="Actividad guiada por docentes" style="height:180px;width:auto;object-fit:cover;border-radius:16px;"></button>
+      <button class="film-btn" onclick="openLb('img/2.jpg')"  aria-label="Ver foto 2"  style="height:180px;"><img src="img/2.jpg"  loading="lazy" alt="Caminadores en juego libre" style="height:180px;width:auto;object-fit:cover;border-radius:16px;"></button>
       <!-- duplicate -->
       <img src="img/1.jpg"  loading="lazy" alt="Karpus Kids" style="height:180px;width:auto;object-fit:cover;flex-shrink:0;border-radius:16px;" aria-hidden="true">
       <img src="img/5.jpg"  loading="lazy" alt="Karpus Kids" style="height:180px;width:auto;object-fit:cover;flex-shrink:0;border-radius:16px;" aria-hidden="true">
@@ -1301,7 +1327,7 @@
 <!-- ── LIGHTBOX ── -->
 <dialog id="lb" aria-label="Visor de imágenes">
   <button id="lb-close" onclick="closeLb()" aria-label="Cerrar visor">✕</button>
-  <img id="lb-img" src="" alt="Foto Karpus Kids">
+  <img id="lb-img" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1 1'%3E%3C/svg%3E" alt="Foto Karpus Kids">
 </dialog>
 
 <script>
@@ -1310,18 +1336,23 @@
   window.addEventListener('scroll', () => hdr.classList.toggle('scrolled', scrollY > 40), { passive: true });
 
   // ── Mobile menu ───────────────────────────────────────────────────────────
-  const mobBtn  = document.getElementById('mobBtn');
-  const mobMenu = document.getElementById('mobMenu');
-  const mobIcon = document.getElementById('mobIcon');
-  mobBtn.addEventListener('click', () => {
-    const open = mobMenu.style.display === 'block';
-    mobMenu.style.display = open ? 'none' : 'block';
-    mobIcon.className = open ? 'bi bi-list' : 'bi bi-x-lg';
-  });
-  mobMenu.querySelectorAll('a').forEach(a => a.addEventListener('click', () => {
-    mobMenu.style.display = 'none';
-    mobIcon.className = 'bi bi-list';
-  }));
+  const mobBtn     = document.getElementById('mobBtn');
+  const mobMenu    = document.getElementById('mobMenu');
+  const mobOverlay = document.getElementById('mobMenuOverlay');
+  const mobIcon    = document.getElementById('mobIcon');
+
+  window.toggleMobMenu = function(forceState) {
+    if (!mobMenu) return;
+    const open = forceState !== undefined ? forceState : mobMenu.style.display !== 'block';
+    mobMenu.style.display    = open ? 'block' : 'none';
+    if (mobOverlay) mobOverlay.style.display = open ? 'block' : 'none';
+    if (mobIcon) mobIcon.className = open ? 'bi bi-x-lg' : 'bi bi-list';
+  };
+
+  if (mobBtn) mobBtn.addEventListener('click', () => toggleMobMenu());
+  if (mobMenu) {
+    mobMenu.querySelectorAll('a').forEach(a => a.addEventListener('click', () => toggleMobMenu(false)));
+  }
 
   // ── Lightbox ──────────────────────────────────────────────────────────────
   function openLb(src) {
@@ -1405,13 +1436,21 @@
           db: { schema: 'public' }
         });
 
-        const { data, error } = await client
+        let { data, error } = await client
           .from('donation_campaigns')
           .select('id, title, description, target_amount, raised_amount, cover_image_url, images, is_active, end_date')
           .eq('is_active', true)
           .order('created_at', { ascending: false });
 
-        if (error) throw error;
+        if (error) {
+          const fb = await client
+            .from('donation_campaigns')
+            .select('id, title, description, target_amount, raised_amount, cover_image_url, is_active, end_date')
+            .eq('is_active', true)
+            .order('created_at', { ascending: false });
+          if (fb.error) throw fb.error;
+          data = fb.data;
+        }
         window.kkCampaigns = data || [];
 
         // Opciones del formulario
