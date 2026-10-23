@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="es" class="scroll-smooth">
 <head>
   <meta charset="UTF-8"/>
@@ -8,6 +8,7 @@
   <meta name="keywords" content="guardería San Cristóbal, estancia infantil San Cristóbal, preescolar San Cristóbal, cuidado niños San Cristóbal, educación infantil San Cristóbal, Karpus Kids">
   <meta name="robots" content="index, follow">
   <link rel="canonical" href="https://karpuskids.com/">
+  <link rel="manifest" href="manifest.json">
   <meta property="og:title" content="Karpus Kids — Guardería y Estancia Infantil en San Cristóbal">
   <meta property="og:description" content="Guardería y estancia infantil en San Cristóbal, República Dominicana. Cuidado experto, educación integral y app exclusiva para padres.">
   <meta property="og:type" content="website">
@@ -42,6 +43,27 @@
       "https://wa.me/18298038424"
     ]
   }
+  </script>
+
+  <!-- OneSignal Push Notifications & Service Worker -->
+  <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+  <script>
+    window.OneSignalDeferred = window.OneSignalDeferred || [];
+    OneSignalDeferred.push(async function(OneSignal) {
+      await OneSignal.init({
+        appId: "47ce2d1e-152e-4ea7-9ddc-8e2142992989",
+        safari_web_id: "web.onesignal.auto.63402434-7a0e-473d-9d21-f095166311e9",
+        notifyButton: { enable: false }
+      });
+    });
+
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js', { scope: '/' })
+          .then(() => {})
+          .catch(() => {});
+      });
+    }
   </script>
   <link rel="icon" href="logo/favicon.ico" sizes="any">
   <link rel="apple-touch-icon" href="logo/apple-touch-icon.png">
@@ -250,7 +272,7 @@
         <div style="width:40px;height:40px;border-radius:12px;overflow:hidden;box-shadow:0 3px 10px rgba(0,0,0,0.18);flex-shrink:0;">
           <img src="img/mundo.jpg" alt="Logo" style="width:100%;height:100%;object-fit:cover;">
         </div>
-        <span class="kk" style="font-size:20px;font-weight:900;line-height:1;">
+        <span class="kk karpus-kids-colored" style="font-size:20px;font-weight:900;line-height:1;">
           <span class="k1">K</span><span class="k2">a</span><span class="k3">r</span><span class="k4">p</span><span class="k5">u</span><span class="k6">s</span>&#32;<span class="k7">K</span><span class="k8">i</span><span class="k9">d</span><span class="k10">s</span>
         </span>
       </a>
@@ -275,7 +297,7 @@
           <i class="bi bi-person-circle"></i> Acceso
         </a>
         <button id="mobBtn" class="mob-btn"
-          style="display:flex;align-items:center;justify-content:center;width:42px;height:42px;border:none;background:#f1f5f9;border-radius:10px;cursor:pointer;">
+          style="display:flex;align-items:center;justify-content:center;width:42px;height:42px;border:none;background:#f1f5f9;border-radius:10px;cursor:pointer;" type="button">
           <i class="bi bi-list" id="mobIcon" style="font-size:20px;color:#475569;"></i>
         </button>
       </div>
@@ -300,7 +322,7 @@
 <section class="hero" id="inicio">
   <!-- Video background (muted, autoplay) -->
   <video class="hero-video" autoplay muted loop playsinline poster="img/karpus.jpg" aria-label="Video de fondo Karpus Kids">
-    <source src="img/video%20karpus%20kids.mp4" type="video/mp4">
+    <source src="img/video karpus kids.mp4" type="video/mp4">
     <track kind="captions" srclang="es" label="Español" default>
   </video>
   <div class="hero-overlay"></div>
@@ -459,7 +481,7 @@
       <button id="btnVerTarifas" onclick="toggleTarifas()" aria-expanded="false" aria-controls="seccionTarifas"
         style="display:inline-flex;align-items:center;gap:10px;background:linear-gradient(135deg,#E91E63,#FF9800);color:#fff;font-weight:900;font-size:15px;padding:16px 36px;border-radius:50px;border:none;cursor:pointer;box-shadow:0 8px 32px rgba(233,30,99,.35);transition:transform .2s,box-shadow .2s;"
         onmouseover="this.style.transform='translateY(-3px)';this.style.boxShadow='0 16px 48px rgba(233,30,99,.45)'"
-        onmouseout="this.style.transform='';this.style.boxShadow='0 8px 32px rgba(233,30,99,.35)'">
+        onmouseout="this.style.transform='';this.style.boxShadow='0 8px 32px rgba(233,30,99,.35)'" type="button">
         <span style="font-size:20px;">💰</span>
         <span id="btnVerTarifasLabel">Ver Tarifas y Precios</span>
         <span id="btnVerTarifasArrow" style="font-size:18px;transition:transform .3s;">&#9660;</span>
@@ -568,10 +590,10 @@
       <p>Transparencia total. Elige el plan ideal y separa tu cupo hoy.</p>
     </div>
     <div class="pt-tabs" role="tablist">
-      <button class="pt-tab active" data-pt="matutina" role="tab" aria-selected="true"><span class="pt-emoji">&#127979;</span> Tanda Matutina</button>
-      <button class="pt-tab" data-pt="estancia" role="tab" aria-selected="false"><span class="pt-emoji">&#129380;</span> Estancia Temprana</button>
-      <button class="pt-tab" data-pt="completo" role="tab" aria-selected="false"><span class="pt-emoji">&#127969;</span> Colegio + Estancia</button>
-      <button class="pt-tab" data-pt="tareas" role="tab" aria-selected="false"><span class="pt-emoji">&#128218;</span> Sala de Tareas</button>
+      <button class="pt-tab active" data-pt="matutina" role="tab" aria-selected="true" type="button"><span class="pt-emoji">&#127979;</span> Tanda Matutina</button>
+      <button class="pt-tab" data-pt="estancia" role="tab" aria-selected="false" type="button"><span class="pt-emoji">&#129380;</span> Estancia Temprana</button>
+      <button class="pt-tab" data-pt="completo" role="tab" aria-selected="false" type="button"><span class="pt-emoji">&#127969;</span> Colegio + Estancia</button>
+      <button class="pt-tab" data-pt="tareas" role="tab" aria-selected="false" type="button"><span class="pt-emoji">&#128218;</span> Sala de Tareas</button>
     </div>
     <div class="pt-panel active" id="pt-matutina">
       <div class="pt-card">
@@ -930,17 +952,17 @@
   <!-- Row 1 — left to right -->
   <div style="overflow:hidden;padding:4px 0;margin-bottom:14px;">
     <div class="film-strip">
-      <button class="film-btn" onclick="openLb('img/2.jpg')"  aria-label="Ver foto 2"><img src="img/2.jpg"  loading="lazy" alt=""></button>
-      <button class="film-btn" onclick="openLb('img/3.jpg')"  aria-label="Ver foto 3"><img src="img/3.jpg"  loading="lazy" alt=""></button>
-      <button class="film-btn" onclick="openLb('img/4.jpg')"  aria-label="Ver foto 4"><img src="img/4.jpg"  loading="lazy" alt=""></button>
-      <button class="film-btn" onclick="openLb('img/5.jpg')"  aria-label="Ver foto 5"><img src="img/5.jpg"  loading="lazy" alt=""></button>
-      <button class="film-btn" onclick="openLb('img/6.jpg')"  aria-label="Ver foto 6"><img src="img/6.jpg"  loading="lazy" alt=""></button>
-      <button class="film-btn" onclick="openLb('img/7.jpg')"  aria-label="Ver foto 7"><img src="img/7.jpg"  loading="lazy" alt=""></button>
-      <button class="film-btn" onclick="openLb('img/8.jpg')"  aria-label="Ver foto 8"><img src="img/8.jpg"  loading="lazy" alt=""></button>
-      <button class="film-btn" onclick="openLb('img/9.jpg')"  aria-label="Ver foto 9"><img src="img/9.jpg"  loading="lazy" alt=""></button>
-      <button class="film-btn" onclick="openLb('img/10.jpg')" aria-label="Ver foto 10"><img src="img/10.jpg" loading="lazy" alt=""></button>
-      <button class="film-btn" onclick="openLb('img/11.jpg')" aria-label="Ver foto 11"><img src="img/11.jpg" loading="lazy" alt=""></button>
-      <button class="film-btn" onclick="openLb('img/12.jpg')" aria-label="Ver foto 12"><img src="img/12.jpg" loading="lazy" alt=""></button>
+      <button class="film-btn" onclick="openLb('img/2.jpg')"  aria-label="Ver foto 2" type="button"><img src="img/2.jpg"  loading="lazy" alt=""></button>
+      <button class="film-btn" onclick="openLb('img/3.jpg')"  aria-label="Ver foto 3" type="button"><img src="img/3.jpg"  loading="lazy" alt=""></button>
+      <button class="film-btn" onclick="openLb('img/4.jpg')"  aria-label="Ver foto 4" type="button"><img src="img/4.jpg"  loading="lazy" alt=""></button>
+      <button class="film-btn" onclick="openLb('img/5.jpg')"  aria-label="Ver foto 5" type="button"><img src="img/5.jpg"  loading="lazy" alt=""></button>
+      <button class="film-btn" onclick="openLb('img/6.jpg')"  aria-label="Ver foto 6" type="button"><img src="img/6.jpg"  loading="lazy" alt=""></button>
+      <button class="film-btn" onclick="openLb('img/7.jpg')"  aria-label="Ver foto 7" type="button"><img src="img/7.jpg"  loading="lazy" alt=""></button>
+      <button class="film-btn" onclick="openLb('img/8.jpg')"  aria-label="Ver foto 8" type="button"><img src="img/8.jpg"  loading="lazy" alt=""></button>
+      <button class="film-btn" onclick="openLb('img/9.jpg')"  aria-label="Ver foto 9" type="button"><img src="img/9.jpg"  loading="lazy" alt=""></button>
+      <button class="film-btn" onclick="openLb('img/10.jpg')" aria-label="Ver foto 10" type="button"><img src="img/10.jpg" loading="lazy" alt=""></button>
+      <button class="film-btn" onclick="openLb('img/11.jpg')" aria-label="Ver foto 11" type="button"><img src="img/11.jpg" loading="lazy" alt=""></button>
+      <button class="film-btn" onclick="openLb('img/12.jpg')" aria-label="Ver foto 12" type="button"><img src="img/12.jpg" loading="lazy" alt=""></button>
       <!-- duplicate for seamless loop -->
       <img src="img/2.jpg"  loading="lazy" alt="Karpus Kids" aria-hidden="true">
       <img src="img/3.jpg"  loading="lazy" alt="Karpus Kids" aria-hidden="true">
@@ -958,15 +980,15 @@
   <!-- Row 2 — right to left (reverse) -->
   <div style="overflow:hidden;padding:4px 0;">
     <div style="display:flex;width:max-content;animation:scrollLeft 50s linear infinite reverse;gap:14px;">
-      <button class="film-btn" onclick="openLb('img/1.jpg')"  aria-label="Ver foto 1"  style="height:180px;"><img src="img/1.jpg"  loading="lazy" alt="" style="height:180px;width:auto;object-fit:cover;border-radius:16px;"></button>
-      <button class="film-btn" onclick="openLb('img/5.jpg')"  aria-label="Ver foto 5"  style="height:180px;"><img src="img/5.jpg"  loading="lazy" alt="" style="height:180px;width:auto;object-fit:cover;border-radius:16px;"></button>
-      <button class="film-btn" onclick="openLb('img/8.jpg')"  aria-label="Ver foto 8"  style="height:180px;"><img src="img/8.jpg"  loading="lazy" alt="" style="height:180px;width:auto;object-fit:cover;border-radius:16px;"></button>
-      <button class="film-btn" onclick="openLb('img/11.jpg')" aria-label="Ver foto 11" style="height:180px;"><img src="img/11.jpg" loading="lazy" alt="" style="height:180px;width:auto;object-fit:cover;border-radius:16px;"></button>
-      <button class="film-btn" onclick="openLb('img/3.jpg')"  aria-label="Ver foto 3"  style="height:180px;"><img src="img/3.jpg"  loading="lazy" alt="" style="height:180px;width:auto;object-fit:cover;border-radius:16px;"></button>
-      <button class="film-btn" onclick="openLb('img/6.jpg')"  aria-label="Ver foto 6"  style="height:180px;"><img src="img/6.jpg"  loading="lazy" alt="" style="height:180px;width:auto;object-fit:cover;border-radius:16px;"></button>
-      <button class="film-btn" onclick="openLb('img/9.jpg')"  aria-label="Ver foto 9"  style="height:180px;"><img src="img/9.jpg"  loading="lazy" alt="" style="height:180px;width:auto;object-fit:cover;border-radius:16px;"></button>
-      <button class="film-btn" onclick="openLb('img/12.jpg')" aria-label="Ver foto 12" style="height:180px;"><img src="img/12.jpg" loading="lazy" alt="" style="height:180px;width:auto;object-fit:cover;border-radius:16px;"></button>
-      <button class="film-btn" onclick="openLb('img/2.jpg')"  aria-label="Ver foto 2"  style="height:180px;"><img src="img/2.jpg"  loading="lazy" alt="" style="height:180px;width:auto;object-fit:cover;border-radius:16px;"></button>
+      <button class="film-btn" onclick="openLb('img/1.jpg')"  aria-label="Ver foto 1"  style="height:180px;" type="button"><img src="img/1.jpg"  loading="lazy" alt="" style="height:180px;width:auto;object-fit:cover;border-radius:16px;"></button>
+      <button class="film-btn" onclick="openLb('img/5.jpg')"  aria-label="Ver foto 5"  style="height:180px;" type="button"><img src="img/5.jpg"  loading="lazy" alt="" style="height:180px;width:auto;object-fit:cover;border-radius:16px;"></button>
+      <button class="film-btn" onclick="openLb('img/8.jpg')"  aria-label="Ver foto 8"  style="height:180px;" type="button"><img src="img/8.jpg"  loading="lazy" alt="" style="height:180px;width:auto;object-fit:cover;border-radius:16px;"></button>
+      <button class="film-btn" onclick="openLb('img/11.jpg')" aria-label="Ver foto 11" style="height:180px;" type="button"><img src="img/11.jpg" loading="lazy" alt="" style="height:180px;width:auto;object-fit:cover;border-radius:16px;"></button>
+      <button class="film-btn" onclick="openLb('img/3.jpg')"  aria-label="Ver foto 3"  style="height:180px;" type="button"><img src="img/3.jpg"  loading="lazy" alt="" style="height:180px;width:auto;object-fit:cover;border-radius:16px;"></button>
+      <button class="film-btn" onclick="openLb('img/6.jpg')"  aria-label="Ver foto 6"  style="height:180px;" type="button"><img src="img/6.jpg"  loading="lazy" alt="" style="height:180px;width:auto;object-fit:cover;border-radius:16px;"></button>
+      <button class="film-btn" onclick="openLb('img/9.jpg')"  aria-label="Ver foto 9"  style="height:180px;" type="button"><img src="img/9.jpg"  loading="lazy" alt="" style="height:180px;width:auto;object-fit:cover;border-radius:16px;"></button>
+      <button class="film-btn" onclick="openLb('img/12.jpg')" aria-label="Ver foto 12" style="height:180px;" type="button"><img src="img/12.jpg" loading="lazy" alt="" style="height:180px;width:auto;object-fit:cover;border-radius:16px;"></button>
+      <button class="film-btn" onclick="openLb('img/2.jpg')"  aria-label="Ver foto 2"  style="height:180px;" type="button"><img src="img/2.jpg"  loading="lazy" alt="" style="height:180px;width:auto;object-fit:cover;border-radius:16px;"></button>
       <!-- duplicate -->
       <img src="img/1.jpg"  loading="lazy" alt="Karpus Kids" style="height:180px;width:auto;object-fit:cover;flex-shrink:0;border-radius:16px;" aria-hidden="true">
       <img src="img/5.jpg"  loading="lazy" alt="Karpus Kids" style="height:180px;width:auto;object-fit:cover;flex-shrink:0;border-radius:16px;" aria-hidden="true">
@@ -1176,7 +1198,7 @@
             Hacer donación anónima (ocultar mi nombre en la lista pública)
           </label>
 
-          <button id="donBtn" onclick="submitDonation()" style="width:100%;padding:15px;border:none;border-radius:14px;background:linear-gradient(135deg,#B45309,#BE123C);color:#fff;font-weight:900;font-size:15px;cursor:pointer;box-shadow:0 8px 24px rgba(255,152,0,.4);transition:transform .2s,box-shadow .2s;">Donar ahora</button>
+          <button id="donBtn" onclick="submitDonation()" style="width:100%;padding:15px;border:none;border-radius:14px;background:linear-gradient(135deg,#B45309,#BE123C);color:#fff;font-weight:900;font-size:15px;cursor:pointer;box-shadow:0 8px 24px rgba(255,152,0,.4);transition:transform .2s,box-shadow .2s;" type="button">Donar ahora</button>
 
           <div id="donMsg" style="font-size:13px;font-weight:700;color:rgba(255,255,255,.8);text-align:center;display:none;"></div>
         </div>
@@ -1190,8 +1212,8 @@
           <p style="color:rgba(255,255,255,.85);font-size:13.5px;line-height:1.7;margin-bottom:14px;">Tu donación quedó registrada con la referencia de seguimiento:</p>
           <div id="donRef" style="font-size:15px;font-weight:900;color:#FFB74D;background:#3F2A10;border:1px dashed rgba(255,152,0,.4);border-radius:12px;padding:12px;margin-bottom:18px;"></div>
           <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
-            <button onclick="downloadReceipt()" style="padding:12px 20px;border:none;border-radius:12px;background:linear-gradient(135deg,#15803D,#115E59);color:#fff;font-weight:900;font-size:13px;cursor:pointer;"><i class="bi bi-file-earmark-pdf"></i> Descargar Recibo</button>
-            <button onclick="resetDonationForm()" style="padding:12px 20px;border:2px solid rgba(255,255,255,.2);background:transparent;color:#fff;font-weight:900;font-size:13px;border-radius:12px;cursor:pointer;">Nueva donación</button>
+            <button onclick="downloadReceipt()" style="padding:12px 20px;border:none;border-radius:12px;background:linear-gradient(135deg,#15803D,#115E59);color:#fff;font-weight:900;font-size:13px;cursor:pointer;" type="button"><i class="bi bi-file-earmark-pdf"></i> Descargar Recibo</button>
+            <button onclick="resetDonationForm()" style="padding:12px 20px;border:2px solid rgba(255,255,255,.2);background:transparent;color:#fff;font-weight:900;font-size:13px;border-radius:12px;cursor:pointer;" type="button">Nueva donación</button>
           </div>
         </div>
 
@@ -1215,7 +1237,7 @@
           <div style="width:40px;height:40px;border-radius:12px;overflow:hidden;flex-shrink:0;">
             <img src="img/mundo.jpg" alt="Karpus Kids" style="width:100%;height:100%;object-fit:cover;">
           </div>
-          <span class="kk" style="font-size:20px;font-weight:900;line-height:1;">
+          <span class="kk karpus-kids-colored" style="font-size:20px;font-weight:900;line-height:1;">
             <span class="k1">K</span><span class="k2">a</span><span class="k3">r</span><span class="k4">p</span><span class="k5">u</span><span class="k6">s</span>&#32;<span class="k7">K</span><span class="k8">i</span><span class="k9">d</span><span class="k10">s</span>
           </span>
         </div>
@@ -1294,13 +1316,16 @@
 
 
 
+<!-- Mobile Menu Backdrop Overlay -->
+<div id="mobMenuOverlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(15,23,42,0.5);z-index:90;backdrop-filter:blur(3px);" onclick="closeMobMenu()"></div>
+
 <!-- ── FABs ── -->
 <a href="https://wa.me/18298038424" target="_blank" class="fab fab-ws" title="WhatsApp"><i class="bi bi-whatsapp"></i></a>
 <a href="https://instagram.com"     target="_blank" class="fab fab-ig" title="Instagram"><i class="bi bi-instagram"></i></a>
 
 <!-- ── LIGHTBOX ── -->
 <dialog id="lb" aria-label="Visor de imágenes">
-  <button id="lb-close" onclick="closeLb()" aria-label="Cerrar visor">✕</button>
+  <button id="lb-close" onclick="closeLb()" aria-label="Cerrar visor" type="button">✕</button>
   <img id="lb-img" src="" alt="Foto Karpus Kids">
 </dialog>
 
@@ -1310,18 +1335,29 @@
   window.addEventListener('scroll', () => hdr.classList.toggle('scrolled', scrollY > 40), { passive: true });
 
   // ── Mobile menu ───────────────────────────────────────────────────────────
-  const mobBtn  = document.getElementById('mobBtn');
-  const mobMenu = document.getElementById('mobMenu');
-  const mobIcon = document.getElementById('mobIcon');
+  const mobBtn     = document.getElementById('mobBtn');
+  const mobMenu    = document.getElementById('mobMenu');
+  const mobOverlay = document.getElementById('mobMenuOverlay');
+  const mobIcon    = document.getElementById('mobIcon');
+
+  function openMobMenu() {
+    mobMenu.style.display = 'block';
+    if (mobOverlay) mobOverlay.style.display = 'block';
+    mobIcon.className = 'bi bi-x-lg';
+  }
+
+  function closeMobMenu() {
+    mobMenu.style.display = 'none';
+    if (mobOverlay) mobOverlay.style.display = 'none';
+    mobIcon.className = 'bi bi-list';
+  }
+
   mobBtn.addEventListener('click', () => {
     const open = mobMenu.style.display === 'block';
-    mobMenu.style.display = open ? 'none' : 'block';
-    mobIcon.className = open ? 'bi bi-list' : 'bi bi-x-lg';
+    if (open) closeMobMenu(); else openMobMenu();
   });
-  mobMenu.querySelectorAll('a').forEach(a => a.addEventListener('click', () => {
-    mobMenu.style.display = 'none';
-    mobIcon.className = 'bi bi-list';
-  }));
+
+  mobMenu.querySelectorAll('a').forEach(a => a.addEventListener('click', closeMobMenu));
 
   // ── Lightbox ──────────────────────────────────────────────────────────────
   function openLb(src) {
@@ -1405,11 +1441,26 @@
           db: { schema: 'public' }
         });
 
-        const { data, error } = await client
+        let data, error;
+        const res1 = await client
           .from('donation_campaigns')
           .select('id, title, description, target_amount, raised_amount, cover_image_url, images, is_active, end_date')
           .eq('is_active', true)
           .order('created_at', { ascending: false });
+
+        if (res1.error) {
+          // Fallback query omitting the `images` column
+          const res2 = await client
+            .from('donation_campaigns')
+            .select('id, title, description, target_amount, raised_amount, cover_image_url, is_active, end_date')
+            .eq('is_active', true)
+            .order('created_at', { ascending: false });
+          data = res2.data;
+          error = res2.error;
+        } else {
+          data = res1.data;
+          error = res1.error;
+        }
 
         if (error) throw error;
         window.kkCampaigns = data || [];
@@ -1473,7 +1524,7 @@
                 <span class="kk-don-muted">de ${fmtRD(target)} · ${cpct.toFixed(0)}% · ${esc(daysLeft(c))}</span>
               </div>
             </div>
-            <button class="kk-don-btn" onclick="pickCampaign(${c.id})">Donar a esta causa</button>
+            <button class="kk-don-btn" onclick="pickCampaign(${c.id})" type="button">Donar a esta causa</button>
           </div>`;
         }).join('');
       } catch (err) {
@@ -1686,11 +1737,11 @@
         if (file.type.startsWith('image/')) {
           const reader = new FileReader();
           reader.onload = (e) => {
-            prev.innerHTML = '<div style="position:relative;display:inline-block;"><img src="' + e.target.result + '" style="max-height:120px;border-radius:10px;border:2px solid rgba(255,255,255,.15);display:block;"><button onclick="event.stopPropagation();clearDonFile()" style="position:absolute;top:-6px;right:-6px;width:22px;height:22px;border-radius:50%;background:#ef4444;color:#fff;border:2px solid #0a0f1e;font-size:11px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;">✕</button><div style="font-size:10.5px;color:rgba(255,255,255,.5);margin-top:6px;font-weight:600;text-align:center;">' + esc(file.name) + ' (' + (file.size / 1024).toFixed(0) + ' KB)</div></div>';
+            prev.innerHTML = '<div style="position:relative;display:inline-block;"><img src="' + e.target.result + '" style="max-height:120px;border-radius:10px;border:2px solid rgba(255,255,255,.15);display:block;"><button onclick="event.stopPropagation();clearDonFile()" style="position:absolute;top:-6px;right:-6px;width:22px;height:22px;border-radius:50%;background:#ef4444;color:#fff;border:2px solid #0a0f1e;font-size:11px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;" type="button">✕</button><div style="font-size:10.5px;color:rgba(255,255,255,.5);margin-top:6px;font-weight:600;text-align:center;">' + esc(file.name) + ' (' + (file.size / 1024).toFixed(0) + ' KB)</div></div>';
           };
           reader.readAsDataURL(file);
         } else {
-          prev.innerHTML = '<div style="display:flex;align-items:center;gap:10px;"><i class="bi bi-file-earmark-pdf" style="font-size:32px;color:#ef4444;"></i><div><div style="font-size:12px;color:rgba(255,255,255,.8);font-weight:700;">' + esc(file.name) + '</div><div style="font-size:10.5px;color:rgba(255,255,255,.4);">' + (file.size / 1024).toFixed(0) + ' KB</div></div><button onclick="event.stopPropagation();clearDonFile()" style="margin-left:auto;width:22px;height:22px;border-radius:50%;background:#ef4444;color:#fff;border:none;font-size:11px;cursor:pointer;">✕</button></div>';
+          prev.innerHTML = '<div style="display:flex;align-items:center;gap:10px;"><i class="bi bi-file-earmark-pdf" style="font-size:32px;color:#ef4444;"></i><div><div style="font-size:12px;color:rgba(255,255,255,.8);font-weight:700;">' + esc(file.name) + '</div><div style="font-size:10.5px;color:rgba(255,255,255,.4);">' + (file.size / 1024).toFixed(0) + ' KB</div></div><button onclick="event.stopPropagation();clearDonFile()" style="margin-left:auto;width:22px;height:22px;border-radius:50%;background:#ef4444;color:#fff;border:none;font-size:11px;cursor:pointer;" type="button">✕</button></div>';
         }
       }
     })();
