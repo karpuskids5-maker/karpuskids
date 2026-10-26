@@ -43,8 +43,10 @@
     ]
   }
   </script>
+  <link rel="manifest" href="manifest.json">
   <link rel="icon" href="logo/favicon.ico" sizes="any">
   <link rel="apple-touch-icon" href="logo/apple-touch-icon.png">
+  <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Poppins:wght@700;800;900&display=swap" rel="stylesheet">
@@ -1305,6 +1307,21 @@
 </dialog>
 
 <script>
+  // ── Service Worker & OneSignal PWA Setup ──────────────────────────────────
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/OneSignalSDKWorker.js', { scope: '/' }).catch(() => {});
+    navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(() => {});
+  }
+  window.OneSignalDeferred = window.OneSignalDeferred || [];
+  window.OneSignalDeferred.push(async function(OneSignal) {
+    await OneSignal.init({
+      appId: "47ce2d1e-152e-4ea7-9ddc-8e2142992989",
+      safari_web_id: "web.onesignal.auto.63402434-7a0e-473d-9d21-f095166311e9",
+      serviceWorkerPath: 'OneSignalSDKWorker.js',
+      notifyButton: { enable: false }
+    });
+  });
+
   // ── Navbar scroll ─────────────────────────────────────────────────────────
   const hdr = document.getElementById('siteHeader');
   window.addEventListener('scroll', () => hdr.classList.toggle('scrolled', scrollY > 40), { passive: true });
