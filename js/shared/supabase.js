@@ -383,7 +383,13 @@ export function startAccountWatchdog(userId, isAdmin = false) {
  */
 export async function isBusinessSuspended() {
   try {
-    const { data, error } = await supabase.rpc('is_business_suspended');
+    // Timeout corto: si la BD/PostgREST está saturada (504), NO debe colgar el
+    // login ni el guard de los paneles. Fail-open: se asume no suspendido.
+    const { data, error } = await Promise.race([
+      supabase.rpc('is_business_suspended'),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('suspension_timeout')), 5000))
+    ]);
     if (error) {
       Helpers.safeLog('warn', '[Suspension] RPC no disponible:', error.message);
       return false;
@@ -551,8 +557,14 @@ export async function ensureRole(requiredRoles) {
   }
 
   // 2. Verificar aceptación de términos (solo si es panel real, no login)
-  // Si termsRes.error existe (ej: tabla no existe), permitimos pasar para no bloquear la app
-  if (!terms && !termsRes.error && !window.location.pathname.includes('login.html')) {
+  // Si termsRes.error existe (ej: tabla no existe / red), permitimos pasar.
+  // Si el usuario ya aceptó en este dispositivo, también permitimos pasar: así
+  // un fallo de RLS o una caída de la BD no deja al usuario atrapado en el
+  // bucle login.html?reason=terms.
+  const termsAcceptedLocally =
+    localStorage.getItem('karpus_terms_accepted_' + TERMS_VERSION) === 'true';
+  if (!terms && !termsRes.error && !termsAcceptedLocally &&
+      !window.location.pathname.includes('login.html')) {
     window.location.href = 'login.html?reason=terms';
     return null;
   }

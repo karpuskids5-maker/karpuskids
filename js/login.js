@@ -95,7 +95,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
   // 3) Verificación en segundo plano: si la empresa está suspendida, mostrar
   //    el banner aunque el usuario abra login.html directamente.
-  try { if (await isBusinessSuspended()) showSuspBanner(); } catch (_) {}
+  //    NO se espera (await): si el RPC tarda por un 504, no debe bloquear el
+  //    registro del formulario de login.
+  isBusinessSuspended().then(showSuspBanner).catch(() => {});
 
   const { data: { session } } = await supabase.auth.getSession();
   
@@ -125,15 +127,27 @@ document.addEventListener('DOMContentLoaded', async () => {
         submitBtn.textContent = 'Guardando...';
         
         try {
-          await supabase.from('terms_acceptance').upsert({
-            user_id:       session.user.id,
-            terms_version: TERMS_VERSION,
-            accepted_at:   new Date().toISOString()
-          }, { onConflict: 'user_id,terms_version' });
-          
+          // Guardar el flag local primero: aunque la escritura falle o tarde
+          // (RLS/504), el guard de los paneles dejará entrar al usuario.
           localStorage.setItem('karpus_terms_accepted_' + TERMS_VERSION, 'true');
+
+          await Promise.race([
+            supabase.from('terms_acceptance').upsert({
+              user_id:       session.user.id,
+              terms_version: TERMS_VERSION,
+              accepted_at:   new Date().toISOString()
+            }, { onConflict: 'user_id,terms_version' }),
+            new Promise((_, reject) =>
+              setTimeout(() => reject(new Error('terms_timeout')), 6000))
+          ]);
+
           await redirectByRole(session.user.id);
         } catch (err) {
+          if (String(err?.message || '').includes('terms_timeout')) {
+            // No bloqueamos por una escritura lenta: continuar al panel.
+            await redirectByRole(session.user.id);
+            return;
+          }
           alert('Error al guardar. Intenta de nuevo.');
           submitBtn.disabled = false;
         }
@@ -220,14 +234,23 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       const userId = authData.user.id;
 
-      // 2. Registrar aceptación de términos si no está registrada
+      // 2. Registrar aceptación de términos si no está registrada.
+      // El flag local se guarda igualmente: si el guard de los paneles no puede
+      // leer la tabla (RLS/red), no debe bloquear el acceso.
       if (acceptTerms?.checked) {
         localStorage.setItem('karpus_terms_accepted_' + TERMS_VERSION, 'true');
-        await supabase.from('terms_acceptance').upsert({
+        // No bloquear el ingreso esperando esta escritura: si la BD está lenta
+        // (504) el usuario debe entrar igual, el flag local ya quedó guardado.
+        supabase.from('terms_acceptance').upsert({
           user_id:       userId,
           terms_version: TERMS_VERSION,
           accepted_at:   new Date().toISOString()
-        }, { onConflict: 'user_id,terms_version', ignoreDuplicates: true });
+        }, { onConflict: 'user_id,terms_version', ignoreDuplicates: true })
+          .then(({ error: termsError }) => {
+            if (termsError) {
+              console.warn('[Login] No se pudo guardar la aceptación de términos:', termsError.message);
+            }
+          });
       }
 
       // 3. OneSignal
@@ -252,10 +275,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     } catch (error) {
       const msg  = String(error?.message || '');
       const name = String(error?.name || '');
-      const isNetwork = name === 'AuthRetryableFetchError' || msg.includes('Failed to fetch') || msg.includes('NetworkError');
+      const isTimeout = /timeout|504|gateway|timed out/i.test(msg);
+      const isNetwork = name === 'AuthRetryableFetchError' || msg.includes('Failed to fetch') || msg.includes('NetworkError') || isTimeout;
 
       let errorMessage = 'Ocurrió un error inesperado. Intenta de nuevo.';
-      if (isNetwork)                               errorMessage = 'Sin conexión. Verifica tu internet.';
+      if (isTimeout)                                errorMessage = 'El servicio está saturado en este momento. Espera unos segundos e intenta de nuevo.';
+      else if (isNetwork)                          errorMessage = 'Sin conexión. Verifica tu internet.';
       else if (msg.includes('Invalid login'))      errorMessage = 'Correo o contraseña incorrectos.';
       else if (msg.includes('Email not confirmed')) errorMessage = 'Confirma tu correo antes de ingresar.';
 
@@ -286,15 +311,30 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 });
 
+// Consulta el perfil con timeout + un reintento. Evita que un 504/red lenta
+// deje al usuario atrapado en el login sin mensaje claro.
+async function fetchProfileForRedirect(userId, attempts = 2, timeoutMs = 12000) {
+  let lastError = null;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      const { data, error } = await Promise.race([
+        supabase.from('profiles').select('role, is_active').eq('id', userId).maybeSingle(),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('profile_timeout')), timeoutMs))
+      ]);
+      if (error) throw error;
+      return data;
+    } catch (err) {
+      lastError = err;
+      if (i < attempts - 1) await new Promise(r => setTimeout(r, 800));
+    }
+  }
+  throw lastError || new Error('profile_error');
+}
+
 async function redirectByRole(userId) {
   try {
-    const { data: profile, error } = await supabase
-      .from('profiles')
-      .select('role, is_active')
-      .eq('id', userId)
-      .maybeSingle();
-
-    if (error) throw error;
+    const profile = await fetchProfileForRedirect(userId);
 
     if (!profile) {
       alert('Tu cuenta no tiene un perfil configurado. Por favor, contacta al administrador.');
@@ -340,6 +380,24 @@ async function redirectByRole(userId) {
       window.location.reload();
     }
   } catch (e) {
-    alert('Error al obtener el perfil. Intenta de nuevo.');
+    const msg = String(e?.message || '');
+    const isTimeout = /timeout|504|gateway|failed to fetch|network/i.test(msg);
+    const errorDiv = document.getElementById('loginError');
+    const text = isTimeout
+      ? 'El servicio está tardando más de lo normal. Espera unos segundos e intenta de nuevo.'
+      : 'Error al obtener el perfil. Intenta de nuevo.';
+    if (errorDiv) {
+      errorDiv.textContent = text;
+      errorDiv.classList.remove('hidden');
+    } else {
+      alert(text);
+    }
+    // No cerramos sesión: al recargar, login.js reintenta la redirección.
+    const submitBtn = document.getElementById('btnLogin');
+    const btnText   = document.getElementById('btnLoginText');
+    const btnIcon   = document.getElementById('btnLoginIcon');
+    if (submitBtn) submitBtn.disabled = false;
+    if (btnText) btnText.textContent = 'Ingresar al Panel';
+    if (btnIcon) btnIcon.textContent = '→';
   }
 }
