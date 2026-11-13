@@ -35,14 +35,14 @@ input:-webkit-autofill { -webkit-box-shadow: 0 0 0 40px #f8fafc inset !important
 }
 .pwa-icon-bounce { animation: iconBounce 1.5s ease-in-out infinite; }
 
-/* ── Banner grande de suspensión del servicio (sube desde abajo) ── */
-@keyframes suspSlideUp {
+/* ── Banner: cuenta desactivada (sube desde abajo) ── */
+@keyframes slideUpBanner {
   from { transform: translateY(130%); opacity: 0; }
   to   { transform: translateY(0);     opacity: 1; }
 }
-.susp-banner { will-change: transform, opacity; }
-.susp-banner-open { animation: suspSlideUp .65s cubic-bezier(.16,1,.3,1) both; }
+.inactive-banner { will-change: transform, opacity; }
+.inactive-banner-open { animation: slideUpBanner .65s cubic-bezier(.16,1,.3,1) both; }
 
 @media (prefers-reduced-motion: reduce) {
-  .susp-banner-open { animation-duration: .01s; }
+  .inactive-banner-open { animation-duration: .01s; }
 }

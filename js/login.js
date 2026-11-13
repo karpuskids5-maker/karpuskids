@@ -65,39 +65,24 @@ document.addEventListener('DOMContentLoaded', async () => {
   const urlParams = new URLSearchParams(window.location.search);
   const reason    = urlParams.get('reason');
 
-  // ── Banner grande de suspensión (sube desde abajo) ───────────────────────
-  const suspBanner = document.getElementById('suspBanner');
-  const suspClose  = document.getElementById('suspBannerClose');
+  // ── Banner: cuenta desactivada (sube desde abajo) ────────────────────────
+  const inactiveBanner = document.getElementById('inactiveBanner');
+  const inactiveClose  = document.getElementById('inactiveBannerClose');
 
-  function showSuspBanner() {
-    if (!suspBanner) return;
-    if (suspBanner.classList.contains('hidden')) {
-      suspBanner.classList.remove('hidden');
-      requestAnimationFrame(() => suspBanner.classList.add('susp-banner-open'));
+  function showInactiveBanner() {
+    if (!inactiveBanner) return;
+    if (inactiveBanner.classList.contains('hidden')) {
+      inactiveBanner.classList.remove('hidden');
+      requestAnimationFrame(() => inactiveBanner.classList.add('inactive-banner-open'));
     }
   }
 
-  if (suspClose) suspClose.addEventListener('click', () => {
-    if (suspBanner) suspBanner.classList.add('hidden');
+  if (inactiveClose) inactiveClose.addEventListener('click', () => {
+    if (inactiveBanner) inactiveBanner.classList.add('hidden');
   });
 
-  // 1) Llegamos desde una redirección por suspensión (login.html?reason=suspended)
-  if (reason === 'suspended') showSuspBanner();
-  // 2) Cuenta desactivada (maestra/asistente inactiva) — banner personalizado
-  if (reason === 'inactive') {
-    const icon = suspBanner?.querySelector('.text-5xl');
-    if (icon) icon.textContent = '🔒';
-    const title = suspBanner?.querySelector('h2');
-    if (title) title.textContent = 'Cuenta desactivada';
-    const txt = suspBanner?.querySelector('p');
-    if (txt) txt.textContent = 'Tu acceso fue desactivado por la administración. Ya no puedes ingresar al panel. Contacta a la directora para reactivar tu cuenta.';
-    showSuspBanner();
-  }
-  // 3) Verificación en segundo plano: si la empresa está suspendida, mostrar
-  //    el banner aunque el usuario abra login.html directamente.
-  //    NO se espera (await): si el RPC tarda por un 504, no debe bloquear el
-  //    registro del formulario de login.
-  isBusinessSuspended().then(showSuspBanner).catch(() => {});
+  // Cuenta desactivada (maestra/asistente inactiva) — banner personalizado
+  if (reason === 'inactive') showInactiveBanner();
 
   const { data: { session } } = await supabase.auth.getSession();
   
